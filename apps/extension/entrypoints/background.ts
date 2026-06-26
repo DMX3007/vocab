@@ -56,34 +56,54 @@ export default defineBackground(() => {
         );
       case 'GET_REVIEW_LOGS':
         return repo.getReviewLogs(message.payload.wordId);
-      default:
+      default: {
         const exhaustive: never = message
         throw new Error(`Unknown message: ${String(exhaustive)}`);
+      }
     }
   }
 
+  type TickContext = {
+    dueCount: number;
+    tabId: number;
+    host: string;
+    pageCtx: {
+      userIsTyping: boolean;
+      isFullscreen: boolean;
+    }
+  }
   // ── the review alarm ─────────────────────────────────────────
-  async function onTick(): Promise<void> {
-    await ready;
-    const now = new Date();
+  async function prepareForTick(now: Date): Promise<TickContext | undefined> {
     const dueCount = (await repo.getDueWords(now, LANG_TO)).length;
     if (dueCount === 0) return;
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id || !tab.url) return;
+    const tabId = tab.id
+
     let host: string;
     try { host = new URL(tab.url).hostname; } catch { return; } // skip browser:// etc.
 
-    // Ask the content script for live page context (typing? fullscreen?).
     const pageCtx = await askPageContext(tab.id);
     if (!pageCtx) return; // no content script on this page (browser store, pdf...)
 
+    return { dueCount, tabId, host, pageCtx }
+  }
+
+  async function onTick(): Promise<void> {
+    await ready;
+    const now = new Date();
     const settings = await settingsStore.load();
+
+    const context = await prepareForTick(now)
+    if (!context) return
+
+    const { dueCount, host, pageCtx, tabId } = context
     const result = planTick(settings, { host, dueCount, ...pageCtx }, now);
     if (!result.show) return;
 
     if (result.settings) await settingsStore.save(result.settings);
-    browser.tabs.sendMessage(tab.id, { type: 'SHOW_OVERLAY', langTo: LANG_TO }).catch(() => { });
+    browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: LANG_TO }).catch(() => { });
   }
 
   async function askPageContext(tabId: number): Promise<{ userIsTyping: boolean; isFullscreen: boolean } | null> {

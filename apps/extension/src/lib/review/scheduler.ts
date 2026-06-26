@@ -8,7 +8,7 @@ import {
 // the active tab's page context, calls this, and acts on the result:
 //   - show: render the overlay on the active tab
 //   - settings: persist these (records the show for throttle + hourly cap)
-// chrome.alarms wiring and message-sending stay outside this file.
+// browser.alarms wiring and message-sending stay outside this file.
 
 const ONE_HOUR_MS = 3_600_000;
 
