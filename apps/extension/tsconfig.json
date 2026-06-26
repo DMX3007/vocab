@@ -1,0 +1,11 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "noUncheckedIndexedAccess": true,
+    "lib": [
+      "ESNext",
+      "DOM"
+    ]
+  },
+}

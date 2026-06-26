@@ -1,0 +1,76 @@
+/* The popup document itself — remove the default white margin/background
+   that was showing as a white frame around the dark dashboard. */
+:root, html, body { margin: 0; padding: 0; background: #1c1a17; }
+
+/* Popup + review card styles. The popup renders in its own document
+   (not injected into a host page), so no Shadow-DOM reset is needed here. */
+.vf-app {
+  width: 340px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: #1c1a17;
+  background: #1c1a17;
+  padding: 0;
+}
+
+/* ── dashboard ─────────────────────────────────────────────── */
+.vf-dash { background: #1c1a17; color: #f3ece1; padding: 18px 18px 22px; }
+.vf-brand { font-family: Georgia, serif; font-style: italic; font-size: 20px; }
+.vf-stats { display: flex; gap: 18px; margin: 16px 0; }
+.vf-stat { flex: 1; }
+.vf-stat-n { font-family: Georgia, serif; font-size: 28px; line-height: 1; }
+.vf-stat-due { color: #e8855c; }
+.vf-stat-streak { color: #e0b15a; }
+.vf-stat-l { font-size: 10px; letter-spacing: 0.1em; color: #8a8073; margin-top: 4px; }
+
+.vf-lang { font-size: 11px; letter-spacing: 0.08em; color: #8a8073; margin-bottom: 14px; }
+.vf-lang b { color: #f3ece1; }
+
+.vf-review-btn {
+  width: 100%; padding: 14px; border: none; border-radius: 10px;
+  background: #e8855c; color: #1c1a17; font-size: 14px; font-weight: 700;
+  letter-spacing: 0.04em; cursor: pointer;
+}
+.vf-review-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.vf-libhead { font-size: 10px; letter-spacing: 0.1em; color: #8a8073; margin: 20px 0 8px; }
+.vf-libitem { display: flex; justify-content: space-between; padding: 8px 0;
+  border-top: 1px solid #2c2925; }
+.vf-libterm { font-family: Georgia, serif; font-style: italic; color: #f3ece1; }
+.vf-libtr { color: #8a8073; font-size: 13px; }
+.vf-libempty { color: #6a6358; font-size: 13px; padding: 10px 0; }
+
+/* ── review card ───────────────────────────────────────────── */
+.vf-card { background: #f7d9cf; color: #1c1a17; padding: 22px; min-height: 200px; }
+.vf-card.vf-ok { background: #d7ecd4; }
+.vf-card.vf-almost { background: #f4e6c3; }
+.vf-card.vf-wrong { background: #f3cfcf; }
+.vf-card-top { display: flex; justify-content: space-between; font-size: 11px;
+  letter-spacing: 0.06em; color: #8a6f64; }
+.vf-card-prompt { font-family: Georgia, serif; font-style: italic; font-size: 34px;
+  margin: 18px 0 6px; }
+.vf-card-ctx { font-size: 12px; color: #99796c; margin-bottom: 16px; }
+.vf-card-input { width: 100%; padding: 12px 14px; border: none; border-radius: 8px;
+  background: #1c1a17; color: #f3ece1; font-size: 15px; outline: none; }
+.vf-card-input::placeholder { color: #6a6358; }
+.vf-card-input:disabled { opacity: 0.8; }
+.vf-card-actions, .vf-card-feedback { display: flex; align-items: center;
+  gap: 10px; margin-top: 16px; }
+.vf-card-feedback { justify-content: space-between; }
+.vf-card-verdict { font-weight: 700; }
+.vf-card-answer { flex: 1; font-family: Georgia, serif; font-style: italic; }
+.vf-card-btn { padding: 10px 18px; border: none; border-radius: 8px;
+  background: #1c1a17; color: #fff; font-size: 14px; cursor: pointer; }
+.vf-card-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.vf-card-empty { display: flex; flex-direction: column; gap: 14px;
+  align-items: flex-start; justify-content: center; }
+
+/* paused / snoozed status bar in the dashboard */
+.vf-pausebar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 10px; padding: 10px 12px; border-radius: 8px;
+  background: #2c2925; color: #e0b15a; font-size: 12px;
+}
+.vf-resume {
+  background: #e0b15a; color: #1c1a17; border: none; border-radius: 6px;
+  padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+}

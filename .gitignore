@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.wxt
+*.log
+
+# WXT build output
+apps/extension/.output
+apps/extension/.wxt
+README.md
+apps/extension/MANUAL-CHECKLIST.md

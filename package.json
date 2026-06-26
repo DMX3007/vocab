@@ -1,0 +1,24 @@
+{
+  "name": "vocabflow",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:core": "vitest run --project core",
+    "test:api": "vitest run --project api",
+    "test:extension": "vitest run --project extension",
+    "typecheck": "tsc -b packages/core apps/api apps/extension"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=20 <23"
+  }
+}

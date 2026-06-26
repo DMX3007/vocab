@@ -1,0 +1,118 @@
+/* Injected INTO the shadow root. Shadow DOM blocks the host page's
+   SELECTORS, but inherited properties (color, font) still cross the
+   boundary — so we reset them and pin every color explicitly. Otherwise
+   a dark-themed host (GitHub dark, Google dark) makes the input text
+   inherit a light color and it vanishes on the white field. */
+.vf-tooltip,
+.vf-tooltip * {
+  all: revert;                      /* drop inherited host styles */
+  box-sizing: border-box;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.vf-tooltip {
+  width: 320px;
+  padding: 14px 16px;
+  background: #f3ece1;            /* warm cream, editorial paper look */
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  color: #1c1a17;
+}
+.vf-row { display: flex; align-items: center; gap: 8px; }
+.vf-head { justify-content: space-between; margin-bottom: 10px; }
+.vf-term {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 22px;
+}
+.vf-langs { font-size: 11px; letter-spacing: 0.08em; color: #8a8073; }
+.vf-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1c1a17;                  /* explicit — never inherit the host's text color */
+  font-size: 14px;
+  outline: none;
+}
+.vf-input::placeholder { color: #9a9183; }
+.vf-input:focus { box-shadow: 0 0 0 2px #e0b15a; }
+.vf-auto {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #e0b15a;            /* the amber AUTO button from the design */
+  color: #1c1a17;                  /* explicit dark text on amber */
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vf-auto:disabled { opacity: 0.45; cursor: not-allowed; }
+.vf-foot { justify-content: space-between; margin-top: 10px; }
+.vf-x {
+  border: none; background: none; font-size: 18px;
+  color: #8a8073; cursor: pointer; line-height: 1;
+}
+.vf-save {
+  padding: 8px 18px; border: none; border-radius: 8px;
+  background: #1c1a17; color: #fff; font-size: 13px; cursor: pointer;
+}
+.vf-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── full-page review overlay ──────────────────────────────── */
+.vf-ov-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(20, 18, 16, 0.82);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2147483647;
+}
+.vf-ov-card {
+  width: 460px; max-width: 92vw;
+  background: #f3ece1; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+.vf-ov-controls {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 22px 18px; background: #f3ece1;
+}
+.vf-ov-link {
+  background: none; border: none; padding: 4px 0;
+  color: #8a6f64; font-size: 12px; cursor: pointer; text-decoration: underline;
+}
+.vf-ov-link:hover { color: #1c1a17; }
+.vf-ov-pause { position: relative; }
+.vf-ov-menu {
+  position: absolute; bottom: 130%; left: 0;
+  background: #fff; border-radius: 8px; padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  display: flex; flex-direction: column; min-width: 150px;
+}
+.vf-ov-menu button {
+  background: none; border: none; text-align: left;
+  padding: 8px 10px; border-radius: 6px;
+  color: #1c1a17; font-size: 13px; cursor: pointer;
+}
+.vf-ov-menu button:hover { background: #f3ece1; }
+
+/* the review card needs explicit colors inside the shadow root too */
+.vf-card { background: #f7d9cf; color: #1c1a17; padding: 22px; }
+.vf-card.vf-ok { background: #d7ecd4; }
+.vf-card.vf-almost { background: #f4e6c3; }
+.vf-card.vf-wrong { background: #f3cfcf; }
+.vf-card-top { display: flex; justify-content: space-between; font-size: 11px;
+  letter-spacing: 0.06em; color: #8a6f64; }
+.vf-card-prompt { font-family: Georgia, serif; font-style: italic; font-size: 34px;
+  margin: 18px 0 6px; color: #1c1a17; }
+.vf-card-ctx { font-size: 12px; color: #99796c; margin-bottom: 16px; }
+.vf-card-input { width: 100%; padding: 12px 14px; border: none; border-radius: 8px;
+  background: #1c1a17; color: #f3ece1; font-size: 15px; outline: none; box-sizing: border-box; }
+.vf-card-input::placeholder { color: #6a6358; }
+.vf-card-actions, .vf-card-feedback { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.vf-card-feedback { justify-content: space-between; }
+.vf-card-verdict { font-weight: 700; color: #1c1a17; }
+.vf-card-answer { flex: 1; font-family: Georgia, serif; font-style: italic; color: #1c1a17; }
+.vf-card-btn { padding: 10px 18px; border: none; border-radius: 8px;
+  background: #1c1a17; color: #fff; font-size: 14px; cursor: pointer; }
+.vf-card-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.vf-card-empty { display: flex; flex-direction: column; gap: 14px; padding: 30px; }
