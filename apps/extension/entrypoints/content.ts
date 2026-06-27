@@ -9,6 +9,7 @@ import { ReviewSession } from '../src/lib/review/session';
 import { SettingsStore } from '../src/lib/review/settings-store';
 import { snooze, pauseFor, addToBlacklist, type PausePreset } from '../src/lib/review/overlay-policy';
 import type { SavePayload } from '../src/lib/tooltip-machine';
+import { ContentCommand } from '@/src/lib/messaging/protocol';
 
 // Runs inside every page. Hosts BOTH the selection tooltip and the review
 // overlay in a Shadow DOM so the host page's CSS can't break them. The logic
@@ -116,7 +117,6 @@ export default defineContentScript({
       );
     }
 
-    type ContentCommand = | { type: "SHOW_OVERLAY"; langTo: string } | { type: "GET_PAGE_CONTEXT" }
 
     // ── messages from the background ───────────────────────────
     browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

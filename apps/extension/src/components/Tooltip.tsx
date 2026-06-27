@@ -34,8 +34,6 @@ export function Tooltip({
   });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => inputRef.current?.focus(), []);
-
   // Save once the machine reaches the 'saved' state.
   useEffect(() => {
     if (state.status === 'saved' && state.payload) {

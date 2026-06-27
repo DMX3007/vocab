@@ -32,6 +32,8 @@ export type Message = {
   [K in keyof RequestMap]: { type: K, payload: RequestMap[K] }
 }[keyof RequestMap]
 
+export type ContentCommand = | { type: "SHOW_OVERLAY"; langTo: string } | { type: "GET_PAGE_CONTEXT" }
+
 /** Dates don't survive structured-clone messaging cleanly across all paths,
  *  so we serialize them as ISO strings and revive them on the receiving end. */
 export type Wire<T> = T extends Date
