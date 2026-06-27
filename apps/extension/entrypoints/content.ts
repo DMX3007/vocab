@@ -21,7 +21,7 @@ export default defineContentScript({
     console.log('[VocabFlow] content script loaded');
     const LANG_FROM = 'en';
     const LANG_TO = 'ru';
-    const settingsStore = new SettingsStore(chrome.storage.local);
+    const settingsStore = new SettingsStore(browser.storage.local);
 
     // ── shared shadow-DOM host ─────────────────────────────────
     let host: HTMLDivElement | null = null;
@@ -75,7 +75,7 @@ export default defineContentScript({
       if (!selection || selection.isCollapsed) return;
       const active = document.activeElement;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' ||
-          (active as HTMLElement).isContentEditable)) return;
+        (active as HTMLElement).isContentEditable)) return;
       const text = selection.toString();
       const container = selection.anchorNode?.textContent ?? text;
       const start = container.indexOf(text);
@@ -116,18 +116,22 @@ export default defineContentScript({
       );
     }
 
+    type ContentCommand = | { type: "SHOW_OVERLAY"; langTo: string } | { type: "GET_PAGE_CONTEXT" }
+
     // ── messages from the background ───────────────────────────
-    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-      if (msg?.type === 'GET_PAGE_CONTEXT') {
+    browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      const message = msg as ContentCommand
+      if (message?.type === 'GET_PAGE_CONTEXT') {
         const active = document.activeElement;
         const userIsTyping = !!active && (active.tagName === 'INPUT' ||
           active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable);
         sendResponse({ userIsTyping, isFullscreen: !!document.fullscreenElement });
-        return; // sync response
+        return true;
       }
-      if (msg?.type === 'SHOW_OVERLAY') {
+      if (message?.type === 'SHOW_OVERLAY') {
         void showOverlay();
       }
+      return true;  // WXT 0.19 types require every path to return true
     });
 
     // ── cross-tab sync: if settings change (pause on another tab), close ──
