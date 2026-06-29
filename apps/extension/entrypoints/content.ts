@@ -10,11 +10,16 @@ import { SettingsStore } from '../src/lib/review/settings-store';
 import { snooze, pauseFor, addToBlacklist, type PausePreset } from '../src/lib/review/overlay-policy';
 import type { SavePayload } from '../src/lib/tooltip-machine';
 import { ContentCommand } from '@/src/lib/messaging/protocol';
+import TooltipIcon from '@/src/components/TooltipIcon';
 
 // Runs inside every page. Hosts BOTH the selection tooltip and the review
 // overlay in a Shadow DOM so the host page's CSS can't break them. The logic
 // (selection, session, policy, settings) is unit-tested; this file is the
 // thin DOM glue, verified by the manual checklist.
+
+type Placement = | { kind: 'anchored'; x: number; y: number; } | { kind: 'centered'; };
+type Surface = { host: HTMLDivElement; root: Root; placement: Placement; };
+let currentSurface: Surface | null = null;
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -22,18 +27,14 @@ export default defineContentScript({
     console.log('[VocabFlow] content script loaded');
     const LANG_FROM = 'en';
     const LANG_TO = 'ru';
-    const settingsStore = new SettingsStore(browser.storage.local);
+    const settingsStore = new SettingsStore(browser.storage.local)
 
-    // ── shared shadow-DOM host ─────────────────────────────────
-    let host: HTMLDivElement | null = null;
-    let root: Root | null = null;
-
-    function mount(node: React.ReactElement, fixed: boolean, x = 0, y = 0) {
+    function mount(node: React.ReactElement, placement: Placement) {
       unmount();
-      host = document.createElement('div');
-      host.style.cssText = fixed
-        ? 'position:fixed;inset:0;z-index:2147483647;'
-        : `position:absolute;z-index:2147483647;left:${x}px;top:${y}px;`;
+      let host = document.createElement('div');
+      host.style.cssText = placement.kind === 'anchored'
+        ? `position:absolute;z-index:2147483647;left:${placement.x}px;top:${placement.y}px;`
+        : 'position:fixed;inset:0;z-index:2147483647;';
       document.body.appendChild(host);
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
@@ -41,15 +42,25 @@ export default defineContentScript({
       shadow.appendChild(style);
       const slot = document.createElement('div');
       shadow.appendChild(slot);
-      root = createRoot(slot);
+      const root = createRoot(slot);
       root.render(node);
+      console.log('[vf] slot rootNode is shadow?', slot.getRootNode() === shadow);
+
+      currentSurface = { host, root, placement };
     }
 
     function unmount() {
-      root?.unmount();
-      host?.remove();
-      root = null;
-      host = null;
+      currentSurface?.root.unmount();
+      currentSurface?.host.remove();
+      currentSurface = null;
+    }
+
+    function showTooltipIcon(term: string, contextSentence: string, x: number, y: number,) {
+      mount(React.createElement(TooltipIcon, {
+        onClick: () => {
+          setTimeout(() => showTooltip(term, contextSentence, x, y), 0);
+        }
+      }), { kind: 'anchored', x, y });
     }
 
     // ── selection tooltip ──────────────────────────────────────
@@ -67,7 +78,7 @@ export default defineContentScript({
           term, contextSentence, sourceUrl: location.href,
           langFrom: LANG_FROM, langTo: LANG_TO, onSave, onDismiss: unmount,
         }),
-        false, x, y,
+        { kind: 'anchored', x, y }
       );
     }
 
@@ -85,14 +96,21 @@ export default defineContentScript({
         : analyzeSelection(text, 0, text.length);
       if (!analyzed) return;
       const rect = selection.getRangeAt(0).getBoundingClientRect();
-      showTooltip(analyzed.term, analyzed.contextSentence,
-        window.scrollX + rect.left, window.scrollY + rect.bottom + 8);
+      showTooltipIcon(analyzed.term, analyzed.contextSentence, window.scrollX + rect.left, window.scrollY + rect.bottom + 8);
     });
 
+    let flag: Boolean = false
     document.addEventListener('mousedown', (e) => {
       // don't dismiss the modal overlay by clicking the backdrop
-      if (host && host.style.position === 'absolute' && !e.composedPath().includes(host)) unmount();
+      flag = (currentSurface?.placement.kind === 'anchored' && !e.composedPath().includes(currentSurface.host))
     });
+
+    document.addEventListener('click', (e) => {
+      if (flag) {
+        unmount();
+        flag = false;
+      }
+    })
 
     // ── review overlay ─────────────────────────────────────────
     async function showOverlay() {
@@ -100,20 +118,20 @@ export default defineContentScript({
       await session.start(LANG_TO, new Date());
       if (session.total === 0) return; // nothing due after all
 
-      const host = location.hostname;
+      const hostname = location.hostname;
       mount(
         React.createElement(ReviewOverlay, {
-          session, host,
+          session, host: hostname,
           onClose: unmount,
           onSnooze: async () => { await settingsStore.update((s) => snooze(s, new Date())); unmount(); },
           onPause: async (preset: PausePreset) => {
             await settingsStore.update((s) => pauseFor(s, new Date(), preset)); unmount();
           },
           onDisableSite: async () => {
-            await settingsStore.update((s) => addToBlacklist(s, host)); unmount();
+            await settingsStore.update((s) => addToBlacklist(s, hostname)); unmount();
           },
         }),
-        true,
+        { kind: 'centered' },
       );
     }
 
@@ -139,7 +157,7 @@ export default defineContentScript({
       const pausedOrSnoozed =
         (s.pausedUntil && new Date(s.pausedUntil) > new Date()) ||
         (s.snoozedUntil && new Date(s.snoozedUntil) > new Date());
-      if (pausedOrSnoozed && host?.style.position === 'fixed') unmount();
+      if (pausedOrSnoozed && currentSurface?.placement.kind === 'centered') unmount();
     });
   },
 });
