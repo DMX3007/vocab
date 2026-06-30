@@ -113,7 +113,7 @@ export default defineContentScript({
     })
 
     document.addEventListener('mousedown', (e) => {
-      flag = currentSurface !== null && currentSurface.component.kind !== 'overlay' && !e.composedPath().includes(currentSurface.host)
+      flag = currentSurface !== null && currentSurface.component.kind === 'tooltip' && !e.composedPath().includes(currentSurface.host)
     });
 
     document.addEventListener('click', (e) => {
