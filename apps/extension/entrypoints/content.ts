@@ -98,10 +98,9 @@ export default defineContentScript({
       showTooltipIcon(analyzed.term, analyzed.contextSentence, window.scrollX + rect.left, window.scrollY + rect.bottom + 8);
     });
 
-    let flag: Boolean = false
+    let flag: boolean = false
 
-    document.addEventListener('selectionchange', (e) => {
-      // 1 when to react
+    document.addEventListener('selectionchange', () => {
       if (currentSurface?.component.kind !== 'icon') {
         return;
       }
@@ -116,7 +115,7 @@ export default defineContentScript({
       flag = currentSurface !== null && currentSurface.component.kind === 'tooltip' && !e.composedPath().includes(currentSurface.host)
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', () => {
       if (flag) {
         unmount();
         flag = false;
