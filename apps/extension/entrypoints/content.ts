@@ -17,23 +17,23 @@ import TooltipIcon from '@/src/components/TooltipIcon';
 // (selection, session, policy, settings) is unit-tested; this file is the
 // thin DOM glue, verified by the manual checklist.
 
-type Placement = | { kind: 'anchored'; x: number; y: number; } | { kind: 'centered'; };
-type Surface = { host: HTMLDivElement; root: Root; placement: Placement; };
+type ComponentPlacements = | { kind: 'icon' | 'tooltip'; x: number; y: number; } | { kind: 'overlay'; };
+
+type Surface = { host: HTMLDivElement; root: Root; component: ComponentPlacements };
 let currentSurface: Surface | null = null;
 
 export default defineContentScript({
   matches: ['<all_urls>'],
   main() {
-    console.log('[VocabFlow] content script loaded');
     const LANG_FROM = 'en';
     const LANG_TO = 'ru';
     const settingsStore = new SettingsStore(browser.storage.local)
 
-    function mount(node: React.ReactElement, placement: Placement) {
+    function mount(node: React.ReactElement, component: ComponentPlacements) {
       unmount();
       let host = document.createElement('div');
-      host.style.cssText = placement.kind === 'anchored'
-        ? `position:absolute;z-index:2147483647;left:${placement.x}px;top:${placement.y}px;`
+      host.style.cssText = component.kind !== 'overlay'
+        ? `position:absolute;z-index:2147483647;left:${component.x}px;top:${component.y}px;`
         : 'position:fixed;inset:0;z-index:2147483647;';
       document.body.appendChild(host);
       const shadow = host.attachShadow({ mode: 'open' });
@@ -44,9 +44,7 @@ export default defineContentScript({
       shadow.appendChild(slot);
       const root = createRoot(slot);
       root.render(node);
-      console.log('[vf] slot rootNode is shadow?', slot.getRootNode() === shadow);
-
-      currentSurface = { host, root, placement };
+      currentSurface = { host, root, component };
     }
 
     function unmount() {
@@ -55,12 +53,10 @@ export default defineContentScript({
       currentSurface = null;
     }
 
-    function showTooltipIcon(term: string, contextSentence: string, x: number, y: number,) {
+    function showTooltipIcon(term: string, contextSentence: string, x: number, y: number) {
       mount(React.createElement(TooltipIcon, {
-        onClick: () => {
-          setTimeout(() => showTooltip(term, contextSentence, x, y), 0);
-        }
-      }), { kind: 'anchored', x, y });
+        onClick: () => showTooltip(term, contextSentence, x, y)
+      }), { kind: 'icon', x, y });
     }
 
     // ── selection tooltip ──────────────────────────────────────
@@ -78,13 +74,16 @@ export default defineContentScript({
           term, contextSentence, sourceUrl: location.href,
           langFrom: LANG_FROM, langTo: LANG_TO, onSave, onDismiss: unmount,
         }),
-        { kind: 'anchored', x, y }
+        { kind: 'tooltip', x, y }
       );
     }
 
-    document.addEventListener('mouseup', () => {
+    document.addEventListener('mouseup', (e) => {
+      if (currentSurface && e.composedPath().includes(currentSurface.host)) return;
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed) return;
+      if (!selection || selection.isCollapsed) {
+        return
+      };
       const active = document.activeElement;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' ||
         (active as HTMLElement).isContentEditable)) return;
@@ -100,9 +99,21 @@ export default defineContentScript({
     });
 
     let flag: Boolean = false
+
+    document.addEventListener('selectionchange', (e) => {
+      // 1 when to react
+      if (currentSurface?.component.kind !== 'icon') {
+        return;
+      }
+
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) {
+        unmount()
+      }
+    })
+
     document.addEventListener('mousedown', (e) => {
-      // don't dismiss the modal overlay by clicking the backdrop
-      flag = (currentSurface?.placement.kind === 'anchored' && !e.composedPath().includes(currentSurface.host))
+      flag = currentSurface !== null && currentSurface.component.kind !== 'overlay' && !e.composedPath().includes(currentSurface.host)
     });
 
     document.addEventListener('click', (e) => {
@@ -131,7 +142,7 @@ export default defineContentScript({
             await settingsStore.update((s) => addToBlacklist(s, hostname)); unmount();
           },
         }),
-        { kind: 'centered' },
+        { kind: 'overlay' },
       );
     }
 
@@ -157,7 +168,7 @@ export default defineContentScript({
       const pausedOrSnoozed =
         (s.pausedUntil && new Date(s.pausedUntil) > new Date()) ||
         (s.snoozedUntil && new Date(s.snoozedUntil) > new Date());
-      if (pausedOrSnoozed && currentSurface?.placement.kind === 'centered') unmount();
+      if (pausedOrSnoozed && currentSurface?.component.kind === 'overlay') unmount();
     });
   },
 });
