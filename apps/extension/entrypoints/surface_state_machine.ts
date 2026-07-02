@@ -1,27 +1,30 @@
 export type SurfaceTypes = | 'idle' | 'icon' | 'tooltip' | 'overlay'
 
-export enum SURFACE_TYPES {
-    IDLE = 'idle',
-    ICON = 'icon',
-    TOOLTIP = 'tooltip',
-    OVERLAY = 'overlay'
-}
-
 export interface SurfaceState {
     status: SurfaceTypes
 }
 
-export type SurfaceEvents = | { name: 'WORD_SELECTED' } | { name: 'REPEAT_DUE' } | { name: 'ICON_CLICKED' } | { name: 'CLICK_OUTSIDE' }
+export type SurfaceEvents = |
+{ name: 'WORD_SELECTED', term: string, contextSentence: string, x: number, y: number } |
+{ name: 'ICON_CLICKED' } |
+{ name: 'CLICK_OUTSIDE' } |
+{ name: 'SELECTION_COLLAPSED' } |
+{ name: "WORD_SAVED" } |
+{ name: 'REPEAT_DUE' }
 
-export function initialSurfaceState() {
-    return {
-        status: SURFACE_TYPES.IDLE
-    }
+export function initialSurfaceState(): SurfaceState {
+    return { status: "idle" }
 }
 
-export function surfaceReducer(event: SurfaceEvents, state: SurfaceState): SurfaceState {
-    switch (event.name) {
+export function surfaceReducer(state: SurfaceState, action: SurfaceEvents): SurfaceState {
+    switch (action.name) {
         case "WORD_SELECTED": {
+            // overlay priority
+            if (state.status === 'overlay') {
+                return {
+                    ...state
+                }
+            }
             return {
                 ...state,
                 status: 'icon'
@@ -31,6 +34,18 @@ export function surfaceReducer(event: SurfaceEvents, state: SurfaceState): Surfa
             return {
                 ...state,
                 status: 'tooltip'
+            }
+        }
+        case "WORD_SAVED": {
+            return {
+                ...state,
+                status: 'idle'
+            }
+        }
+        case "SELECTION_COLLAPSED": {
+            return {
+                ...state,
+                status: 'idle'
             }
         }
         case "CLICK_OUTSIDE": {
@@ -47,8 +62,7 @@ export function surfaceReducer(event: SurfaceEvents, state: SurfaceState): Surfa
         }
         default: {
             return {
-                ...state,
-                status: 'idle'
+                ...state
             }
         }
     }

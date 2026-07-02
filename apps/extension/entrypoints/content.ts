@@ -32,9 +32,11 @@ export default defineContentScript({
     function mount(node: React.ReactElement, component: ComponentPlacements) {
       unmount();
       let host = document.createElement('div');
+
       host.style.cssText = component.kind !== 'overlay'
         ? `position:absolute;z-index:2147483647;left:${component.x}px;top:${component.y}px;`
         : 'position:fixed;inset:0;z-index:2147483647;';
+
       document.body.appendChild(host);
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
