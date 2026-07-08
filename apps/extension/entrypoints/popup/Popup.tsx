@@ -10,7 +10,7 @@ import '../../src/components/popup.css';
 // TODO(loop): make the active language a real setting + dropdown.
 const LANG_TO = 'ru';
 const LANG_LABEL = 'Russian (ru)';
-const settingsStore = new SettingsStore(chrome.storage.local);
+const settingsStore = new SettingsStore(browser.storage.local);
 
 export function Popup() {
   const [ready, setReady] = useState(false);

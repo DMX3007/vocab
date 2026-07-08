@@ -36,10 +36,12 @@ export type ContentCommand = | { type: "SHOW_OVERLAY"; langTo: string } | { type
 
 /** Dates don't survive structured-clone messaging cleanly across all paths,
  *  so we serialize them as ISO strings and revive them on the receiving end. */
-export type Wire<T> = T extends Date
-  ? string
-  : T extends Array<infer U>
-  ? Array<Wire<U>>
-  : T extends object
-  ? { [K in keyof T]: Wire<T[K]> }
+export type Wire<T> =
+  // «если T — это Date → замени на string»
+  T extends Date ? string
+  // «если T — массив чего-то (infer U = вытащи это "что-то" в переменную U) → верни массив из Wire<U>». 
+  : T extends Array<infer U> ? Array<Wire<U>>
+  // «если T — объект → построй такой же объект, но каждое поле прогони через Wire»
+  : T extends object ? { [K in keyof T]: Wire<T[K]> }
+  // «иначе (число, строка, boolean) — оставь как есть». Wire<number> = number.
   : T;

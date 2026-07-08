@@ -1,4 +1,4 @@
-import { initialSurfaceState, surfaceReducer } from '../entrypoints/surface_state_machine'
+import { initialSurfaceState, surfaceReducer } from '../src/lib/surface-machine'
 import { describe, it, expect } from 'vitest'
 
 const initialState = initialSurfaceState()

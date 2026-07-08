@@ -20,6 +20,7 @@ import TooltipIcon from '@/src/components/TooltipIcon';
 type ComponentPlacements = | { kind: 'icon' | 'tooltip'; x: number; y: number; } | { kind: 'overlay'; };
 
 type Surface = { host: HTMLDivElement; root: Root; component: ComponentPlacements };
+
 let currentSurface: Surface | null = null;
 
 export default defineContentScript({
@@ -47,6 +48,19 @@ export default defineContentScript({
       const root = createRoot(slot);
       root.render(node);
       currentSurface = { host, root, component };
+      suppressOuterListeners(host);
+    }
+
+    function suppressOuterListeners(host: HTMLDivElement) {
+      host.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+      })
+      host.addEventListener('keypress', (e) => {
+        e.stopPropagation();
+      })
+      host.addEventListener('keyup', (e) => {
+        e.stopPropagation();
+      })
     }
 
     function unmount() {
