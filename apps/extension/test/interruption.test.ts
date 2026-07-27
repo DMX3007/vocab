@@ -67,6 +67,7 @@ describe('canInterrupt', () => {
   it('returns a machine-readable reason for every denial', () => {
     const denied = canInterrupt({ ...base, dueCount: 0 });
     expect(denied.allowed).toBe(false);
+    if (denied.allowed) throw new Error('unreachable');
     expect(denied.reason).toBe('nothing_due');
   });
 });

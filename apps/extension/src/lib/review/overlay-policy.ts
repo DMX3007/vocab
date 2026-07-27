@@ -1,4 +1,5 @@
 import { canInterrupt, type InterruptionSettings } from '../interruption';
+import { DEFAULT_TARGET_LANG } from '../languages';
 
 // Decides whether the review overlay may pop on the active tab right now.
 // Pure and synchronous: the caller gathers the page context and the stored
@@ -22,6 +23,8 @@ export interface OverlaySettings {
   maxPerHour: number;
   /** cards already shown in the last hour */
   shownInLastHour: number;
+  /** the language currently being learned (an ISO code from SUPPORTED_LANGUAGES) */
+  targetLang: string;
 }
 
 export function defaultSettings(): OverlaySettings {
@@ -33,6 +36,7 @@ export function defaultSettings(): OverlaySettings {
     throttleMinutes: 10,
     maxPerHour: 4,
     shownInLastHour: 0,
+    targetLang: DEFAULT_TARGET_LANG,
   };
 }
 

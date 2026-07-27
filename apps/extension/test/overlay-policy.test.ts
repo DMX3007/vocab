@@ -8,9 +8,14 @@ import {
   removeFromBlacklist,
   isBlacklisted,
   defaultSettings,
+  type OverlayDecision,
   type OverlaySettings,
   type PageContext,
 } from '../src/lib/review/overlay-policy';
+
+// OverlayDecision is a discriminated union where only 'wait'/'idle' carry a
+// reason; this narrows it for assertions instead of casting.
+const reasonOf = (d: OverlayDecision) => ('reason' in d ? d.reason : undefined);
 
 const NOW = new Date('2026-06-10T14:00:00Z');
 const inMin = (n: number) => new Date(NOW.getTime() + n * 60_000);
@@ -40,7 +45,7 @@ describe('decideOverlay', () => {
     const s = settings({ snoozedUntil: inMin(15).toISOString() });
     const waiting = decideOverlay(s, page, NOW);
     expect(waiting.action).toBe('wait');
-    expect(waiting.reason).toBe('snoozed');
+    expect(reasonOf(waiting)).toBe('snoozed');
     expect(decideOverlay(s, page, inMin(16)).action).toBe('show');
   });
 
@@ -48,13 +53,13 @@ describe('decideOverlay', () => {
     const s = settings({ pausedUntil: inMin(60).toISOString() });
     const d = decideOverlay(s, page, NOW);
     expect(d.action).toBe('wait');
-    expect(d.reason).toBe('paused');
+    expect(reasonOf(d)).toBe('paused');
   });
 
   it('waits on a blacklisted host (and its subdomains)', () => {
     const s = settings({ blacklist: ['youtube.com'] });
-    expect(decideOverlay(s, { ...page, host: 'youtube.com' }, NOW).reason).toBe('blacklisted');
-    expect(decideOverlay(s, { ...page, host: 'www.youtube.com' }, NOW).reason).toBe('blacklisted');
+    expect(reasonOf(decideOverlay(s, { ...page, host: 'youtube.com' }, NOW))).toBe('blacklisted');
+    expect(reasonOf(decideOverlay(s, { ...page, host: 'www.youtube.com' }, NOW))).toBe('blacklisted');
     expect(decideOverlay(s, { ...page, host: 'example.com' }, NOW).action).toBe('show');
   });
 
@@ -65,7 +70,7 @@ describe('decideOverlay', () => {
 
   it('respects the throttle between consecutive cards', () => {
     const s = settings({ lastShownAt: inMin(-5).toISOString(), throttleMinutes: 10 });
-    expect(decideOverlay(s, page, NOW).reason).toBe('throttled');
+    expect(reasonOf(decideOverlay(s, page, NOW))).toBe('throttled');
     const s2 = settings({ lastShownAt: inMin(-15).toISOString(), throttleMinutes: 10 });
     expect(decideOverlay(s2, page, NOW).action).toBe('show');
   });
