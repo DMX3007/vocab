@@ -73,6 +73,21 @@ body {
   color: #f3ece1;
 }
 
+.vf-lang-select {
+  background: #2c2925;
+  color: #f3ece1;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  font-family: inherit;
+}
+
+.vf-lang-select:disabled {
+  opacity: 0.6;
+}
+
 .vf-review-btn {
   width: 100%;
   padding: 14px;

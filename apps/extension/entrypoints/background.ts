@@ -13,9 +13,6 @@ import type { Message } from '../src/lib/messaging/protocol';
 const ALARM = 'vocabflow-review';
 const TICK_MINUTES = 1; // check often; the throttle/cap keep it polite
 
-// TODO(loop): real active target language from settings.
-const LANG_TO = 'ru';
-
 export default defineBackground(() => {
   console.log('[VocabFlow] service worker alive');
   const repo = new WordRepository();
@@ -73,8 +70,8 @@ export default defineBackground(() => {
     }
   }
   // ── the review alarm ─────────────────────────────────────────
-  async function prepareForTick(now: Date): Promise<TickContext | undefined> {
-    const dueCount = (await repo.getDueWords(now, LANG_TO)).length;
+  async function prepareForTick(now: Date, langTo: string): Promise<TickContext | undefined> {
+    const dueCount = (await repo.getDueWords(now, langTo)).length;
     if (dueCount === 0) return;
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -95,7 +92,7 @@ export default defineBackground(() => {
     const now = new Date();
     const settings = await settingsStore.load();
 
-    const context = await prepareForTick(now)
+    const context = await prepareForTick(now, settings.targetLang)
     if (!context) return
 
     const { dueCount, host, pageCtx, tabId } = context
@@ -103,7 +100,7 @@ export default defineBackground(() => {
     if (!result.show) return;
 
     if (result.settings) await settingsStore.save(result.settings);
-    browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: LANG_TO }).catch(() => { });
+    browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: settings.targetLang }).catch(() => { });
   }
 
   async function askPageContext(tabId: number): Promise<{ userIsTyping: boolean; isFullscreen: boolean } | null> {

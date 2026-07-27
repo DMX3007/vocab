@@ -11,6 +11,7 @@ import { snooze, pauseFor, addToBlacklist, type PausePreset } from '../src/lib/r
 import type { SavePayload } from '../src/lib/tooltip-machine';
 import { ContentCommand } from '@/src/lib/messaging/protocol';
 import TooltipIcon from '@/src/components/TooltipIcon';
+import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
 
 // Runs inside every page. Hosts BOTH the selection tooltip and the review
 // overlay in a Shadow DOM so the host page's CSS can't break them. The logic
@@ -27,8 +28,12 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   main() {
     const LANG_FROM = 'en';
-    const LANG_TO = 'ru';
+    // The active target language; loaded from settings and kept live via
+    // subscribe() so a change made in the popup (or another tab) applies
+    // immediately without a page reload.
+    let targetLang = DEFAULT_TARGET_LANG;
     const settingsStore = new SettingsStore(browser.storage.local)
+    void settingsStore.load().then((s) => { targetLang = s.targetLang; });
 
     function mount(node: React.ReactElement, component: ComponentPlacements) {
       unmount();
@@ -81,14 +86,14 @@ export default defineContentScript({
         void wordClient.saveWord({
           term: payload.term, translation: payload.translation,
           contextSentence: payload.contextSentence, sourceUrl: payload.sourceUrl,
-          langFrom: LANG_FROM, langTo: LANG_TO,
+          langFrom: LANG_FROM, langTo: targetLang,
         });
         unmount();
       };
       mount(
         React.createElement(Tooltip, {
           term, contextSentence, sourceUrl: location.href,
-          langFrom: LANG_FROM, langTo: LANG_TO, onSave, onDismiss: unmount,
+          langFrom: LANG_FROM, langTo: targetLang, onSave, onDismiss: unmount,
         }),
         { kind: 'tooltip', x, y }
       );
@@ -139,9 +144,9 @@ export default defineContentScript({
     })
 
     // ── review overlay ─────────────────────────────────────────
-    async function showOverlay() {
+    async function showOverlay(langTo: string) {
       const session = new ReviewSession(wordClient, { mode: 'normal' });
-      await session.start(LANG_TO, new Date());
+      await session.start(langTo, new Date());
       if (session.total === 0) return; // nothing due after all
 
       const hostname = location.hostname;
@@ -173,13 +178,14 @@ export default defineContentScript({
         return true;
       }
       if (message?.type === 'SHOW_OVERLAY') {
-        void showOverlay();
+        void showOverlay(message.langTo);
       }
       return true;  // WXT 0.19 types require every path to return true
     });
 
     // ── cross-tab sync: if settings change (pause on another tab), close ──
     settingsStore.subscribe((s) => {
+      targetLang = s.targetLang;
       const pausedOrSnoozed =
         (s.pausedUntil && new Date(s.pausedUntil) > new Date()) ||
         (s.snoozedUntil && new Date(s.snoozedUntil) > new Date());

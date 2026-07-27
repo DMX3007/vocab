@@ -2,6 +2,10 @@ export type SurfaceTypes = | 'idle' | 'icon' | 'tooltip' | 'overlay'
 
 export interface SurfaceState {
     status: SurfaceTypes
+    term?: string
+    contextSentence?: string
+    x?: number
+    y?: number
 }
 
 export type SurfaceEvents = |
@@ -26,8 +30,11 @@ export function surfaceReducer(state: SurfaceState, action: SurfaceEvents): Surf
                 }
             }
             return {
-                ...state,
-                status: 'icon'
+                status: 'icon',
+                term: action.term,
+                contextSentence: action.contextSentence,
+                x: action.x,
+                y: action.y,
             }
         }
         case "ICON_CLICKED": {
@@ -37,26 +44,16 @@ export function surfaceReducer(state: SurfaceState, action: SurfaceEvents): Surf
             }
         }
         case "WORD_SAVED": {
-            return {
-                ...state,
-                status: 'idle'
-            }
+            return initialSurfaceState()
         }
         case "SELECTION_COLLAPSED": {
-            return {
-                ...state,
-                status: 'idle'
-            }
+            return initialSurfaceState()
         }
         case "CLICK_OUTSIDE": {
-            return {
-                ...state,
-                status: 'idle'
-            }
+            return initialSurfaceState()
         }
         case "REPEAT_DUE": {
             return {
-                ...state,
                 status: 'overlay'
             }
         }

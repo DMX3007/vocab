@@ -5,11 +5,9 @@ import { resume, type OverlaySettings } from '../../src/lib/review/overlay-polic
 import { ReviewSession } from '../../src/lib/review/session';
 import { ReviewCard } from '../../src/components/ReviewCard';
 import type { Word } from '../../src/lib/storage/types';
+import { SUPPORTED_LANGUAGES } from '../../src/lib/languages';
 import '../../src/components/popup.css';
 
-// TODO(loop): make the active language a real setting + dropdown.
-const LANG_TO = 'ru';
-const LANG_LABEL = 'Russian (ru)';
 const settingsStore = new SettingsStore(browser.storage.local);
 
 export function Popup() {
@@ -20,11 +18,12 @@ export function Popup() {
   const [settings, setSettings] = useState<OverlaySettings | null>(null);
 
   const refresh = useCallback(async () => {
-    const all = await wordClient.getAllWords(LANG_TO);
-    const due = await wordClient.getDueWords(new Date(), LANG_TO);
+    const s = await settingsStore.load();
+    const all = await wordClient.getAllWords(s.targetLang);
+    const due = await wordClient.getDueWords(new Date(), s.targetLang);
     setWords(all);
     setDueCount(due.length);
-    setSettings(await settingsStore.load());
+    setSettings(s);
   }, []);
 
   useEffect(() => {
@@ -35,9 +34,15 @@ export function Popup() {
   }, [refresh]);
 
   async function startReview(forceAll = false) {
+    const targetLang = settings?.targetLang ?? (await settingsStore.load()).targetLang;
     const s = new ReviewSession(wordClient, { mode: 'normal' });
-    await s.start(LANG_TO, new Date(), { includeAll: forceAll });
+    await s.start(targetLang, new Date(), { includeAll: forceAll });
     setSession(s);
+  }
+
+  async function handleLangChange(targetLang: string) {
+    await settingsStore.update((s) => ({ ...s, targetLang }));
+    await refresh();
   }
 
   async function endReview() {
@@ -79,7 +84,19 @@ export function Popup() {
           </div>
         </div>
 
-        <div className="vf-lang">TARGET <b>{LANG_LABEL}</b></div>
+        <div className="vf-lang">
+          TARGET{' '}
+          <select
+            className="vf-lang-select"
+            value={settings?.targetLang ?? ''}
+            onChange={(e) => void handleLangChange(e.target.value)}
+            disabled={!ready}
+          >
+            {SUPPORTED_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
+            ))}
+          </select>
+        </div>
 
         <button className="vf-review-btn" onClick={() => startReview(false)} disabled={!ready || dueCount === 0}>
           {dueCount > 0 ? `Review ${dueCount}` : 'Nothing due'}

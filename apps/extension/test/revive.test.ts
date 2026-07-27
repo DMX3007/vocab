@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { reviveWord, reviveWords } from '../src/lib/messaging/revive';
+import type { WireWord } from '../src/lib/storage/types';
 
 // Messages cross context boundaries; Dates may arrive as ISO strings.
 // reviveWord turns a wire-format word back into real Date objects so the
 // rest of the app keeps working with Date, not string.
 
-const wireWord = {
+const wireWord: WireWord = {
   id: 'w1',
   term: 'fortitude',
   translations: ['стойкость'],
