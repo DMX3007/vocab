@@ -146,6 +146,12 @@ export class WordRepository {
     return logs.sort((a, b) => a.reviewedAt.getTime() - b.reviewedAt.getTime());
   }
 
+  /** Every review ever logged, across all words and languages — the raw material for Progress stats. */
+  async getAllReviewLogs(): Promise<ReviewLog[]> {
+    const logs = await this.db.reviewLogs.toArray();
+    return logs.sort((a, b) => a.reviewedAt.getTime() - b.reviewedAt.getTime());
+  }
+
   // ── internal helpers ───────────────────────────────────────────
   private async liveWordsOf(langTo: string): Promise<Word[]> {
     const words = await this.db.words.where('langTo').equals(langTo).toArray();

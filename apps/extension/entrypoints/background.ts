@@ -53,6 +53,11 @@ export default defineBackground(() => {
         );
       case 'GET_REVIEW_LOGS':
         return repo.getReviewLogs(message.payload.wordId);
+      case 'DELETE_WORD':
+        await repo.deleteWord(message.payload.wordId, new Date(message.payload.now));
+        return null;
+      case 'GET_ALL_LOGS':
+        return repo.getAllReviewLogs();
       default: {
         const exhaustive: never = message
         throw new Error(`Unknown message: ${String(exhaustive)}`);

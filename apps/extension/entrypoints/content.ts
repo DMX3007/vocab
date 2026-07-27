@@ -11,6 +11,7 @@ import { snooze, pauseFor, addToBlacklist, type PausePreset } from '../src/lib/r
 import type { SavePayload } from '../src/lib/tooltip-machine';
 import { ContentCommand } from '@/src/lib/messaging/protocol';
 import TooltipIcon from '@/src/components/TooltipIcon';
+import SkippedChip from '@/src/components/SkippedChip';
 import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
 
 // Runs inside every page. Hosts BOTH the selection tooltip and the review
@@ -18,7 +19,7 @@ import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
 // (selection, session, policy, settings) is unit-tested; this file is the
 // thin DOM glue, verified by the manual checklist.
 
-type ComponentPlacements = | { kind: 'icon' | 'tooltip'; x: number; y: number; } | { kind: 'overlay'; };
+type ComponentPlacements = | { kind: 'icon' | 'tooltip' | 'skipped'; x: number; y: number; } | { kind: 'overlay'; };
 
 type Surface = { host: HTMLDivElement; root: Root; component: ComponentPlacements };
 
@@ -76,8 +77,17 @@ export default defineContentScript({
 
     function showTooltipIcon(term: string, contextSentence: string, x: number, y: number) {
       mount(React.createElement(TooltipIcon, {
-        onClick: () => showTooltip(term, contextSentence, x, y)
+        onClick: () => showTooltip(term, contextSentence, x, y),
+        onSkip: () => showSkipped(term, contextSentence, x, y),
       }), { kind: 'icon', x, y });
+    }
+
+    // ── skipped — a quiet chip the user can click to bring the trigger back ──
+    function showSkipped(term: string, contextSentence: string, x: number, y: number) {
+      mount(
+        React.createElement(SkippedChip, { onClick: () => showTooltipIcon(term, contextSentence, x, y) }),
+        { kind: 'skipped', x, y },
+      );
     }
 
     // ── selection tooltip ──────────────────────────────────────
@@ -93,7 +103,8 @@ export default defineContentScript({
       mount(
         React.createElement(Tooltip, {
           term, contextSentence, sourceUrl: location.href,
-          langFrom: LANG_FROM, langTo: targetLang, onSave, onDismiss: unmount,
+          langFrom: LANG_FROM, langTo: targetLang, onSave,
+          onDismiss: () => showSkipped(term, contextSentence, x, y),
         }),
         { kind: 'tooltip', x, y }
       );

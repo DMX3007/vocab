@@ -4,34 +4,71 @@ import { SettingsStore } from '../../src/lib/review/settings-store';
 import { resume, type OverlaySettings } from '../../src/lib/review/overlay-policy';
 import { ReviewSession } from '../../src/lib/review/session';
 import { ReviewCard } from '../../src/components/ReviewCard';
-import type { Word } from '../../src/lib/storage/types';
-import { SUPPORTED_LANGUAGES } from '../../src/lib/languages';
+import { ReviewPane } from '../../src/components/ReviewPane';
+import { LibraryPane } from '../../src/components/LibraryPane';
+import { ProgressPane } from '../../src/components/ProgressPane';
+import { PlanPane, type PlanState } from '../../src/components/PlanPane';
+import { AddWordModal, type AddWordInput } from '../../src/components/AddWordModal';
+import { Icon } from '../../src/components/icons';
+import { computeProgressStats } from '../../src/lib/review/progress';
+import type { LibrarySort } from '../../src/lib/review/library';
+import type { Word, ReviewLog } from '../../src/lib/storage/types';
+import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
 import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
+const PLAN_STATE_KEY = 'vocabflow_plan_state';
+
+type TabId = 'review' | 'progress' | 'library' | 'plan';
 
 export function Popup() {
   const [ready, setReady] = useState(false);
   const [words, setWords] = useState<Word[]>([]);
+  const [logs, setLogs] = useState<ReviewLog[]>([]);
   const [dueCount, setDueCount] = useState(0);
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [settings, setSettings] = useState<OverlaySettings | null>(null);
+  const [tab, setTab] = useState<TabId>('review');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<LibrarySort>('added');
+  const [planState, setPlanState] = useState<PlanState>('beta');
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
-    const all = await wordClient.getAllWords(s.targetLang);
-    const due = await wordClient.getDueWords(new Date(), s.targetLang);
+    const [all, due, allLogs] = await Promise.all([
+      wordClient.getAllWords(s.targetLang),
+      wordClient.getDueWords(new Date(), s.targetLang),
+      wordClient.getAllReviewLogs(),
+    ]);
     setWords(all);
     setDueCount(due.length);
+    setLogs(allLogs);
     setSettings(s);
   }, []);
 
   useEffect(() => {
     (async () => {
+      const stored = await browser.storage.local.get(PLAN_STATE_KEY);
+      const storedState = stored[PLAN_STATE_KEY];
+      if (storedState === 'beta' || storedState === 'free' || storedState === 'premium') {
+        setPlanState(storedState);
+      }
       await refresh();
       setReady(true);
     })();
   }, [refresh]);
+
+  function updatePlanState(next: PlanState) {
+    setPlanState(next);
+    void browser.storage.local.set({ [PLAN_STATE_KEY]: next });
+  }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }
 
   async function startReview(forceAll = false) {
     const targetLang = settings?.targetLang ?? (await settingsStore.load()).targetLang;
@@ -55,6 +92,27 @@ export function Popup() {
     await refresh();
   }
 
+  async function handleAddWords(inputs: AddWordInput[]) {
+    const targetLang = settings?.targetLang ?? DEFAULT_TARGET_LANG;
+    for (const input of inputs) {
+      await wordClient.saveWord({
+        term: input.term,
+        translation: input.translation,
+        contextSentence: input.contextSentence ?? '',
+        sourceUrl: '',
+        langFrom: 'en',
+        langTo: targetLang,
+      });
+    }
+    showToast(`Added ${inputs.length} word${inputs.length === 1 ? '' : 's'}`);
+    await refresh();
+  }
+
+  async function handleDelete(id: string) {
+    await wordClient.deleteWord(id, new Date());
+    await refresh();
+  }
+
   const pausedUntil = settings?.pausedUntil ? new Date(settings.pausedUntil) : null;
   const snoozedUntil = settings?.snoozedUntil ? new Date(settings.snoozedUntil) : null;
   const isPaused = !!pausedUntil && pausedUntil > new Date();
@@ -68,59 +126,118 @@ export function Popup() {
     );
   }
 
+  const stats = computeProgressStats(words, logs, new Date());
+  const tabs: { id: TabId; label: string; badge?: number; count?: number }[] = [
+    { id: 'review', label: 'Review', badge: dueCount },
+    { id: 'progress', label: 'Progress' },
+    { id: 'library', label: 'Library', count: words.length },
+    { id: 'plan', label: 'Plan' },
+  ];
+
   return (
     <div className="vf-app">
-      <div className="vf-dash">
-        <div className="vf-brand">Vocabflow</div>
-
-        <div className="vf-stats">
-          <div className="vf-stat">
-            <div className="vf-stat-n">{words.length}</div>
-            <div className="vf-stat-l">WORDS</div>
-          </div>
-          <div className="vf-stat">
-            <div className="vf-stat-n vf-stat-due">{dueCount}</div>
-            <div className="vf-stat-l">DUE NOW</div>
-          </div>
-        </div>
-
-        <div className="vf-lang">
-          TARGET{' '}
-          <select
-            className="vf-lang-select"
-            value={settings?.targetLang ?? ''}
-            onChange={(e) => void handleLangChange(e.target.value)}
-            disabled={!ready}
-          >
-            {SUPPORTED_LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
-            ))}
-          </select>
-        </div>
-
-        <button className="vf-review-btn" onClick={() => startReview(false)} disabled={!ready || dueCount === 0}>
-          {dueCount > 0 ? `Review ${dueCount}` : 'Nothing due'}
-        </button>
-
-        {(isPaused || isSnoozed) && (
-          <div className="vf-pausebar">
-            <span>{isPaused ? 'Reminders paused' : 'Snoozed'}</span>
-            <button className="vf-resume" onClick={handleResume}>Resume now</button>
-          </div>
-        )}
-
-        <div className="vf-libhead">LIBRARY {'\u00b7'} {words.length}</div>
-        {words.length === 0 ? (
-          <div className="vf-libempty">No words yet. Select text on any page to add some.</div>
-        ) : (
-          words.slice(0, 8).map((w) => (
-            <div className="vf-libitem" key={w.id}>
-              <span className="vf-libterm">{w.term}</span>
-              <span className="vf-libtr">{w.translations[0]}</span>
-            </div>
-          ))
-        )}
+      <div className={`toast ${toast ? 'show' : ''}`}>
+        {toast && <Icon name="check" />} {toast}
       </div>
+
+      <div className="h-bar">
+        <div className="brand">
+          <BrandMark />
+          <div>
+            <div className="brand-name">Vocab<em>flow</em></div>
+            <div className="overline">
+              <span className={`tier-pill ${planState === 'premium' ? 'premium' : ''}`}>
+                {planState === 'premium' ? '★ PREMIUM' : planState === 'free' ? 'FREE' : 'BETA'}
+              </span>
+              {planState === 'free' ? (
+                <button className="header-quota" onClick={() => setTab('plan')} style={{ marginLeft: 6 }}>
+                  {words.length} / 500 words →
+                </button>
+              ) : (
+                <span style={{ marginLeft: 6 }}>{words.length} words</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="h-actions">
+          <button className="icon-btn" title="Help"><Icon name="help" /></button>
+        </div>
+      </div>
+
+      <div className="ribbon">
+        <div className="ribbon-cell">
+          <div className="ribbon-num">{words.length}</div>
+          <div className="ribbon-label">Words</div>
+        </div>
+        <div className="ribbon-cell">
+          <div className="ribbon-num heat">{dueCount}</div>
+          <div className="ribbon-label">Due now</div>
+          {dueCount > 0 && <Icon name="sparkle" size={12} className="ribbon-spark" />}
+        </div>
+        <div className="ribbon-cell">
+          <div className="ribbon-num gold">{stats.streak}</div>
+          <div className="ribbon-label">Day streak</div>
+        </div>
+      </div>
+
+      <div className="tabs" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            {t.label}
+            {t.badge != null && t.badge > 0 && <span className="badge attn">{t.badge}</span>}
+            {t.count != null && t.count > 0 && <span className="count">{t.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      {(isPaused || isSnoozed) && (
+        <div className="vf-pausebar">
+          <span>{isPaused ? 'Reminders paused' : 'Snoozed'}</span>
+          <button className="vf-resume" onClick={handleResume}>Resume now</button>
+        </div>
+      )}
+
+      <div className="tab-body">
+        {tab === 'review' && (
+          <ReviewPane
+            words={words}
+            dueCount={dueCount}
+            targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
+            onLangChange={handleLangChange}
+            onStartReview={() => startReview(false)}
+            ready={ready}
+          />
+        )}
+        {tab === 'progress' && <ProgressPane words={words} logs={logs} />}
+        {tab === 'library' && (
+          <LibraryPane
+            words={words}
+            sort={sort}
+            setSort={setSort}
+            search={search}
+            setSearch={setSearch}
+            onDelete={handleDelete}
+          />
+        )}
+        {tab === 'plan' && <PlanPane words={words} planState={planState} onPlanState={updatePlanState} />}
+      </div>
+
+      {tab === 'library' && (
+        <button className="fab" onClick={() => setModalOpen(true)} title="Add new word">
+          <Icon name="plus" size={15} />
+          <span className="fab-label">Add word</span>
+        </button>
+      )}
+
+      <AddWordModal open={modalOpen} onClose={() => setModalOpen(false)} onAdd={handleAddWords} />
+    </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <div className="brand-mark">
+      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20 }}>&amp;</span>
     </div>
   );
 }

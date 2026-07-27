@@ -1,4 +1,4 @@
-import type { SaveWordInput, ReviewMode, WireWord } from '../storage/types';
+import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog } from '../storage/types';
 import type { Grade } from '@vocabflow/core';
 
 // Why this exists: in a Chrome extension the content script runs in the
@@ -14,6 +14,8 @@ export type RequestMap = {
   COUNT_WORDS: { langTo: string };
   RECORD_REVIEW: { wordId: string; grade: Grade; mode: ReviewMode; now: string };
   GET_REVIEW_LOGS: { wordId: string };
+  DELETE_WORD: { wordId: string; now: string };
+  GET_ALL_LOGS: Record<string, never>;
 };
 
 export type ResponseMap = {
@@ -23,6 +25,8 @@ export type ResponseMap = {
   COUNT_WORDS: number;
   RECORD_REVIEW: WireWord;
   GET_REVIEW_LOGS: unknown[];
+  DELETE_WORD: null;
+  GET_ALL_LOGS: WireReviewLog[];
 };
 
 

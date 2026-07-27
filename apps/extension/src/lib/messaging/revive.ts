@@ -1,4 +1,4 @@
-import type { Word, WireWord } from '../storage/types';
+import type { Word, WireWord, ReviewLog, WireReviewLog } from '../storage/types';
 
 // Across the messaging boundary Dates arrive as ISO strings. These helpers
 // turn a wire-format word back into one with real Date objects, so the rest
@@ -17,4 +17,12 @@ export function reviveWord(wire: WireWord): Word {
 
 export function reviveWords(wires: WireWord[]): Word[] {
   return wires.map(reviveWord);
+}
+
+export function reviveReviewLog(wire: WireReviewLog): ReviewLog {
+  return { ...wire, reviewedAt: new Date(wire.reviewedAt) };
+}
+
+export function reviveReviewLogs(wires: WireReviewLog[]): ReviewLog[] {
+  return wires.map(reviveReviewLog);
 }

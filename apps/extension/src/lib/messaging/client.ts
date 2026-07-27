@@ -1,7 +1,7 @@
-import type { SaveWordInput, Word, ReviewMode } from '../storage/types';
+import type { SaveWordInput, Word, ReviewMode, ReviewLog } from '../storage/types';
 import type { Grade } from '@vocabflow/core';
 import type { Message, ResponseMap, MessageType } from './protocol';
-import { reviveWord, reviveWords } from './revive';
+import { reviveWord, reviveWords, reviveReviewLogs } from './revive';
 
 // Client used by the popup and the content script. It hides the messaging
 // and date-revival so callers work with the same shapes the repository
@@ -32,6 +32,12 @@ export const wordClient = {
     return reviveWord(
       (await send({ type: 'RECORD_REVIEW', payload: { wordId, grade, mode, now: now.toISOString() } })),
     );
+  },
+  async deleteWord(wordId: string, now: Date): Promise<void> {
+    await send({ type: 'DELETE_WORD', payload: { wordId, now: now.toISOString() } });
+  },
+  async getAllReviewLogs(): Promise<ReviewLog[]> {
+    return reviveReviewLogs(await send({ type: 'GET_ALL_LOGS', payload: {} }));
   },
 };
 

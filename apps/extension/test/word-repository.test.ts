@@ -158,3 +158,24 @@ describe('recordReview', () => {
     expect(logs[1]!.mode).toBe('voice');
   });
 });
+
+describe('getAllReviewLogs (across every word and language, for Progress stats)', () => {
+  it('returns every log, oldest first, regardless of word or language', async () => {
+    const a = await repo.saveWord(sample, NOW);
+    const b = await repo.saveWord(
+      { ...sample, term: 'casa', translation: 'дом', langTo: 'es' },
+      NOW,
+    );
+    await repo.recordReview(b.id, 5, 'typing', later(1000));
+    await repo.recordReview(a.id, 3, 'typing', NOW);
+    const logs = await repo.getAllReviewLogs();
+    expect(logs).toHaveLength(2);
+    expect(logs[0]!.wordId).toBe(a.id); // NOW comes before later(1000)
+    expect(logs[1]!.wordId).toBe(b.id);
+  });
+
+  it('returns an empty array when nothing has been reviewed yet', async () => {
+    await repo.saveWord(sample, NOW);
+    expect(await repo.getAllReviewLogs()).toEqual([]);
+  });
+});

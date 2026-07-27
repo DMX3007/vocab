@@ -42,3 +42,5 @@ export interface ReviewLog {
   mode: ReviewMode;
   grade: number;
 }
+
+export type WireReviewLog = Omit<ReviewLog, 'reviewedAt'> & { reviewedAt: string };
