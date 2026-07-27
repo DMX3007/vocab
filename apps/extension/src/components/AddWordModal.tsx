@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icon } from './icons';
+import { fetchWordsFromGoogleSheet, type WordInput } from '../lib/import/google-sheet';
 
-export interface AddWordInput {
-  term: string;
-  translation: string;
-  contextSentence?: string;
-}
+export type AddWordInput = WordInput;
 
 interface Props {
   open: boolean;
@@ -13,16 +10,23 @@ interface Props {
   onAdd: (inputs: AddWordInput[]) => void;
 }
 
-// Add-to-library sheet: single word (term + translation + optional example),
-// or a bulk paste mode that parses one "term — translation" pair per line.
-// There's no auto-translate here — the tooltip's own AUTO button is disabled
-// pending a translate endpoint, so this modal doesn't pretend to have one.
+type Mode = 'single' | 'bulk' | 'sheet';
+
+// Add-to-library sheet: a single word (term + translation + optional
+// example), a bulk paste mode that parses one "term — translation" pair per
+// line, or a Google Sheet import (public CSV export, no OAuth). There's no
+// auto-translate here — the tooltip's own AUTO button is disabled pending a
+// translate endpoint, so this modal doesn't pretend to have one.
 export function AddWordModal({ open, onClose, onAdd }: Props) {
-  const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const [mode, setMode] = useState<Mode>('single');
   const [term, setTerm] = useState('');
   const [translation, setTranslation] = useState('');
   const [context, setContext] = useState('');
   const [bulkText, setBulkText] = useState('');
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [sheetWords, setSheetWords] = useState<WordInput[]>([]);
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const [sheetError, setSheetError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -35,6 +39,10 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
         setTranslation('');
         setContext('');
         setBulkText('');
+        setSheetUrl('');
+        setSheetWords([]);
+        setSheetLoading(false);
+        setSheetError(null);
         setMode('single');
       }, 250);
     }
@@ -65,6 +73,26 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
     onClose();
   }
 
+  async function handleFetchSheet() {
+    if (!sheetUrl.trim()) return;
+    setSheetLoading(true);
+    setSheetError(null);
+    setSheetWords([]);
+    try {
+      setSheetWords(await fetchWordsFromGoogleSheet(sheetUrl.trim()));
+    } catch (err) {
+      setSheetError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setSheetLoading(false);
+    }
+  }
+
+  function submitSheet() {
+    if (!sheetWords.length) return;
+    onAdd(sheetWords);
+    onClose();
+  }
+
   return (
     <div className={`scrim ${open ? 'open' : ''}`} onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -78,6 +106,9 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
           </button>
           <button className={mode === 'bulk' ? 'on' : ''} onClick={() => setMode('bulk')}>
             <Icon name="paste" size={12} /> Paste a list
+          </button>
+          <button className={mode === 'sheet' ? 'on' : ''} onClick={() => setMode('sheet')}>
+            <Icon name="sheet" size={12} /> Google Sheet
           </button>
         </div>
 
@@ -115,7 +146,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
               <Icon name="plus" size={14} /> Add to library
             </button>
           </>
-        ) : (
+        ) : mode === 'bulk' ? (
           <>
             <div className="bulk-help">
               One pair per line — separated by <span className="kbd">—</span>, <span className="kbd">:</span>, or tab.
@@ -154,6 +185,64 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
 
             <button className="btn-primary" onClick={submitBulk} disabled={!parsedBulk.length}>
               <Icon name="download" size={14} /> Import {parsedBulk.length || ''} word{parsedBulk.length === 1 ? '' : 's'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="bulk-help">
+              Column A = word, column B = translation (optional column C = example). The sheet must be shared
+              as <em>Anyone with the link → Viewer</em>.
+            </div>
+            <div className="field">
+              <label className="field-label">Sheet URL</label>
+              <input
+                className="field-input"
+                value={sheetUrl}
+                onChange={(e) => {
+                  setSheetUrl(e.target.value);
+                  setSheetError(null);
+                  setSheetWords([]);
+                }}
+                placeholder="https://docs.google.com/spreadsheets/d/…"
+              />
+            </div>
+
+            <button
+              className="btn-secondary"
+              onClick={handleFetchSheet}
+              disabled={!sheetUrl.trim() || sheetLoading}
+              style={{ marginBottom: 12 }}
+            >
+              {sheetLoading ? 'Fetching…' : (<><Icon name="sheet" size={13} /> Fetch words</>)}
+            </button>
+
+            {sheetError && (
+              <div className="license-msg err" style={{ marginBottom: 12 }}>{sheetError}</div>
+            )}
+
+            {sheetWords.length > 0 && (
+              <>
+                <div className="field-label" style={{ marginBottom: 6 }}>
+                  Preview {'·'} {sheetWords.length} word{sheetWords.length === 1 ? '' : 's'}
+                </div>
+                <div className="bulk-preview">
+                  {sheetWords.slice(0, 6).map((r, i) => (
+                    <div className="bulk-preview-row" key={i}>
+                      <span className="pw">{r.term}</span>
+                      <span className="pt">{r.translation}</span>
+                    </div>
+                  ))}
+                  {sheetWords.length > 6 && (
+                    <div className="bulk-preview-row">
+                      <span className="pt">… and {sheetWords.length - 6} more</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <button className="btn-primary" onClick={submitSheet} disabled={!sheetWords.length}>
+              <Icon name="download" size={14} /> Import {sheetWords.length || ''} word{sheetWords.length === 1 ? '' : 's'}
             </button>
           </>
         )}
