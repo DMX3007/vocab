@@ -70,7 +70,7 @@ export function ReviewCard({ session, onFinished }: Props) {
     <div className={`vf-card ${verdictClass}`} onKeyDown={onKeyDown}>
       <div className="vf-card-top">
         <span className="vf-card-streak">Streak {'\u00b7'} {done.index + 1} / {done.total}</span>
-        <span className="vf-card-dir">{card.direction === 'forward' ? 'EN' : 'RU'}</span>
+        <span className="vf-card-dir">{card.direction === 'forward' ? 'EN → RU' : 'RU → EN'}</span>
       </div>
 
       <div className="vf-card-prompt">{card.prompt}</div>
@@ -79,7 +79,7 @@ export function ReviewCard({ session, onFinished }: Props) {
       <input
         ref={inputRef}
         className="vf-card-input"
-        placeholder="Type the translation..."
+        placeholder={card.direction === 'forward' ? 'Type the translation...' : 'Type the original word...'}
         value={answer}
         disabled={!!verdict}
         onChange={(e) => setAnswer(e.target.value)}

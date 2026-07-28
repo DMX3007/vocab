@@ -15,6 +15,15 @@ describe('normalizeAnswer', () => {
     expect(normalizeAnswer('résumé!')).toBe('resume');
     expect(normalizeAnswer('добродетели.')).toBe('добродетели');
   });
+
+  it('ignores Russian stress marks (combining acute accent), a common artifact of copy-pasted dictionary text', () => {
+    // "сто́йкость" — а combining acute accent (U+0301) over the stressed о
+    expect(normalizeAnswer('сто́йкость')).toBe(normalizeAnswer('стойкость'));
+  });
+
+  it('keeps й distinct from и (it must not collapse via the diacritic-stripping step)', () => {
+    expect(normalizeAnswer('мой')).not.toBe(normalizeAnswer('мои'));
+  });
 });
 
 describe('levenshtein', () => {
