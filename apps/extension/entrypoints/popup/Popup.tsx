@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
 import { resume, type OverlaySettings } from '../../src/lib/review/overlay-policy';
-import { ReviewSession } from '../../src/lib/review/session';
-import { ReviewCard } from '../../src/components/ReviewCard';
 import { ReviewPane } from '../../src/components/ReviewPane';
 import { LibraryPane } from '../../src/components/LibraryPane';
 import { ProgressPane } from '../../src/components/ProgressPane';
@@ -27,7 +25,6 @@ export function Popup() {
   const [words, setWords] = useState<Word[]>([]);
   const [logs, setLogs] = useState<ReviewLog[]>([]);
   const [dueCount, setDueCount] = useState(0);
-  const [session, setSession] = useState<ReviewSession | null>(null);
   const [settings, setSettings] = useState<OverlaySettings | null>(null);
   const [tab, setTab] = useState<TabId>('review');
   const [modalOpen, setModalOpen] = useState(false);
@@ -72,20 +69,22 @@ export function Popup() {
     setTimeout(() => setToast(null), 2200);
   }
 
-  async function startReview(forceAll = false) {
+  // Review always happens as the same full-page overlay the alarm shows —
+  // never inline in the popup — so there's one review experience, not two.
+  async function handleStartReview() {
     const targetLang = settings?.targetLang ?? (await settingsStore.load()).targetLang;
-    const s = new ReviewSession(wordClient, { mode: 'normal' });
-    await s.start(targetLang, new Date(), { includeAll: forceAll });
-    setSession(s);
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error('no active tab');
+      await browser.tabs.sendMessage(tab.id, { type: 'SHOW_OVERLAY', langTo: targetLang });
+      window.close();
+    } catch {
+      showToast('Open a regular webpage first, then review from there.');
+    }
   }
 
   async function handleLangChange(targetLang: string) {
     await settingsStore.update((s) => ({ ...s, targetLang }));
-    await refresh();
-  }
-
-  async function endReview() {
-    setSession(null);
     await refresh();
   }
 
@@ -119,14 +118,6 @@ export function Popup() {
   const snoozedUntil = settings?.snoozedUntil ? new Date(settings.snoozedUntil) : null;
   const isPaused = !!pausedUntil && pausedUntil > new Date();
   const isSnoozed = !!snoozedUntil && snoozedUntil > new Date();
-
-  if (session) {
-    return (
-      <div className="vf-app">
-        <ReviewCard session={session} onFinished={endReview} />
-      </div>
-    );
-  }
 
   const stats = computeProgressStats(words, logs, new Date());
   const tabs: { id: TabId; label: string; badge?: number; count?: number }[] = [
@@ -206,7 +197,7 @@ export function Popup() {
             dueCount={dueCount}
             targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
             onLangChange={handleLangChange}
-            onStartReview={() => startReview(false)}
+            onStartReview={handleStartReview}
             ready={ready}
           />
         )}

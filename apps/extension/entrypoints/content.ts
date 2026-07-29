@@ -190,6 +190,10 @@ export default defineContentScript({
       }
       if (message?.type === 'SHOW_OVERLAY') {
         void showOverlay(message.langTo);
+        // Acknowledge immediately — showOverlay's own await(s) shouldn't hold
+        // up the sender (the popup awaits this to know a content script is
+        // here before closing itself).
+        sendResponse(true);
       }
       return true;  // WXT 0.19 types require every path to return true
     });
