@@ -8,7 +8,7 @@ import {
   type LibrarySort,
   type AlgoFilter,
 } from '../lib/review/library';
-import { MASTERED_INTERVAL_DAYS } from '../lib/review/progress';
+import { isMastered } from '../lib/review/progress';
 import { ALGO_LABELS } from '../lib/review/algo';
 import type { Word } from '../lib/storage/types';
 import type { AlgoId } from '@vocabflow/core';
@@ -74,8 +74,8 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     );
   }
 
-  const mastered = words.filter((w) => w.srsState.intervalDays >= MASTERED_INTERVAL_DAYS).length;
-  const learning = words.filter((w) => w.srsState.intervalDays > 0 && w.srsState.intervalDays < MASTERED_INTERVAL_DAYS).length;
+  const mastered = words.filter(isMastered).length;
+  const learning = words.filter((w) => w.srsState.intervalDays > 0 && !isMastered(w)).length;
   const fresh = words.filter((w) => w.srsState.intervalDays === 0).length;
 
   return (

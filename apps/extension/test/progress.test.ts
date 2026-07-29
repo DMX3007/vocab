@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeProgressStats, ACHIEVEMENTS } from '../src/lib/review/progress';
+import { computeProgressStats, isMastered, ACHIEVEMENTS } from '../src/lib/review/progress';
 import type { Word, ReviewLog } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00'); // a Saturday, local time
@@ -71,6 +71,14 @@ describe('computeProgressStats', () => {
     expect(computeProgressStats(words, [], NOW).mastered).toBe(2);
   });
 
+  it('mastered counts Leitner words that reached the last box, regardless of interval days', () => {
+    const words = [
+      word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 16 } as Word['srsState'] }), // last box, mastered
+      word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } as Word['srsState'] }), // box 4, not yet
+    ];
+    expect(computeProgressStats(words, [], NOW).mastered).toBe(1);
+  });
+
   it('dailyReviews buckets by weekday within the trailing 7-day window only', () => {
     const logs = [
       log('w1', 5, 0), // today
@@ -110,6 +118,17 @@ describe('computeProgressStats', () => {
   it('nextMilestone picks the smallest milestone still ahead', () => {
     const logs = Array.from({ length: 3 }, (_, i) => log('w1', 5, i));
     expect(computeProgressStats([], logs, NOW).nextMilestone).toBe(7); // streak is 3
+  });
+});
+
+describe('isMastered', () => {
+  it('SM-2: mastered once the interval reaches 21 days', () => {
+    expect(isMastered(word({ srsState: { intervalDays: 21 } as Word['srsState'] }))).toBe(true);
+    expect(isMastered(word({ srsState: { intervalDays: 20 } as Word['srsState'] }))).toBe(false);
+  });
+  it('Leitner: mastered once it reaches the last box, even though its 16-day interval never hits 21', () => {
+    expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 16 } as Word['srsState'] }))).toBe(true);
+    expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } as Word['srsState'] }))).toBe(false);
   });
 });
 

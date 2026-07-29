@@ -1,3 +1,4 @@
+import { DEFAULT_LEITNER_CONFIG } from '@vocabflow/core';
 import type { Word, ReviewLog } from '../storage/types';
 
 // Turns the raw word + review-log history into the numbers the Progress tab
@@ -13,6 +14,16 @@ const XP_PER_LEVEL = 100;
 /** A word is "mastered" once its SRS interval has grown past three weeks. */
 export const MASTERED_INTERVAL_DAYS = 21;
 const DAILY_GOAL = 10;
+
+/** Algo-aware "mastered": Leitner's box ladder tops out at 16 days, which
+ *  never crosses MASTERED_INTERVAL_DAYS — so for Leitner, "mastered" means
+ *  "reached the last box" instead of a fixed day count. */
+export function isMastered(word: Word): boolean {
+  if (word.srsState.algo === 'leitner') {
+    return word.srsState.stepIndex >= DEFAULT_LEITNER_CONFIG.boxIntervalDays.length - 1;
+  }
+  return word.srsState.intervalDays >= MASTERED_INTERVAL_DAYS;
+}
 
 export const LEVEL_TITLES = [
   '', 'Beginner', 'Explorer', 'Learner', 'Student', 'Scholar',
@@ -124,7 +135,7 @@ export function computeProgressStats(words: Word[], logs: ReviewLog[], now: Date
   const todayIdx = now.getDay();
   const todayCount = dailyReviews[todayIdx] ?? 0;
 
-  const mastered = words.filter((w) => w.srsState.intervalDays >= MASTERED_INTERVAL_DAYS).length;
+  const mastered = words.filter(isMastered).length;
   const streak = computeStreak(logs, now);
 
   return {

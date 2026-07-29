@@ -224,6 +224,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .word-text { flex: 1; min-width: 0; }
 .word-en { font-family: var(--serif); font-size: 18px; line-height: 1.1; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .word-tr { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.word-stats-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+.word-stat-text { font-family: var(--mono); font-size: 9px; letter-spacing: 0.03em; color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.review-filter-row { display: flex; align-items: center; justify-content: space-between; padding: 0 14px 10px; }
 .row-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .due-pill {
   font-family: var(--mono);

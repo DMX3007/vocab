@@ -129,6 +129,33 @@ describe('ReviewSession (normal mode)', () => {
     expect(session.total).toBe(1); // included despite not being due
   });
 
+  it('start({ algoFilter }) only queues due words on that algorithm', async () => {
+    await save('fortitude', 'стойкость', minutesAgo(30)); // sm2 (default)
+    await repo.saveWord(
+      { term: 'candor', translation: 'откровенность', contextSentence: '…', sourceUrl: 'u', langFrom: 'en', langTo: 'ru' },
+      minutesAgo(20),
+      'leitner',
+    );
+
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW, { algoFilter: 'leitner' });
+    expect(session.total).toBe(1);
+    expect(session.currentCard?.term).toBe('candor');
+  });
+
+  it('start({ algoFilter: "all" }) (or omitted) queues every due word regardless of algorithm', async () => {
+    await save('fortitude', 'стойкость', minutesAgo(30));
+    await repo.saveWord(
+      { term: 'candor', translation: 'откровенность', contextSentence: '…', sourceUrl: 'u', langFrom: 'en', langTo: 'ru' },
+      minutesAgo(20),
+      'leitner',
+    );
+
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW, { algoFilter: 'all' });
+    expect(session.total).toBe(2);
+  });
+
   it('caps the session at maxCards, leaving the rest for next time', async () => {
     for (let i = 0; i < DEFAULT_SESSION_CONFIG.maxCards + 5; i++) {
       await save(`w${i}`, `п${i}`, minutesAgo(100 - i));

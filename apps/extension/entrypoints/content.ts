@@ -10,6 +10,7 @@ import { SettingsStore } from '../src/lib/review/settings-store';
 import { snooze, pauseFor, addToBlacklist, type PausePreset } from '../src/lib/review/overlay-policy';
 import type { SavePayload } from '../src/lib/tooltip-machine';
 import { ContentCommand } from '@/src/lib/messaging/protocol';
+import type { AlgoFilter } from '../src/lib/review/library';
 import TooltipIcon from '@/src/components/TooltipIcon';
 import SkippedChip from '@/src/components/SkippedChip';
 import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
@@ -155,9 +156,9 @@ export default defineContentScript({
     })
 
     // ── review overlay ─────────────────────────────────────────
-    async function showOverlay(langTo: string) {
+    async function showOverlay(langTo: string, algoFilter?: AlgoFilter) {
       const session = new ReviewSession(wordClient, { mode: 'normal' });
-      await session.start(langTo, new Date());
+      await session.start(langTo, new Date(), { algoFilter });
       if (session.total === 0) return; // nothing due after all
 
       const hostname = location.hostname;
@@ -189,7 +190,7 @@ export default defineContentScript({
         return true;
       }
       if (message?.type === 'SHOW_OVERLAY') {
-        void showOverlay(message.langTo);
+        void showOverlay(message.langTo, message.algoFilter);
         // Acknowledge immediately — showOverlay's own await(s) shouldn't hold
         // up the sender (the popup awaits this to know a content script is
         // here before closing itself).

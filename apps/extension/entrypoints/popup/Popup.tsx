@@ -10,7 +10,7 @@ import { AddWordModal, type AddWordInput } from '../../src/components/AddWordMod
 import { HelpSheet } from '../../src/components/HelpSheet';
 import { Icon } from '../../src/components/icons';
 import { computeProgressStats } from '../../src/lib/review/progress';
-import type { LibrarySort } from '../../src/lib/review/library';
+import type { LibrarySort, AlgoFilter } from '../../src/lib/review/library';
 import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
 import type { AlgoId } from '@vocabflow/core';
@@ -79,12 +79,12 @@ export function Popup() {
 
   // Review always happens as the same full-page overlay the alarm shows —
   // never inline in the popup — so there's one review experience, not two.
-  async function handleStartReview() {
+  async function handleStartReview(algoFilter: AlgoFilter) {
     const targetLang = settings?.targetLang ?? (await settingsStore.load()).targetLang;
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('no active tab');
-      await browser.tabs.sendMessage(tab.id, { type: 'SHOW_OVERLAY', langTo: targetLang });
+      await browser.tabs.sendMessage(tab.id, { type: 'SHOW_OVERLAY', langTo: targetLang, algoFilter });
       window.close();
     } catch {
       showToast('Open a regular webpage first, then review from there.');
@@ -213,6 +213,7 @@ export function Popup() {
         {tab === 'review' && (
           <ReviewPane
             words={words}
+            logs={logs}
             dueCount={dueCount}
             targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
             onLangChange={handleLangChange}

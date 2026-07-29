@@ -7,6 +7,7 @@ import {
   type Grade,
 } from '@vocabflow/core';
 import type { Word, ReviewMode } from '../storage/types';
+import type { AlgoFilter } from './library';
 
 // The session only needs these three methods. Both the real WordRepository
 // (used in tests) and the messaging wordClient (used in the popup) satisfy
@@ -68,20 +69,25 @@ export class ReviewSession {
     private readonly tuning: SessionTuning = DEFAULT_SESSION_CONFIG,
   ) {}
 
-  /** Builds the snapshot: due words of this language, most-overdue first, capped. */
   /** Builds the snapshot: due words of this language, most-overdue first, capped.
    *  With { includeAll } it queues every (non-deleted) word regardless of due
-   *  date — used by the manual "force review" trigger for testing. */
+   *  date — used by the manual "force review" trigger for testing. With
+   *  { algoFilter } set to a specific algorithm, only that algorithm's words
+   *  are queued — lets the popup start a session scoped to "just Leitner"
+   *  or "just SM-2" instead of everything due. */
   async start(
     langTo: string,
     now: Date,
-    options: { includeAll?: boolean } = {},
+    options: { includeAll?: boolean; algoFilter?: AlgoFilter } = {},
   ): Promise<void> {
     const pool = options.includeAll
       ? await this.repo.getAllWords(langTo)
       : await this.repo.getDueWords(now, langTo);
-    pool.sort((a, b) => a.srsState.dueAt.getTime() - b.srsState.dueAt.getTime());
-    this.queue = pool.slice(0, this.tuning.maxCards);
+    const filtered = !options.algoFilter || options.algoFilter === 'all'
+      ? pool
+      : pool.filter((w) => w.srsState.algo === options.algoFilter);
+    filtered.sort((a, b) => a.srsState.dueAt.getTime() - b.srsState.dueAt.getTime());
+    this.queue = filtered.slice(0, this.tuning.maxCards);
     this.index = 0;
     this.started = true;
   }

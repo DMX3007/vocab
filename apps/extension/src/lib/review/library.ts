@@ -1,6 +1,6 @@
 import type { AlgoId } from '@vocabflow/core';
 import type { Word } from '../storage/types';
-import { MASTERED_INTERVAL_DAYS } from './progress';
+import { isMastered } from './progress';
 
 // Pure helpers for the Library tab: how a word is bucketed (for the status
 // badge + banner counts) and how the list is sorted/filtered. Kept separate
@@ -10,7 +10,7 @@ export type WordStatus = 'due' | 'mastered' | 'learning' | 'fresh';
 
 export function wordStatus(word: Word, now: Date): WordStatus {
   if (word.srsState.dueAt.getTime() <= now.getTime()) return 'due';
-  if (word.srsState.intervalDays >= MASTERED_INTERVAL_DAYS) return 'mastered';
+  if (isMastered(word)) return 'mastered';
   if (word.srsState.intervalDays > 0) return 'learning';
   return 'fresh';
 }

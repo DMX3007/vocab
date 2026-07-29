@@ -41,6 +41,12 @@ describe('wordStatus', () => {
   it('fresh for a brand-new word (interval still 0)', () => {
     expect(wordStatus(word({ srsState: { intervalDays: 0 } }), NOW)).toBe('fresh');
   });
+  it('Leitner is mastered by reaching the last box, not by a day count', () => {
+    const w = word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 16 } });
+    expect(wordStatus(w, NOW)).toBe('mastered');
+    const notYet = word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } });
+    expect(wordStatus(notYet, NOW)).toBe('learning');
+  });
 });
 
 describe('sortWords', () => {
