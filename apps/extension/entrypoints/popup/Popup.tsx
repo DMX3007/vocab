@@ -9,6 +9,7 @@ import { LibraryPane } from '../../src/components/LibraryPane';
 import { ProgressPane } from '../../src/components/ProgressPane';
 import { PlanPane, type PlanState } from '../../src/components/PlanPane';
 import { AddWordModal, type AddWordInput } from '../../src/components/AddWordModal';
+import { HelpSheet } from '../../src/components/HelpSheet';
 import { Icon } from '../../src/components/icons';
 import { computeProgressStats } from '../../src/lib/review/progress';
 import type { LibrarySort } from '../../src/lib/review/library';
@@ -30,6 +31,7 @@ export function Popup() {
   const [settings, setSettings] = useState<OverlaySettings | null>(null);
   const [tab, setTab] = useState<TabId>('review');
   const [modalOpen, setModalOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<LibrarySort>('added');
@@ -160,7 +162,7 @@ export function Popup() {
           </div>
         </div>
         <div className="h-actions">
-          <button className="icon-btn" title="Help"><Icon name="help" /></button>
+          <button className="icon-btn" title="Help" onClick={() => setHelpOpen(true)}><Icon name="help" /></button>
         </div>
       </div>
 
@@ -230,6 +232,7 @@ export function Popup() {
       )}
 
       <AddWordModal open={modalOpen} onClose={() => setModalOpen(false)} onAdd={handleAddWords} />
+      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
