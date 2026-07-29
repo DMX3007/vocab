@@ -1,5 +1,5 @@
 import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog } from '../storage/types';
-import type { Grade } from '@vocabflow/core';
+import type { AlgoId, Grade } from '@vocabflow/core';
 
 // Why this exists: in a Chrome extension the content script runs in the
 // WEB PAGE's origin and the popup runs in the EXTENSION's origin. They do
@@ -16,6 +16,7 @@ export type RequestMap = {
   GET_REVIEW_LOGS: { wordId: string };
   DELETE_WORD: { wordId: string; now: string };
   GET_ALL_LOGS: Record<string, never>;
+  MOVE_WORDS_ALGO: { wordIds: string[]; algo: AlgoId; now: string };
 };
 
 export type ResponseMap = {
@@ -27,6 +28,7 @@ export type ResponseMap = {
   GET_REVIEW_LOGS: unknown[];
   DELETE_WORD: null;
   GET_ALL_LOGS: WireReviewLog[];
+  MOVE_WORDS_ALGO: WireWord[];
 };
 
 

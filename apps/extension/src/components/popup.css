@@ -449,10 +449,16 @@ input, select, textarea { font: inherit; color: inherit; }
 .lib-search svg { width: 13px; height: 13px; color: var(--ink-4); flex-shrink: 0; }
 .lib-search input { flex: 1; background: transparent; border: 0; outline: none; font-size: 12.5px; min-width: 0; }
 .lib-sort { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 9px; padding: 6px 10px; font-size: 11.5px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.lib-sort.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.lib-toolbar2 { display: flex; align-items: center; gap: 6px; padding: 0 14px 10px; }
+.lib-toolbar2 .lib-sort:last-child { margin-left: auto; }
 
 .library-grid { display: flex; flex-direction: column; gap: 8px; padding: 0 14px; }
 .lib-card { display: grid; grid-template-columns: 4px 1fr; background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; }
 .lib-card:hover { border-color: color-mix(in oklch, var(--ink) 25%, transparent); transform: translateY(-1px); box-shadow: 0 6px 14px -8px #00000022; }
+.lib-card.selectable { cursor: pointer; }
+.lib-card.selected { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
 .lib-card-strip { background: var(--ink-5); }
 .lib-card.status-due .lib-card-strip { background: var(--heat); }
 .lib-card.status-mastered .lib-card-strip { background: var(--leaf); }
@@ -460,19 +466,52 @@ input, select, textarea { font: inherit; color: inherit; }
 .lib-card.status-fresh .lib-card-strip { background: var(--gold); }
 .lib-card-body { padding: 9px 12px 9px 11px; }
 .lib-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lib-card-head-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.lib-card-checkbox { flex-shrink: 0; width: 15px; height: 15px; accent-color: var(--ink); cursor: pointer; }
 .lib-card-word { font-family: var(--serif); font-size: 16px; letter-spacing: -0.01em; color: var(--ink); line-height: 1.2; }
 .lib-card-del { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--ink-5); opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s; }
 .lib-card:hover .lib-card-del { opacity: 1; }
 .lib-card-del:hover { background: var(--heat-soft); color: var(--heat); }
 .lib-card-del svg { width: 11px; height: 11px; }
 .lib-card-tr { font-size: 12px; color: var(--ink-3); line-height: 1.4; margin-top: 1px; }
-.lib-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--rule-2); }
-.lib-card-source { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; color: var(--ink-4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.lib-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--rule-2); }
+.lib-card-foot-main { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lib-card-source { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; color: var(--ink-4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
+.lib-card-algo { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); padding: 1px 5px; border: 1px solid var(--rule); border-radius: 4px; flex-shrink: 0; }
 .lib-card-status { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; font-weight: 600; flex-shrink: 0; }
 .lib-card-status.due { background: var(--heat-soft); color: var(--heat); }
 .lib-card-status.mastered { background: var(--leaf-soft); color: var(--leaf); }
 .lib-card-status.learning { background: var(--cool-soft); color: var(--cool); }
 .lib-card-status.fresh { background: color-mix(in oklch, var(--gold) 22%, transparent); color: color-mix(in oklch, var(--gold) 70%, var(--ink)); }
+
+/* ── Select mode: bulk-move bar (covers the FAB while active) ── */
+.lib-select-bar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  box-shadow: 0 -6px 16px -8px #00000022;
+}
+.lib-select-count { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.lib-select-actions { display: flex; gap: 6px; margin-left: auto; }
+.lib-select-move {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.lib-select-move:hover { background: var(--paper-3); }
+.lib-select-move:disabled { opacity: 0.4; cursor: not-allowed; }
+.lib-select-cancel { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; color: var(--ink-4); flex-shrink: 0; }
+.lib-select-cancel:hover { background: var(--paper-2); color: var(--ink); }
 
 /* ───────── Toast ───────── */
 .toast {

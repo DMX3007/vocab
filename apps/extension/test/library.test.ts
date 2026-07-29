@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wordStatus, sortWords, filterWords } from '../src/lib/review/library';
+import { wordStatus, sortWords, filterWords, filterByAlgo } from '../src/lib/review/library';
 import type { Word } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00Z');
@@ -71,5 +71,19 @@ describe('filterWords', () => {
   });
   it('empty query returns everything', () => {
     expect(filterWords(words, '  ')).toEqual(words);
+  });
+});
+
+describe('filterByAlgo', () => {
+  const sm2Word = word({ id: 'a', srsState: { algo: 'sm2' } });
+  const leitnerWord = word({ id: 'b', srsState: { algo: 'leitner' } });
+  const words = [sm2Word, leitnerWord];
+
+  it('"all" returns everything', () => {
+    expect(filterByAlgo(words, 'all')).toEqual(words);
+  });
+  it('filters down to just the requested algorithm', () => {
+    expect(filterByAlgo(words, 'sm2').map((w) => w.id)).toEqual(['a']);
+    expect(filterByAlgo(words, 'leitner').map((w) => w.id)).toEqual(['b']);
   });
 });

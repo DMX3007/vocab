@@ -1,5 +1,5 @@
 import type { SaveWordInput, Word, ReviewMode, ReviewLog } from '../storage/types';
-import type { Grade } from '@vocabflow/core';
+import type { AlgoId, Grade } from '@vocabflow/core';
 import type { Message, ResponseMap, MessageType } from './protocol';
 import { reviveWord, reviveWords, reviveReviewLogs } from './revive';
 
@@ -38,6 +38,9 @@ export const wordClient = {
   },
   async getAllReviewLogs(): Promise<ReviewLog[]> {
     return reviveReviewLogs(await send({ type: 'GET_ALL_LOGS', payload: {} }));
+  },
+  async moveWordsAlgo(wordIds: string[], algo: AlgoId, now: Date): Promise<Word[]> {
+    return reviveWords(await send({ type: 'MOVE_WORDS_ALGO', payload: { wordIds, algo, now: now.toISOString() } }));
   },
 };
 

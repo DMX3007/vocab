@@ -179,3 +179,61 @@ describe('getAllReviewLogs (across every word and language, for Progress stats)'
     expect(await repo.getAllReviewLogs()).toEqual([]);
   });
 });
+
+describe('per-word algorithm', () => {
+  it('saveWord defaults new words to sm2, but honors an explicit algo', async () => {
+    const sm2Word = await repo.saveWord(sample, NOW);
+    expect(sm2Word.srsState.algo).toBe('sm2');
+
+    const leitnerWord = await repo.saveWord({ ...sample, term: 'candor' }, NOW, 'leitner');
+    expect(leitnerWord.srsState.algo).toBe('leitner');
+  });
+
+  it('recordReview schedules each word with ITS OWN algorithm', async () => {
+    const sm2Word = await repo.saveWord(sample, NOW, 'sm2');
+    const leitnerWord = await repo.saveWord({ ...sample, term: 'candor' }, NOW, 'leitner');
+
+    const afterSm2 = await repo.recordReview(sm2Word.id, 4, 'typing', NOW);
+    const afterLeitner = await repo.recordReview(leitnerWord.id, 4, 'typing', NOW);
+
+    expect(afterSm2.srsState.algo).toBe('sm2');
+    expect(afterLeitner.srsState.algo).toBe('leitner');
+    // A single grade-4 review: SM-2 takes it through a learning STEP (still
+    // phase 'learning', no interval yet), while Leitner promotes it straight
+    // to box 2 (a 2-day interval) — proof the repo dispatched to two
+    // different schedulers, not one shared instance.
+    expect(afterSm2.srsState.phase).toBe('learning');
+    expect(afterSm2.srsState.intervalDays).toBe(0);
+    expect(afterLeitner.srsState.intervalDays).toBe(2);
+  });
+
+  describe('moveWordsAlgo', () => {
+    it('switches the algorithm and resets progress to fresh/due-now', async () => {
+      const w = await repo.saveWord(sample, NOW, 'sm2');
+      const reviewed = await repo.recordReview(w.id, 5, 'typing', NOW); // interval grows past 0
+      expect(reviewed.srsState.intervalDays).toBeGreaterThan(0);
+
+      const [moved] = await repo.moveWordsAlgo([w.id], 'leitner', later(1000));
+      expect(moved!.srsState.algo).toBe('leitner');
+      expect(moved!.srsState.intervalDays).toBe(0); // fresh, like a brand-new word
+      expect(moved!.srsState.dueAt.getTime()).toBeLessThanOrEqual(later(1000).getTime());
+      // term/translations/context are untouched
+      expect(moved!.term).toBe('fortitude');
+      expect(moved!.translations).toEqual(['стойкость']);
+    });
+
+    it('moves several words in one call', async () => {
+      const a = await repo.saveWord(sample, NOW, 'sm2');
+      const b = await repo.saveWord({ ...sample, term: 'candor' }, NOW, 'sm2');
+      const moved = await repo.moveWordsAlgo([a.id, b.id], 'leitner', later(1000));
+      expect(moved).toHaveLength(2);
+      expect(moved.every((w) => w.srsState.algo === 'leitner')).toBe(true);
+    });
+
+    it('silently skips ids that do not exist', async () => {
+      const a = await repo.saveWord(sample, NOW, 'sm2');
+      const moved = await repo.moveWordsAlgo([a.id, 'nope'], 'leitner', later(1000));
+      expect(moved).toHaveLength(1);
+    });
+  });
+});

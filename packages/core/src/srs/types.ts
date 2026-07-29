@@ -1,6 +1,6 @@
 export type Grade = 0 | 1 | 2 | 3 | 4 | 5;
 export type Phase = 'learning' | 'review' | 'relearning';
-export type AlgoId = 'sm2'; // 'fsrs' | 'leitner' reserved for next loops
+export type AlgoId = 'sm2' | 'leitner'; // 'fsrs' reserved for a later loop
 
 export interface SrsState {
   algo: AlgoId;

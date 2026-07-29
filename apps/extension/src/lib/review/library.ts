@@ -1,3 +1,4 @@
+import type { AlgoId } from '@vocabflow/core';
 import type { Word } from '../storage/types';
 import { MASTERED_INTERVAL_DAYS } from './progress';
 
@@ -36,4 +37,11 @@ export function filterWords(words: Word[], query: string): Word[] {
   return words.filter(
     (w) => w.term.toLowerCase().includes(q) || w.translations.some((t) => t.toLowerCase().includes(q)),
   );
+}
+
+export type AlgoFilter = 'all' | AlgoId;
+
+export function filterByAlgo(words: Word[], filter: AlgoFilter): Word[] {
+  if (filter === 'all') return words;
+  return words.filter((w) => w.srsState.algo === filter);
 }

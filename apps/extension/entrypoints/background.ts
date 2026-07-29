@@ -38,8 +38,10 @@ export default defineBackground(() => {
   async function handle(message: Message): Promise<unknown> {
     await ready;
     switch (message.type) {
-      case 'SAVE_WORD':
-        return repo.saveWord(message.payload.input, new Date());
+      case 'SAVE_WORD': {
+        const { defaultAlgo } = await settingsStore.load();
+        return repo.saveWord(message.payload.input, new Date(), defaultAlgo);
+      }
       case 'GET_ALL_WORDS':
         return repo.getAllWords(message.payload.langTo);
       case 'GET_DUE_WORDS':
@@ -58,6 +60,8 @@ export default defineBackground(() => {
         return null;
       case 'GET_ALL_LOGS':
         return repo.getAllReviewLogs();
+      case 'MOVE_WORDS_ALGO':
+        return repo.moveWordsAlgo(message.payload.wordIds, message.payload.algo, new Date(message.payload.now));
       default: {
         const exhaustive: never = message
         throw new Error(`Unknown message: ${String(exhaustive)}`);

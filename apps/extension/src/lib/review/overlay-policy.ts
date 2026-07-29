@@ -1,5 +1,6 @@
 import { canInterrupt, type InterruptionSettings } from '../interruption';
 import { DEFAULT_TARGET_LANG } from '../languages';
+import type { AlgoId } from '@vocabflow/core';
 
 // Decides whether the review overlay may pop on the active tab right now.
 // Pure and synchronous: the caller gathers the page context and the stored
@@ -25,6 +26,8 @@ export interface OverlaySettings {
   shownInLastHour: number;
   /** the language currently being learned (an ISO code from SUPPORTED_LANGUAGES) */
   targetLang: string;
+  /** the scheduler NEW words are saved with; existing words keep whatever they were saved/moved onto */
+  defaultAlgo: AlgoId;
 }
 
 export function defaultSettings(): OverlaySettings {
@@ -37,6 +40,7 @@ export function defaultSettings(): OverlaySettings {
     maxPerHour: 4,
     shownInLastHour: 0,
     targetLang: DEFAULT_TARGET_LANG,
+    defaultAlgo: 'sm2',
   };
 }
 

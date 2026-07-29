@@ -3,7 +3,9 @@ import {
   createScheduler,
   initialState,
   DEFAULT_CONFIG,
+  type AlgoId,
   type Grade,
+  type SrsAlgorithm,
 } from '@vocabflow/core';
 import type { ReviewLog, ReviewMode, SaveWordInput, Word } from './types';
 
@@ -14,7 +16,13 @@ const newId = (): string =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-const scheduler = createScheduler('sm2', DEFAULT_CONFIG);
+// Every word carries its OWN algorithm (word.srsState.algo), so a review
+// picks its scheduler from this registry rather than the repo running one
+// fixed algorithm for everything.
+const schedulers: Record<AlgoId, SrsAlgorithm> = {
+  sm2: createScheduler('sm2', DEFAULT_CONFIG),
+  leitner: createScheduler('leitner'),
+};
 
 /**
  * The word repository: the only thing that talks to IndexedDB.
@@ -42,8 +50,10 @@ export class WordRepository {
     return this.db.open();
   }
 
-  /** Saves a selection. If the same term+langTo already exists, merges into it. */
-  async saveWord(input: SaveWordInput, now: Date): Promise<Word> {
+  /** Saves a selection. If the same term+langTo already exists, merges into it.
+   *  `algo` picks the scheduler for a brand-new word only — merging into an
+   *  existing word never touches its algorithm or progress. */
+  async saveWord(input: SaveWordInput, now: Date, algo: AlgoId = 'sm2'): Promise<Word> {
     const existing = await this.findLive(input.term, input.langTo);
 
     if (existing) {
@@ -64,7 +74,7 @@ export class WordRepository {
       langTo: input.langTo,
       contextSentence: input.contextSentence,
       sourceUrl: input.sourceUrl,
-      srsState: initialState('sm2', now), // brand-new word is due immediately
+      srsState: initialState(algo, now), // brand-new word is due immediately
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -124,7 +134,7 @@ export class WordRepository {
     const word = await this.db.words.get(wordId);
     if (!word) throw new Error(`Word not found: ${wordId}`);
 
-    const srsState = scheduler.schedule(word.srsState, grade, now);
+    const srsState = schedulers[word.srsState.algo].schedule(word.srsState, grade, now);
     const updated: Word = { ...word, srsState, updatedAt: now };
 
     await this.db.transaction('rw', this.db.words, this.db.reviewLogs, async () => {
@@ -138,6 +148,23 @@ export class WordRepository {
       });
     });
     return updated;
+  }
+
+  /** Switches one or more words onto a different algorithm. There's no honest way to
+   *  convert an ease factor into a Leitner box (or back), so progress resets: the
+   *  word starts fresh under the new algorithm, due immediately. */
+  async moveWordsAlgo(ids: string[], algo: AlgoId, now: Date): Promise<Word[]> {
+    return this.db.transaction('rw', this.db.words, async () => {
+      const updated: Word[] = [];
+      for (const id of ids) {
+        const word = await this.db.words.get(id);
+        if (!word) continue;
+        const next: Word = { ...word, srsState: initialState(algo, now), updatedAt: now };
+        await this.db.words.put(next);
+        updated.push(next);
+      }
+      return updated;
+    });
   }
 
   /** Review history of a word, oldest first. */

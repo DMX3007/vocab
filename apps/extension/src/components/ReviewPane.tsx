@@ -2,19 +2,25 @@ import React from 'react';
 import { Icon } from './icons';
 import type { Word } from '../lib/storage/types';
 import { SUPPORTED_LANGUAGES } from '../lib/languages';
+import { ALGO_OPTIONS } from '../lib/review/algo';
+import type { AlgoId } from '@vocabflow/core';
 
 interface Props {
   words: Word[];
   dueCount: number;
   targetLang: string;
   onLangChange: (lang: string) => void;
+  algo: AlgoId;
+  onAlgoChange: (algo: AlgoId) => void;
   onStartReview: () => void;
   ready: boolean;
 }
 
-// Review tab: the target-language tray, a start-review button when
-// something is due, and the due list itself (soonest-overdue first).
-export function ReviewPane({ words, dueCount, targetLang, onLangChange, onStartReview, ready }: Props) {
+// Review tab: the target-language + algorithm tray, a start-review button
+// when something is due, and the due list itself (soonest-overdue first).
+// The algorithm picker here only sets what NEW words get scheduled with —
+// switching an existing word's algorithm happens in Library.
+export function ReviewPane({ words, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, ready }: Props) {
   const now = Date.now();
   const due = words
     .filter((w) => w.srsState.dueAt.getTime() <= now)
@@ -28,6 +34,14 @@ export function ReviewPane({ words, dueCount, targetLang, onLangChange, onStartR
           <select className="tray-value" value={targetLang} onChange={(e) => onLangChange(e.target.value)} disabled={!ready}>
             {SUPPORTED_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
+            ))}
+          </select>
+        </div>
+        <div className="tray-row full">
+          <span className="tray-label">New words use</span>
+          <select className="tray-value" value={algo} onChange={(e) => onAlgoChange(e.target.value as AlgoId)} disabled={!ready}>
+            {ALGO_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </div>

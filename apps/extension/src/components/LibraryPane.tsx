@@ -1,8 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Icon } from './icons';
-import { wordStatus, sortWords, filterWords, type LibrarySort } from '../lib/review/library';
+import {
+  wordStatus,
+  sortWords,
+  filterWords,
+  filterByAlgo,
+  type LibrarySort,
+  type AlgoFilter,
+} from '../lib/review/library';
 import { MASTERED_INTERVAL_DAYS } from '../lib/review/progress';
+import { ALGO_LABELS } from '../lib/review/algo';
 import type { Word } from '../lib/storage/types';
+import type { AlgoId } from '@vocabflow/core';
 
 interface Props {
   words: Word[];
@@ -11,13 +20,49 @@ interface Props {
   search: string;
   setSearch: (search: string) => void;
   onDelete: (id: string) => void;
+  onMoveAlgo: (ids: string[], algo: AlgoId) => void;
+  /** Popup renders the "Add word" FAB as a sibling, so it needs to know
+   *  when select mode is active to hide it (the bulk-move bar covers the
+   *  same corner of the screen). */
+  onSelectModeChange?: (active: boolean) => void;
 }
 
 const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New' };
 
-export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete }: Props) {
+export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onSelectModeChange }: Props) {
   const now = new Date();
-  const filtered = useMemo(() => sortWords(filterWords(words, search), sort), [words, search, sort]);
+  const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const filtered = useMemo(
+    () => sortWords(filterByAlgo(filterWords(words, search), algoFilter), sort),
+    [words, search, algoFilter, sort],
+  );
+
+  function toggleSelectMode() {
+    const next = !selectMode;
+    setSelectMode(next);
+    setSelectedIds(new Set());
+    onSelectModeChange?.(next);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleMove(algo: AlgoId) {
+    if (!selectedIds.size) return;
+    onMoveAlgo([...selectedIds], algo);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    onSelectModeChange?.(false);
+  }
 
   if (words.length === 0) {
     return (
@@ -60,6 +105,17 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete 
         </select>
       </div>
 
+      <div className="lib-toolbar2">
+        <select className="lib-sort" value={algoFilter} onChange={(e) => setAlgoFilter(e.target.value as AlgoFilter)}>
+          <option value="all">All algorithms</option>
+          <option value="sm2">SM-2 only</option>
+          <option value="leitner">Leitner only</option>
+        </select>
+        <button className={`lib-sort ${selectMode ? 'on' : ''}`} onClick={toggleSelectMode}>
+          {selectMode ? 'Cancel' : 'Select · move'}
+        </button>
+      </div>
+
       {filtered.length === 0 ? (
         <div className="empty" style={{ padding: '32px 24px' }}>
           <div className="empty-hint">No words match &ldquo;{search}&rdquo;</div>
@@ -68,6 +124,7 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete 
         <div className="library-grid">
           {filtered.map((w) => {
             const status = wordStatus(w, now);
+            const selected = selectedIds.has(w.id);
             let source = '';
             try {
               source = w.sourceUrl ? new URL(w.sourceUrl).hostname : 'manual';
@@ -75,24 +132,61 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete 
               source = 'manual';
             }
             return (
-              <div className={`lib-card status-${status}`} key={w.id}>
+              <div
+                className={`lib-card status-${status} ${selectMode ? 'selectable' : ''} ${selected ? 'selected' : ''}`}
+                key={w.id}
+                onClick={selectMode ? () => toggleSelected(w.id) : undefined}
+              >
                 <div className="lib-card-strip" />
                 <div className="lib-card-body">
                   <div className="lib-card-head">
-                    <div className="lib-card-word">{w.term}</div>
-                    <button className="lib-card-del" onClick={() => onDelete(w.id)} title="Remove">
-                      <Icon name="trash" />
-                    </button>
+                    <div className="lib-card-head-main">
+                      {selectMode && (
+                        <input
+                          type="checkbox"
+                          className="lib-card-checkbox"
+                          checked={selected}
+                          onChange={() => toggleSelected(w.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                      <div className="lib-card-word">{w.term}</div>
+                    </div>
+                    {!selectMode && (
+                      <button className="lib-card-del" onClick={() => onDelete(w.id)} title="Remove">
+                        <Icon name="trash" />
+                      </button>
+                    )}
                   </div>
                   <div className="lib-card-tr">{w.translations.join(', ')}</div>
                   <div className="lib-card-foot">
-                    <span className="lib-card-source">{source}</span>
+                    <div className="lib-card-foot-main">
+                      <span className="lib-card-source">{source}</span>
+                      <span className="lib-card-algo">{ALGO_LABELS[w.srsState.algo]}</span>
+                    </div>
                     <span className={`lib-card-status ${status}`}>{STATUS_LABEL[status]}</span>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {selectMode && (
+        <div className="lib-select-bar">
+          <span className="lib-select-count">{selectedIds.size} selected</span>
+          <div className="lib-select-actions">
+            <button className="lib-select-move" disabled={!selectedIds.size} onClick={() => handleMove('sm2')}>
+              Move to SM-2
+            </button>
+            <button className="lib-select-move" disabled={!selectedIds.size} onClick={() => handleMove('leitner')}>
+              Move to Leitner
+            </button>
+          </div>
+          <button className="lib-select-cancel" onClick={toggleSelectMode} title="Cancel">
+            <Icon name="close" size={13} />
+          </button>
         </div>
       )}
     </div>

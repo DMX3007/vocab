@@ -13,6 +13,7 @@ import { computeProgressStats } from '../../src/lib/review/progress';
 import type { LibrarySort } from '../../src/lib/review/library';
 import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
+import type { AlgoId } from '@vocabflow/core';
 import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
@@ -32,6 +33,7 @@ export function Popup() {
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<LibrarySort>('added');
+  const [librarySelecting, setLibrarySelecting] = useState(false);
   const [planState, setPlanState] = useState<PlanState>('beta');
 
   const refresh = useCallback(async () => {
@@ -59,6 +61,12 @@ export function Popup() {
     })();
   }, [refresh]);
 
+  // LibraryPane unmounts on tab switch (resetting its own state), but it
+  // can't tell us that's happening — reset our mirror of its select mode too.
+  useEffect(() => {
+    if (tab !== 'library') setLibrarySelecting(false);
+  }, [tab]);
+
   function updatePlanState(next: PlanState) {
     setPlanState(next);
     void browser.storage.local.set({ [PLAN_STATE_KEY]: next });
@@ -85,6 +93,17 @@ export function Popup() {
 
   async function handleLangChange(targetLang: string) {
     await settingsStore.update((s) => ({ ...s, targetLang }));
+    await refresh();
+  }
+
+  async function handleDefaultAlgoChange(defaultAlgo: AlgoId) {
+    await settingsStore.update((s) => ({ ...s, defaultAlgo }));
+    await refresh();
+  }
+
+  async function handleMoveAlgo(wordIds: string[], algo: AlgoId) {
+    await wordClient.moveWordsAlgo(wordIds, algo, new Date());
+    showToast(`Moved ${wordIds.length} word${wordIds.length === 1 ? '' : 's'} to ${algo === 'sm2' ? 'SM-2' : 'Leitner'}`);
     await refresh();
   }
 
@@ -197,6 +216,8 @@ export function Popup() {
             dueCount={dueCount}
             targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
             onLangChange={handleLangChange}
+            algo={settings?.defaultAlgo ?? 'sm2'}
+            onAlgoChange={handleDefaultAlgoChange}
             onStartReview={handleStartReview}
             ready={ready}
           />
@@ -210,12 +231,14 @@ export function Popup() {
             search={search}
             setSearch={setSearch}
             onDelete={handleDelete}
+            onMoveAlgo={handleMoveAlgo}
+            onSelectModeChange={setLibrarySelecting}
           />
         )}
         {tab === 'plan' && <PlanPane words={words} planState={planState} onPlanState={updatePlanState} />}
       </div>
 
-      {tab === 'library' && (
+      {tab === 'library' && !librarySelecting && (
         <button className="fab" onClick={() => setModalOpen(true)} title="Add new word">
           <Icon name="plus" size={15} />
           <span className="fab-label">Add word</span>
