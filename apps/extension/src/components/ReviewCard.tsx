@@ -5,6 +5,7 @@ import type { Word } from '../lib/storage/types';
 import { Icon } from './icons';
 import { speak } from '../lib/tts';
 import { shouldSuggestShelving } from '../lib/review/library';
+import { diffChars } from '../lib/review/diff';
 
 interface Props {
   session: ReviewSession;
@@ -158,6 +159,14 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
         disabled={!!verdict}
         onChange={(e) => setAnswer(e.target.value)}
       />
+
+      {verdict && verdict.verdict !== 'correct' && (
+        <div className="vf-diff" title="Letters that didn't match what was typed">
+          {diffChars(answer, verdict.matched ?? card.expected[0] ?? '').map((d, i) => (
+            <span key={i} className={`vf-diff-char ${d.correct ? 'ok' : 'bad'}`}>{d.char}</span>
+          ))}
+        </div>
+      )}
 
       {verdict ? (
         <div className="vf-card-feedback">

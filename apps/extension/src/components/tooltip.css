@@ -441,6 +441,23 @@
   cursor: not-allowed;
 }
 
+.vf-diff {
+  margin-top: 10px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.vf-diff-char.ok { color: #1c1a17; }
+.vf-diff-char.bad {
+  color: #a5311f;
+  background: rgba(165, 49, 31, 0.14);
+  border-radius: 3px;
+  text-decoration: underline;
+  text-decoration-color: rgba(165, 49, 31, 0.6);
+}
+
 .vf-dict {
   margin-top: 12px;
   padding: 10px 12px;
