@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'; // gives Node a real in-memory IndexedDB
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { DEFAULT_CONFIG } from '@vocabflow/core';
 import { WordRepository } from '../src/lib/storage/word-repository';
 
 // A fresh, isolated database per test so they never bleed into each other.
@@ -76,7 +77,7 @@ describe('getDueWords (scoped to the active target language)', () => {
     const due = await repo.saveWord(sample, NOW);
     // push a second word into the future by reviewing it well
     const fresh = await repo.saveWord({ ...sample, term: 'alacrity', translation: 'рвение' }, NOW);
-    await repo.recordReview(fresh.id, 5, 'typing', NOW); // graduates, due in days
+    await repo.recordReview(fresh.id, 5, 'typing', NOW); // advances a step, due in ~25s
 
     const result = await repo.getDueWords(later(1000), 'ru');
     const ids = result.map((w) => w.id);
@@ -142,9 +143,9 @@ describe('recordReview', () => {
   it('advances the SRS state through the core scheduler and pushes dueAt forward', async () => {
     const w = await repo.saveWord(sample, NOW);
     const dueBefore = w.srsState.dueAt.getTime();
-    const after = await repo.recordReview(w.id, 5, 'typing', NOW);
+    const after = await repo.recordReview(w.id, 4, 'typing', NOW);
     expect(after.srsState.dueAt.getTime()).toBeGreaterThan(dueBefore);
-    expect(after.srsState.repetitions).toBeGreaterThan(0);
+    expect(after.srsState.stepIndex).toBeGreaterThan(0); // advanced within the learning ladder
   });
 
   it('appends an immutable review log entry (source of truth)', async () => {
@@ -209,9 +210,11 @@ describe('per-word algorithm', () => {
 
   describe('moveWordsAlgo', () => {
     it('switches the algorithm and resets progress to fresh/due-now', async () => {
-      const w = await repo.saveWord(sample, NOW, 'sm2');
-      const reviewed = await repo.recordReview(w.id, 5, 'typing', NOW); // interval grows past 0
-      expect(reviewed.srsState.intervalDays).toBeGreaterThan(0);
+      let w = await repo.saveWord(sample, NOW, 'sm2');
+      for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
+        w = await repo.recordReview(w.id, 4, 'typing', NOW); // walk the full learning ladder to graduate
+      }
+      expect(w.srsState.intervalDays).toBeGreaterThan(0);
 
       const [moved] = await repo.moveWordsAlgo([w.id], 'leitner', later(1000));
       expect(moved!.srsState.algo).toBe('leitner');

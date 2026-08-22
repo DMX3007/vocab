@@ -1,6 +1,7 @@
 import {
   addDays,
   addMinutes,
+  addSeconds,
   type Grade,
   type SchedulerConfig,
   type SrsAlgorithm,
@@ -45,13 +46,22 @@ function updateEase(currentEase: number, grade: Grade, minimumEase: number): num
 
 // ── The algorithm ────────────────────────────────────────────────
 export function createSm2(config: SchedulerConfig): SrsAlgorithm {
-  const learningSteps = config.learningStepsMin; //   e.g. [1, 10, 60] minutes
+  const learningSteps = config.learningStepsSec; // e.g. [25,25,25,25,25,60,120,300,600] seconds
   const relearningSteps = config.relearningStepsMin; // e.g. [10] minutes
 
   // A broken config must fail loudly at startup,
   // not silently mis-schedule reviews later.
-  if (learningSteps.length === 0) throw new Error('learningStepsMin must not be empty');
+  if (learningSteps.length === 0) throw new Error('learningStepsSec must not be empty');
   if (relearningSteps.length === 0) throw new Error('relearningStepsMin must not be empty');
+  if (config.learningBurstSteps < 0 || config.learningBurstSteps > learningSteps.length) {
+    throw new Error('learningBurstSteps must be between 0 and learningStepsSec.length');
+  }
+
+  const secondsAtStep = (steps: number[], index: number): number => {
+    const seconds = steps[index];
+    if (seconds === undefined) throw new Error(`No step at index ${index}`);
+    return seconds;
+  };
 
   const minutesAtStep = (steps: number[], index: number): number => {
     const minutes = steps[index];
@@ -69,16 +79,22 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
     repetitions: state.repetitions + 1,
   });
 
-  /** New word: walk the learning steps (1 min → 10 min → 60 min), then graduate. */
+  /** New word: a mandatory rapid-fire burst, then escalating pauses, then
+   *  graduate. A confident "easy" answer can only skip ahead once the
+   *  mandatory burst is behind it (see learningBurstSteps) — answering
+   *  fast right after adding a word doesn't prove it's memorized
+   *  long-term, it's just sitting in short-term memory. Failing at any
+   *  point resets all the way back to the start of the burst: the word
+   *  gets drilled as many times as it takes. */
   const scheduleLearning = (state: SrsState, grade: Grade, now: Date): SrsState => {
     if (isFailed(grade)) {
-      // Forgot it — start the steps over. This is what makes new words
-      // appear very often at the beginning.
-      return { ...state, stepIndex: 0, dueAt: addMinutes(now, minutesAtStep(learningSteps, 0)) };
+      return { ...state, stepIndex: 0, dueAt: addSeconds(now, secondsAtStep(learningSteps, 0)) };
     }
 
-    if (isPerfect(grade)) {
-      // The word is obviously easy — skip the remaining steps.
+    const pastMandatoryBurst = state.stepIndex >= config.learningBurstSteps;
+    if (isPerfect(grade) && pastMandatoryBurst) {
+      // Confidently correct, and the mandatory drilling is already done —
+      // skip the remaining escalation steps.
       return enterReviewPhase(state, config.easyIntervalDays, now);
     }
 
@@ -91,7 +107,7 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
     return {
       ...state,
       stepIndex: nextStepIndex,
-      dueAt: addMinutes(now, minutesAtStep(learningSteps, nextStepIndex)),
+      dueAt: addSeconds(now, secondsAtStep(learningSteps, nextStepIndex)),
     };
   };
 

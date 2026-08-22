@@ -7,6 +7,7 @@ import {
 } from '../src/index';
 
 const NOW = new Date('2026-06-10T12:00:00Z');
+const sec = (n: number) => n * 1_000;
 const min = (n: number) => n * 60_000;
 const days = (n: number) => n * 86_400_000;
 
@@ -23,53 +24,77 @@ describe('initial state', () => {
   });
 });
 
-describe('learning phase (Anki-like steps: often at the beginning)', () => {
-  it('correct answer advances to next step: 1min -> 10min', () => {
+describe('learning phase (mandatory burst, then escalating pauses)', () => {
+  it('correct answer advances one step at a time through the burst (~25s apart)', () => {
     const s0 = initialState('sm2', NOW);
-    // default steps are [1, 10, 60] minutes
+    // default ladder: 5 steps @ 25s (mandatory burst), then 1/2/5/10 min
     const s1 = sm2.schedule(s0, 4, NOW);
     expect(s1.phase).toBe('learning');
     expect(s1.stepIndex).toBe(1);
-    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + min(10));
+    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
-  it('walks all steps then graduates to review with graduating interval (1 day)', () => {
-    let s: SrsState = initialState('sm2', NOW);
-    s = sm2.schedule(s, 4, NOW); // -> step 1 (10 min)
-    s = sm2.schedule(s, 4, NOW); // -> step 2 (60 min)
-    expect(s.stepIndex).toBe(2);
-    expect(s.dueAt.getTime()).toBe(NOW.getTime() + min(60));
+  it('grade 5 ("easy") during the mandatory burst does NOT skip ahead', () => {
+    const s0 = initialState('sm2', NOW);
+    const s1 = sm2.schedule(s0, 5, NOW); // still inside the burst (step 0 < burstSteps)
+    expect(s1.phase).toBe('learning'); // no early graduation
+    expect(s1.stepIndex).toBe(1);
+    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
+  });
 
-    s = sm2.schedule(s, 4, NOW); // graduates
+  it('grade 5 ("easy") past the mandatory burst graduates immediately with the easy interval', () => {
+    let s: SrsState = initialState('sm2', NOW);
+    for (let i = 0; i < DEFAULT_CONFIG.learningBurstSteps; i++) s = sm2.schedule(s, 4, NOW); // clear the burst
+    expect(s.stepIndex).toBe(DEFAULT_CONFIG.learningBurstSteps);
+
+    s = sm2.schedule(s, 5, NOW); // now past the burst -> easy can skip
+    expect(s.phase).toBe('review');
+    expect(s.intervalDays).toBe(DEFAULT_CONFIG.easyIntervalDays);
+  });
+
+  it('the escalation pauses grow: 1m -> 2m -> 5m -> 10m, then graduate', () => {
+    let s: SrsState = initialState('sm2', NOW);
+    for (let i = 0; i < DEFAULT_CONFIG.learningBurstSteps; i++) s = sm2.schedule(s, 4, NOW); // clear the burst -> due in 1m
+
+    const offsets: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      s = sm2.schedule(s, 4, NOW);
+      offsets.push(s.dueAt.getTime() - NOW.getTime());
+    }
+    expect(offsets).toEqual([min(2), min(5), min(10), days(1)]); // the 4th pass graduates
     expect(s.phase).toBe('review');
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
-    expect(s.dueAt.getTime()).toBe(NOW.getTime() + days(1));
     expect(s.repetitions).toBe(1);
   });
 
-  it('failed answer resets to step 0 (frequent repetition until learned)', () => {
-    const s0 = initialState('sm2', NOW);
-    const s1 = sm2.schedule(s0, 4, NOW); // step 1
-    const s2 = sm2.schedule(s1, 1, NOW); // fail
-    expect(s2.phase).toBe('learning');
-    expect(s2.stepIndex).toBe(0);
-    expect(s2.dueAt.getTime()).toBe(NOW.getTime() + min(1));
+  it('walking the whole ladder (burst + escalation) with steady passes graduates with the graduating interval', () => {
+    let s: SrsState = initialState('sm2', NOW);
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
+      s = sm2.schedule(s, 4, NOW);
+    }
+    expect(s.phase).toBe('review');
+    expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
+    expect(s.dueAt.getTime()).toBe(NOW.getTime() + days(1));
   });
 
-  it('grade 5 (easy) graduates immediately with the easy interval', () => {
-    const s0 = initialState('sm2', NOW);
-    const s1 = sm2.schedule(s0, 5, NOW);
-    expect(s1.phase).toBe('review');
-    expect(s1.intervalDays).toBe(DEFAULT_CONFIG.easyIntervalDays);
+  it('failed answer resets to the start of the burst, no matter how far along it was', () => {
+    let s: SrsState = initialState('sm2', NOW);
+    for (let i = 0; i < 7; i++) s = sm2.schedule(s, 4, NOW); // deep into the escalation phase
+    expect(s.stepIndex).toBeGreaterThan(DEFAULT_CONFIG.learningBurstSteps);
+
+    s = sm2.schedule(s, 1, NOW); // fail
+    expect(s.phase).toBe('learning');
+    expect(s.stepIndex).toBe(0);
+    expect(s.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 });
 
 describe('review phase (SM-2, intervals grow when remembered)', () => {
   const graduated = (): SrsState => {
     let s: SrsState = initialState('sm2', NOW);
-    s = sm2.schedule(s, 4, NOW);
-    s = sm2.schedule(s, 4, NOW);
-    s = sm2.schedule(s, 4, NOW); // review, interval = 1d, EF = 2.5
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
+      s = sm2.schedule(s, 4, NOW); // walk the full ladder, interval = 1d, EF = 2.5
+    }
     return s;
   };
 
@@ -106,7 +131,7 @@ describe('review phase (SM-2, intervals grow when remembered)', () => {
 describe('relearning phase', () => {
   it('passing relearning returns to review with a reduced interval (min 1 day)', () => {
     let s: SrsState = initialState('sm2', NOW);
-    s = sm2.schedule(s, 5, NOW); // graduate easy, interval 4d
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) s = sm2.schedule(s, 4, NOW); // graduate, interval 1d
     for (let i = 0; i < 3; i++) s = sm2.schedule(s, 4, new Date(s.dueAt));
     const bigInterval = s.intervalDays;
     s = sm2.schedule(s, 0, new Date(s.dueAt)); // lapse -> relearning
@@ -118,7 +143,7 @@ describe('relearning phase', () => {
 
   it('failing relearning keeps it on step 0', () => {
     let s: SrsState = initialState('sm2', NOW);
-    s = sm2.schedule(s, 5, NOW);
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) s = sm2.schedule(s, 4, NOW); // graduate
     s = sm2.schedule(s, 0, new Date(s.dueAt)); // -> relearning
     const again = sm2.schedule(s, 1, new Date(s.dueAt));
     expect(again.phase).toBe('relearning');
@@ -135,7 +160,9 @@ describe('ease table matches the published SM-2 formula', () => {
 
   const graduated = (): SrsState => {
     let s: SrsState = initialState('sm2', NOW);
-    s = sm2.schedule(s, 5, NOW); // straight to review phase, ease = 2.5
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
+      s = sm2.schedule(s, 4, NOW); // review phase, ease = 2.5 (learning-phase passes don't touch ease)
+    }
     return s;
   };
 

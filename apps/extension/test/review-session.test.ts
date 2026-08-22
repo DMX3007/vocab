@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { DEFAULT_CONFIG } from '@vocabflow/core';
 import { WordRepository } from '../src/lib/storage/word-repository';
 import { ReviewSession, DEFAULT_SESSION_CONFIG } from '../src/lib/review/session';
 
@@ -73,7 +74,9 @@ describe('ReviewSession (normal mode)', () => {
     // "ordered" repeat material with a long history behind it.
     const repeat = await save('candor', 'откровенность', minutesAgo(60 * 24 * 30));
     const tenDaysAgo = new Date(NOW.getTime() - 10 * 24 * 60 * 60_000);
-    await repo.recordReview(repeat.id, 5, 'typing', tenDaysAgo); // graduates to review, interval 4d
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
+      await repo.recordReview(repeat.id, 4, 'typing', tenDaysAgo); // walk the full ladder to graduate, interval 1d
+    }
     const graduated = (await repo.getWord(repeat.id))!;
     expect(graduated.srsState.intervalDays).toBeGreaterThan(0); // confirms it's "repeat", not fresh
     expect(graduated.srsState.dueAt.getTime()).toBeLessThan(NOW.getTime()); // and well overdue by now
@@ -216,7 +219,7 @@ describe('ReviewSession (normal mode)', () => {
 
   it('start({ includeAll }) queues every word, even ones not yet due (manual review)', async () => {
     const fresh = await save('fortitude', 'стойкость', minutesAgo(30));
-    await repo.recordReview(fresh.id, 5, 'typing', NOW); // push far into the future
+    await repo.recordReview(fresh.id, 5, 'typing', NOW); // advances a step, not due yet
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
     await session.start('ru', NOW, { includeAll: true });
     expect(session.total).toBe(1); // included despite not being due

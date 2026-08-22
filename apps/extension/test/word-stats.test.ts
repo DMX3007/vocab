@@ -53,7 +53,7 @@ describe('algoProgressLabel', () => {
     expect(algoProgressLabel(word({ srsState: { algo: 'leitner', stepIndex: 2 } }))).toBe('Box 3/5');
   });
   it('SM-2 learning: shows the step', () => {
-    expect(algoProgressLabel(word({ srsState: { algo: 'sm2', phase: 'learning', stepIndex: 1 } }))).toBe('Learning · step 2/3');
+    expect(algoProgressLabel(word({ srsState: { algo: 'sm2', phase: 'learning', stepIndex: 1 } }))).toBe('Learning · step 2/9');
   });
   it('SM-2 relearning: shows the step', () => {
     expect(algoProgressLabel(word({ srsState: { algo: 'sm2', phase: 'relearning', stepIndex: 0 } }))).toBe('Relearning · step 1/1');

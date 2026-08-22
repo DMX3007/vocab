@@ -45,7 +45,7 @@ export function algoProgressLabel(word: Word): string {
   if (algo === 'leitner') {
     return `Box ${stepIndex + 1}/${DEFAULT_LEITNER_CONFIG.boxIntervalDays.length}`;
   }
-  if (phase === 'learning') return `Learning · step ${stepIndex + 1}/${DEFAULT_CONFIG.learningStepsMin.length}`;
+  if (phase === 'learning') return `Learning · step ${stepIndex + 1}/${DEFAULT_CONFIG.learningStepsSec.length}`;
   if (phase === 'relearning') return `Relearning · step ${stepIndex + 1}/${DEFAULT_CONFIG.relearningStepsMin.length}`;
   return `Review · ease ${easeFactor.toFixed(1)}`;
 }
@@ -74,7 +74,7 @@ export function estimateReviewsToMastery(word: Word): number {
   // Still learning/relearning: the remaining drill steps, then the review
   // reps it'd take from the graduating interval onward.
   const stepsRemaining = phase === 'learning'
-    ? DEFAULT_CONFIG.learningStepsMin.length - stepIndex
+    ? DEFAULT_CONFIG.learningStepsSec.length - stepIndex
     : DEFAULT_CONFIG.relearningStepsMin.length - stepIndex;
   return stepsRemaining + reviewRepsFrom(DEFAULT_CONFIG.graduatingIntervalDays, easeFactor);
 }
