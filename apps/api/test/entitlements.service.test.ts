@@ -8,17 +8,15 @@ describe('plans config', () => {
     expect(PLANS.premium).toBeDefined();
   });
 
-  it('free plan has finite limits, premium is unlimited where it matters', () => {
+  it('free plan has a finite word cap, premium is unlimited', () => {
     expect(PLANS.free.maxWords).toBeGreaterThan(0);
-    expect(PLANS.free.autoTranslatePerDay).toBeGreaterThan(0);
     expect(PLANS.premium.maxWords).toBeNull();
-    expect(PLANS.premium.autoTranslatePerDay).toBeNull();
   });
 
-  it('fsrs is premium-only at launch, sm2 is free', () => {
-    expect(PLANS.free.algos).toContain('sm2');
-    expect(PLANS.free.algos).not.toContain('fsrs');
-    expect(PLANS.premium.algos).toContain('fsrs');
+  it('at launch, maxWords is the only dimension that actually differs — everything else is unenforced so far', () => {
+    const { maxWords: _free, ...freeRest } = PLANS.free;
+    const { maxWords: _premium, ...premiumRest } = PLANS.premium;
+    expect(freeRest).toEqual(premiumRest);
   });
 });
 
@@ -37,19 +35,19 @@ describe('EntitlementsService', () => {
   });
 
   it('canUse: under the limit -> allowed', () => {
-    const r = svc.canUse('free', 'autoTranslatePerDay', 10);
+    const r = svc.canUse('free', 'maxWords', 10);
     expect(r.allowed).toBe(true);
   });
 
   it('canUse: at/over the limit -> denied with limit info (premium upsell signal)', () => {
-    const limit = PLANS.free.autoTranslatePerDay!;
-    const r = svc.canUse('free', 'autoTranslatePerDay', limit);
+    const limit = PLANS.free.maxWords!;
+    const r = svc.canUse('free', 'maxWords', limit);
     expect(r.allowed).toBe(false);
     expect(r.limit).toBe(limit);
   });
 
   it('canUse: null limit means unlimited', () => {
-    const r = svc.canUse('premium', 'autoTranslatePerDay', 1_000_000);
+    const r = svc.canUse('premium', 'maxWords', 1_000_000);
     expect(r.allowed).toBe(true);
   });
 });

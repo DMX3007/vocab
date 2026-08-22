@@ -1,3 +1,5 @@
+import type { AlgoId } from '@vocabflow/core';
+
 export type PlanId = 'free' | 'premium';
 
 export interface PlanLimits {
@@ -6,22 +8,27 @@ export interface PlanLimits {
   autoTranslatePerDay: number | null;
   voiceReviewsPerDay: number | null;
   maxDevices: number | null;
-  algos: ReadonlyArray<'sm2' | 'leitner' | 'fsrs'>;
+  algos: ReadonlyArray<AlgoId>;
   voiceProvider: 'webspeech' | 'whisper';
 }
 
 /**
  * Entitlements as data. Changing monetization = changing this object
  * (later: a DB table / remote config), never touching feature code.
- * Counters in UsageCounter run from day one even while everything is free,
- * so future pricing is based on real usage distributions.
+ *
+ * At launch the ONLY dimension that's actually enforced is maxWords — the
+ * extension doesn't rate-limit translate/voice reviews, cap devices, or
+ * restrict which algorithm you pick, so free and premium are identical on
+ * every other field for now. They're kept here (rather than deleted) as
+ * the seam for the next paid features to land in, one field at a time, as
+ * each one actually ships client-side enforcement — not before.
  */
 export const PLANS: Record<PlanId, PlanLimits> = {
   free: {
     maxWords: 500,
-    autoTranslatePerDay: 50,
-    voiceReviewsPerDay: 100,
-    maxDevices: 1,
+    autoTranslatePerDay: null,
+    voiceReviewsPerDay: null,
+    maxDevices: null,
     algos: ['sm2', 'leitner'],
     voiceProvider: 'webspeech',
   },
@@ -30,7 +37,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     autoTranslatePerDay: null,
     voiceReviewsPerDay: null,
     maxDevices: null,
-    algos: ['sm2', 'leitner', 'fsrs'],
-    voiceProvider: 'whisper',
+    algos: ['sm2', 'leitner'],
+    voiceProvider: 'webspeech',
   },
 };
