@@ -1,31 +1,35 @@
 import React, { useState } from 'react';
 import { Icon } from './icons';
 import type { Word } from '../lib/storage/types';
+import { FREE_WORD_CAP } from '../lib/plan';
 
 export type PlanState = 'beta' | 'free' | 'premium';
-
-// Mirrors apps/api's PLANS.free.maxWords (see plans.config.ts). Duplicated as
-// a plain number here rather than importing the NestJS package into the
-// extension bundle — this tab is presentational only; nothing here is
-// actually enforced yet, so a real backend can adopt this seam later.
-const FREE_WORD_CAP = 500;
 
 interface Props {
   words: Word[];
   planState: PlanState;
-  onPlanState: (state: PlanState) => void;
+  /** Opens the external checkout page (Ko-fi) — payment never happens
+   *  inside the extension itself. */
+  onBuy: () => void;
+  /** Validates a pasted key against the API. This — and ONLY this — is
+   *  allowed to grant Premium; there is deliberately no "just set the state"
+   *  escape hatch in this component, since that would make the whole word
+   *  cap a click away from being bypassed by anyone. */
+  onActivateLicense: (key: string) => Promise<{ ok: boolean; message: string }>;
+  /** Forgets this browser's stored license key and drops back to Free. */
+  onDeactivate: () => void;
 }
 
-// Plan tab — three states, matching the approved redesign. Nothing here is
-// enforced: "Get Premium" / "Activate" just flip the locally-stored
-// planState so the UI can be demoed end-to-end ahead of real billing.
-export function PlanPane({ words, planState, onPlanState }: Props) {
-  if (planState === 'premium') return <PremiumActiveView onPlanState={onPlanState} />;
-  if (planState === 'free') return <UpgradeView words={words} onPlanState={onPlanState} />;
-  return <BetaView onPlanState={onPlanState} />;
+// Plan tab — three real states. planState only ever changes via a genuine
+// license check (onActivateLicense) or explicit deactivation; nothing in
+// here can self-assign Premium.
+export function PlanPane({ words, planState, onBuy, onActivateLicense, onDeactivate }: Props) {
+  if (planState === 'premium') return <PremiumActiveView onDeactivate={onDeactivate} />;
+  if (planState === 'free') return <UpgradeView words={words} onBuy={onBuy} onActivateLicense={onActivateLicense} />;
+  return <BetaView />;
 }
 
-function BetaView({ onPlanState }: { onPlanState: (s: PlanState) => void }) {
+function BetaView() {
   return (
     <div className="plan-pane">
       <div className="info-card info-tip">
@@ -34,9 +38,6 @@ function BetaView({ onPlanState }: { onPlanState: (s: PlanState) => void }) {
           <span className="serif-italic">All features unlocked.</span>
           <span> No word cap, for now.</span>
         </div>
-        <button className="link-btn" onClick={() => onPlanState('free')}>
-          Preview the post-beta plan →
-        </button>
       </div>
 
       <div className="info-card">
@@ -51,42 +52,41 @@ function BetaView({ onPlanState }: { onPlanState: (s: PlanState) => void }) {
         <div className="tip-item"><div className="num">2</div><div>Say the word aloud when reviewing.</div></div>
         <div className="tip-item"><div className="num">3</div><div>Save words in context — a sentence beats a single word.</div></div>
       </div>
-
-      <div className="plan-foot">Preview state {'·'} <button className="link-btn inline" onClick={() => onPlanState('premium')}>Premium active</button></div>
     </div>
   );
 }
 
-function UpgradeView({ words, onPlanState }: { words: Word[]; onPlanState: (s: PlanState) => void }) {
-  const [billing, setBilling] = useState<'year' | 'lifetime'>('year');
+function UpgradeView({
+  words,
+  onBuy,
+  onActivateLicense,
+}: {
+  words: Word[];
+  onBuy: () => void;
+  onActivateLicense: (key: string) => Promise<{ ok: boolean; message: string }>;
+}) {
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [licenseKey, setLicenseKey] = useState('');
-  const [licenseMsg, setLicenseMsg] = useState<null | string | { ok: boolean; text: string }>(null);
+  const [activating, setActivating] = useState(false);
+  const [licenseMsg, setLicenseMsg] = useState<null | { ok: boolean; text: string }>(null);
   const used = words.length;
   const pct = Math.min(100, Math.round((used / FREE_WORD_CAP) * 100));
   const nearCap = used >= FREE_WORD_CAP * 0.8;
 
+  // Only ONE thing is actually different today: the word cap. Everything
+  // else in the app (both algorithms, typed review, dictionary lookups) is
+  // already free for everyone — this list only promises what's real.
   const features = [
     { free: `${FREE_WORD_CAP} words max`, pro: 'Unlimited words' },
-    { free: 'Fixed review schedule', pro: 'Custom review interval' },
-    { free: 'SM-2 only', pro: 'FSRS · Leitner · more' },
-    { free: 'Typed review only', pro: 'Card flip · voice review' },
+    { free: 'Free, forever', pro: 'Supports ongoing development' },
   ];
 
-  const price = billing === 'year'
-    ? { amount: '$19', suffix: '/ year', note: 'billed annually' }
-    : { amount: '$49', suffix: 'once', note: 'lifetime · all future updates' };
-
-  function tryActivate() {
-    setLicenseMsg('Validating…');
-    setTimeout(() => {
-      if (licenseKey.replace(/-/g, '').length >= 12) {
-        setLicenseMsg({ ok: true, text: 'License accepted. Welcome to Premium.' });
-        setTimeout(() => onPlanState('premium'), 900);
-      } else {
-        setLicenseMsg({ ok: false, text: "That key doesn't look right. Check the format XXXX-XXXX-XXXX-XXXX." });
-      }
-    }, 500);
+  async function tryActivate() {
+    setActivating(true);
+    setLicenseMsg(null);
+    const result = await onActivateLicense(licenseKey);
+    setActivating(false);
+    setLicenseMsg({ ok: result.ok, text: result.message });
   }
 
   return (
@@ -98,22 +98,13 @@ function UpgradeView({ words, onPlanState }: { words: Word[]; onPlanState: (s: P
             <div className="pricing-name">Premium</div>
           </div>
           <div className="pricing-price">
-            <div className="amount">{price.amount}<span className="suffix">{price.suffix}</span></div>
-            <div className="price-note">{price.note}</div>
+            <div className="amount">Pay what you want<span className="suffix"></span></div>
+            <div className="price-note">one-time, via Ko-fi</div>
           </div>
         </div>
 
-        <div className="billing-toggle" role="tablist">
-          <button role="tab" aria-selected={billing === 'year'} className={`bt-opt ${billing === 'year' ? 'on' : ''}`} onClick={() => setBilling('year')}>
-            Yearly
-          </button>
-          <button role="tab" aria-selected={billing === 'lifetime'} className={`bt-opt ${billing === 'lifetime' ? 'on' : ''}`} onClick={() => setBilling('lifetime')}>
-            Lifetime <span className="bt-tag">save 60%</span>
-          </button>
-        </div>
-
-        <button className="cta-btn" onClick={() => onPlanState('premium')}>
-          <span>Get Premium</span>
+        <button className="cta-btn" onClick={onBuy}>
+          <span>Support &amp; get Premium</span>
           <span className="cta-arrow">→</span>
         </button>
       </div>
@@ -152,30 +143,25 @@ function UpgradeView({ words, onPlanState }: { words: Word[]; onPlanState: (s: P
             <input
               type="text"
               className="license-input"
-              placeholder="XXXX-XXXX-XXXX-XXXX"
+              placeholder="VF-XXXX-XXXX-XXXX-XXXX"
               value={licenseKey}
               onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
               spellCheck={false}
             />
-            <button className="license-activate" onClick={tryActivate} disabled={!licenseKey.trim()}>Activate</button>
+            <button className="license-activate" onClick={tryActivate} disabled={!licenseKey.trim() || activating}>
+              {activating ? 'Checking…' : 'Activate'}
+            </button>
             {licenseMsg && (
-              <div className={`license-msg ${typeof licenseMsg === 'object' ? (licenseMsg.ok ? 'ok' : 'err') : ''}`}>
-                {typeof licenseMsg === 'object' ? licenseMsg.text : licenseMsg}
-              </div>
+              <div className={`license-msg ${licenseMsg.ok ? 'ok' : 'err'}`}>{licenseMsg.text}</div>
             )}
           </div>
         )}
-      </div>
-
-      <div className="plan-foot">
-        Preview state {'·'} <button className="link-btn inline" onClick={() => onPlanState('beta')}>Beta</button>
-        {' · '}<button className="link-btn inline" onClick={() => onPlanState('premium')}>Active</button>
       </div>
     </div>
   );
 }
 
-function PremiumActiveView({ onPlanState }: { onPlanState: (s: PlanState) => void }) {
+function PremiumActiveView({ onDeactivate }: { onDeactivate: () => void }) {
   const [confirmOff, setConfirmOff] = useState(false);
   return (
     <div className="plan-pane">
@@ -183,7 +169,7 @@ function PremiumActiveView({ onPlanState }: { onPlanState: (s: PlanState) => voi
         <div className="active-mark"><Icon name="check" size={16} /></div>
         <div className="overline">Plan</div>
         <div className="active-title"><span className="serif-italic">Premium</span> {'·'} Active</div>
-        <div className="active-sub">Thank you for supporting VocabFlow. Every feature unlocked, on every browser you sign into.</div>
+        <div className="active-sub">Thank you for supporting VocabFlow.</div>
         <div className="active-meta">
           <div className="meta-row"><span className="meta-k">Words saved</span><span className="meta-v">{'∞'}</span></div>
         </div>
@@ -192,26 +178,19 @@ function PremiumActiveView({ onPlanState }: { onPlanState: (s: PlanState) => voi
       <div className="active-perks">
         <div className="overline">What&rsquo;s unlocked</div>
         <div className="perk"><Icon name="check" size={11} /> Unlimited words</div>
-        <div className="perk"><Icon name="check" size={11} /> Custom review intervals</div>
-        <div className="perk"><Icon name="check" size={11} /> All spacing algorithms, as they ship</div>
       </div>
 
       {!confirmOff ? (
         <button className="ghost-btn danger" onClick={() => setConfirmOff(true)}>Deactivate license</button>
       ) : (
         <div className="deact-confirm">
-          <div className="deact-msg">Sure? You&rsquo;ll drop back to the free word cap.</div>
+          <div className="deact-msg">Sure? You&rsquo;ll drop back to the free word cap on this browser.</div>
           <div className="deact-row">
             <button className="ghost-btn" onClick={() => setConfirmOff(false)}>Keep Premium</button>
-            <button className="ghost-btn danger" onClick={() => { setConfirmOff(false); onPlanState('free'); }}>Yes, deactivate</button>
+            <button className="ghost-btn danger" onClick={() => { setConfirmOff(false); onDeactivate(); }}>Yes, deactivate</button>
           </div>
         </div>
       )}
-
-      <div className="plan-foot">
-        Preview state {'·'} <button className="link-btn inline" onClick={() => onPlanState('beta')}>Beta</button>
-        {' · '}<button className="link-btn inline" onClick={() => onPlanState('free')}>Upgrade pitch</button>
-      </div>
     </div>
   );
 }

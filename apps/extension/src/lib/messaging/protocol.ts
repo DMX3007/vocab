@@ -29,6 +29,7 @@ export type RequestMap = {
     changes: { term?: string; translations?: string[]; contextSentence?: string };
     now: string;
   };
+  ACTIVATE_LICENSE: { key: string };
 };
 
 export type ResponseMap = {
@@ -48,6 +49,7 @@ export type ResponseMap = {
   EXPORT_LIBRARY: WireWord[];
   LOOKUP_DICTIONARY: WireWord;
   UPDATE_WORD: WireWord;
+  ACTIVATE_LICENSE: { valid: boolean; plan?: 'free' | 'premium'; limits?: { maxWords: number | null } };
 };
 
 

@@ -5,6 +5,7 @@ import { shouldShowStreakReminder, markStreakReminderShown } from '../src/lib/re
 import { computeProgressStats } from '../src/lib/review/progress';
 import { translateWord } from '../src/lib/translate/mymemory';
 import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
+import { validateLicense } from '../src/lib/licensing/license-client';
 import type { Message } from '../src/lib/messaging/protocol';
 
 // The service worker owns the database AND drives the review alarm.
@@ -88,6 +89,8 @@ export default defineBackground(() => {
         // isn't subject to the host page's CSP, so this stays reliable
         // across whatever site the tooltip happens to be open on.
         return translateWord(message.payload.term, message.payload.langFrom, message.payload.langTo);
+      case 'ACTIVATE_LICENSE':
+        return validateLicense(message.payload.key);
       default: {
         const exhaustive: never = message
         throw new Error(`Unknown message: ${String(exhaustive)}`);

@@ -72,6 +72,11 @@ export const wordClient = {
   ): Promise<Word> {
     return reviveWord(await send({ type: 'UPDATE_WORD', payload: { wordId, changes, now: now.toISOString() } }));
   },
+  /** Checks a pasted license key against the API. Never rejects on an
+   *  invalid/unknown key — { valid: false } is an everyday result. */
+  async activateLicense(key: string) {
+    return send({ type: 'ACTIVATE_LICENSE', payload: { key } });
+  },
 };
 
 export type WordClient = typeof wordClient;

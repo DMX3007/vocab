@@ -15,11 +15,17 @@ import { computeProgressStats } from '../../src/lib/review/progress';
 import type { LibrarySort, AlgoFilter } from '../../src/lib/review/library';
 import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
+import { FREE_WORD_CAP } from '../../src/lib/plan';
 import type { AlgoId } from '@vocabflow/core';
 import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
 const PLAN_STATE_KEY = 'vocabflow_plan_state';
+const LICENSE_KEY_STORAGE = 'vocabflow_license_key';
+// Point this at your real Ko-fi page before shipping — see the licensing
+// runbook. Payment always happens on Ko-fi's own site, in a new tab, never
+// inside the extension itself.
+const KOFI_URL = 'https://ko-fi.com/vocabflow';
 const THEME_KEY = 'vocabflow_theme';
 
 type TabId = 'review' | 'progress' | 'library' | 'plan';
@@ -118,6 +124,35 @@ export function Popup() {
     void browser.storage.local.set({ [PLAN_STATE_KEY]: next });
   }
 
+  /** Checks a pasted license key against the API and, if it's good, both
+   *  updates planState AND remembers the key itself (so a future re-check —
+   *  e.g. after a refund revokes it — has something to re-validate). */
+  async function handleActivateLicense(key: string): Promise<{ ok: boolean; message: string }> {
+    let result: Awaited<ReturnType<typeof wordClient.activateLicense>>;
+    try {
+      result = await wordClient.activateLicense(key);
+    } catch {
+      return { ok: false, message: "Couldn't reach the license server — check your connection and try again." };
+    }
+    if (!result.valid) {
+      return { ok: false, message: "That key doesn't look right. Check the format XXXX-XXXX-XXXX-XXXX." };
+    }
+    await browser.storage.local.set({ [LICENSE_KEY_STORAGE]: key });
+    updatePlanState(result.plan === 'premium' ? 'premium' : 'free');
+    return { ok: true, message: 'License accepted. Welcome to Premium.' };
+  }
+
+  /** Checkout always happens on Ko-fi's own page, in a new tab — never a
+   *  form embedded in the extension. */
+  function handleBuy() {
+    void browser.tabs.create({ url: KOFI_URL });
+  }
+
+  async function handleDeactivateLicense() {
+    await browser.storage.local.remove(LICENSE_KEY_STORAGE);
+    updatePlanState('free');
+  }
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
@@ -160,7 +195,19 @@ export function Popup() {
 
   async function handleAddWords(inputs: AddWordInput[]) {
     const targetLang = settings?.targetLang ?? DEFAULT_TARGET_LANG;
-    for (const input of inputs) {
+
+    // The only real plan difference today: free is capped at FREE_WORD_CAP
+    // words total. beta/premium are unlimited. Approximates against the
+    // batch size rather than checking each merge-vs-create outcome — errs
+    // toward stopping a little early, never over the cap.
+    const remaining = planState === 'free' ? Math.max(0, FREE_WORD_CAP - words.length) : Infinity;
+    if (remaining <= 0) {
+      showToast(`You've hit the free ${FREE_WORD_CAP}-word cap — upgrade in the Plan tab to add more`);
+      return;
+    }
+    const toAdd = inputs.slice(0, remaining);
+
+    for (const input of toAdd) {
       await wordClient.saveWord({
         term: input.term,
         translation: input.translation,
@@ -170,7 +217,12 @@ export function Popup() {
         langTo: targetLang,
       });
     }
-    showToast(`Added ${inputs.length} word${inputs.length === 1 ? '' : 's'}`);
+
+    if (toAdd.length < inputs.length) {
+      showToast(`Added ${toAdd.length} — the rest hit the free ${FREE_WORD_CAP}-word cap. Upgrade in the Plan tab for more.`);
+    } else {
+      showToast(`Added ${toAdd.length} word${toAdd.length === 1 ? '' : 's'}`);
+    }
     await refresh();
   }
 
@@ -355,7 +407,15 @@ export function Popup() {
             onSelectModeChange={setLibrarySelecting}
           />
         )}
-        {tab === 'plan' && <PlanPane words={words} planState={planState} onPlanState={updatePlanState} />}
+        {tab === 'plan' && (
+          <PlanPane
+            words={words}
+            planState={planState}
+            onBuy={handleBuy}
+            onActivateLicense={handleActivateLicense}
+            onDeactivate={() => void handleDeactivateLicense()}
+          />
+        )}
       </div>
 
       {tab === 'library' && !librarySelecting && (
