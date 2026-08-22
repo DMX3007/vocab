@@ -1,5 +1,15 @@
 import type { SrsState } from '@vocabflow/core';
 
+/** One cached dictionary lookup (see lib/dictionary/freeDictionary.ts) —
+ *  a definition, its part of speech, and an example sentence when the
+ *  provider has one (many entries don't). */
+export interface DictionaryInfo {
+  partOfSpeech: string;
+  definition: string;
+  example: string | null;
+  phonetic: string | null;
+}
+
 /** What the tooltip hands us when the user saves a selection. */
 export interface SaveWordInput {
   term: string;
@@ -27,13 +37,20 @@ export interface Word {
    *  already known) — excluded from due/review, kept in the Library under
    *  its own "Shelved" status until un-shelved. */
   shelvedAt: Date | null;
+  /** Cached dictionary lookup, or null if none was found. */
+  dictionary: DictionaryInfo | null;
+  /** Set the first time a lookup is attempted, found or not — so a word
+   *  with no dictionary entry isn't re-fetched on every review. Null means
+   *  "never looked up yet", distinct from "looked up, nothing found". */
+  dictionaryFetchedAt: Date | null;
 }
 
-export type WireWord = Omit<Word, 'createdAt' | 'updatedAt' | 'deletedAt' | 'shelvedAt' | 'srsState'> & {
+export type WireWord = Omit<Word, 'createdAt' | 'updatedAt' | 'deletedAt' | 'shelvedAt' | 'dictionaryFetchedAt' | 'srsState'> & {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
   shelvedAt: string | null;
+  dictionaryFetchedAt: string | null;
   srsState: Omit<Word['srsState'], 'dueAt'> & { dueAt: string };
 };
 

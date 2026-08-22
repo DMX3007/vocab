@@ -4,6 +4,7 @@ import { planTick } from '../src/lib/review/scheduler';
 import { shouldShowStreakReminder, markStreakReminderShown } from '../src/lib/review/overlay-policy';
 import { computeProgressStats } from '../src/lib/review/progress';
 import { translateWord } from '../src/lib/translate/mymemory';
+import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
 import type { Message } from '../src/lib/messaging/protocol';
 
 // The service worker owns the database AND drives the review alarm.
@@ -73,6 +74,13 @@ export default defineBackground(() => {
         return repo.clearLibrary(message.payload.langTo, new Date(message.payload.now));
       case 'EXPORT_LIBRARY':
         return repo.getAllWordsEverywhere();
+      case 'LOOKUP_DICTIONARY': {
+        const word = await repo.getWord(message.payload.wordId);
+        if (!word) throw new Error(`Word not found: ${message.payload.wordId}`);
+        if (word.dictionaryFetchedAt) return word; // already looked up, found or not
+        const info = await fetchDictionaryInfo(word.term);
+        return repo.setDictionaryInfo(word.id, info, new Date(message.payload.now));
+      }
       case 'TRANSLATE':
         // Runs here, not in the content script: a service worker's fetch
         // isn't subject to the host page's CSP, so this stays reliable

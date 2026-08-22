@@ -28,6 +28,8 @@ const wireWord: WireWord = {
   updatedAt: '2026-06-10T12:00:00.000Z',
   deletedAt: null,
   shelvedAt: null,
+  dictionary: null,
+  dictionaryFetchedAt: null,
 };
 
 describe('reviveWord', () => {
@@ -47,6 +49,12 @@ describe('reviveWord', () => {
   it('revives deletedAt when present', () => {
     const w = reviveWord({ ...wireWord, deletedAt: '2026-06-11T00:00:00.000Z' });
     expect(w.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps dictionaryFetchedAt null as null, and revives it when present', () => {
+    expect(reviveWord(wireWord).dictionaryFetchedAt).toBeNull();
+    const w = reviveWord({ ...wireWord, dictionaryFetchedAt: '2026-06-11T00:00:00.000Z' });
+    expect(w.dictionaryFetchedAt).toBeInstanceOf(Date);
   });
 
   it('reviveWords maps a whole array', () => {

@@ -7,7 +7,7 @@ import {
   type Grade,
   type SrsAlgorithm,
 } from '@vocabflow/core';
-import type { ReviewLog, ReviewMode, SaveWordInput, Word } from './types';
+import type { DictionaryInfo, ReviewLog, ReviewMode, SaveWordInput, Word } from './types';
 
 // A tiny id generator. crypto.randomUUID exists in extension contexts and
 // in modern Node; client-generated ids let a word exist before any network.
@@ -79,6 +79,8 @@ export class WordRepository {
       updatedAt: now,
       deletedAt: null,
       shelvedAt: null,
+      dictionary: null,
+      dictionaryFetchedAt: null,
     };
     await this.db.words.add(word);
     return word;
@@ -170,6 +172,17 @@ export class WordRepository {
       srsState: { ...word.srsState, dueAt: now },
       updatedAt: now,
     };
+    await this.db.words.put(updated);
+    return updated;
+  }
+
+  /** Caches a dictionary lookup result (or the fact that none was found —
+   *  info may be null). The actual fetch happens in background.ts, not
+   *  here: this repo is dumb storage and makes no network calls. */
+  async setDictionaryInfo(id: string, info: DictionaryInfo | null, now: Date): Promise<Word> {
+    const word = await this.db.words.get(id);
+    if (!word) throw new Error(`Word not found: ${id}`);
+    const updated: Word = { ...word, dictionary: info, dictionaryFetchedAt: now, updatedAt: now };
     await this.db.words.put(updated);
     return updated;
   }

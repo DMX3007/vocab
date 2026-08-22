@@ -21,6 +21,8 @@ function word(id: string, dueAt: Date): Word {
     updatedAt: NOW,
     deletedAt: null,
     shelvedAt: null,
+    dictionary: null,
+    dictionaryFetchedAt: null,
   };
 }
 

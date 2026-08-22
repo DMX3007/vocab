@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ReviewSession, ReviewCard as Card } from '../lib/review/session';
 import type { GradeResult } from '@vocabflow/core';
+import type { Word } from '../lib/storage/types';
 import { Icon } from './icons';
 import { speak } from '../lib/tts';
 import { shouldSuggestShelving } from '../lib/review/library';
@@ -8,12 +9,16 @@ import { shouldSuggestShelving } from '../lib/review/library';
 interface Props {
   session: ReviewSession;
   onFinished: () => void;
+  /** Looks up (and caches) a definition/example for the just-answered word.
+   *  Fetched only after grading, not before — reinforcement for a word
+   *  you've already tried to recall, not a hint beforehand. */
+  onLookupDictionary: (wordId: string) => Promise<Word>;
 }
 
 // Dumb view over an already-started ReviewSession. The session holds all the
 // logic (which card, direction, grading, persistence); this only renders the
 // current card, takes an answer, shows the verdict, then advances.
-export function ReviewCard({ session, onFinished }: Props) {
+export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   const [card, setCard] = useState<Card | null>(session.currentCard);
   const [answer, setAnswer] = useState('');
   const [verdict, setVerdict] = useState<GradeResult | null>(null);
@@ -22,6 +27,7 @@ export function ReviewCard({ session, onFinished }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [shelveSuggestionDismissed, setShelveSuggestionDismissed] = useState(false);
   const [shelving, setShelving] = useState(false);
+  const [dictInfo, setDictInfo] = useState<Word['dictionary']>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number>(Date.now());
 
@@ -29,6 +35,23 @@ export function ReviewCard({ session, onFinished }: Props) {
     inputRef.current?.focus();
     startedAt.current = Date.now();
   }, [card]);
+
+  // Fetches the example/definition only once the verdict is up — after the
+  // user's already tried to recall the word, never as a hint beforehand.
+  // Cached on the word itself (dictionaryFetchedAt), so this is a no-op
+  // network-wise on every review after the first.
+  useEffect(() => {
+    if (!verdict) { setDictInfo(null); return; }
+    const word = session.lastAnsweredWord;
+    if (!word) return;
+    if (word.dictionaryFetchedAt) { setDictInfo(word.dictionary); return; }
+    let cancelled = false;
+    onLookupDictionary(word.id)
+      .then((updated) => { if (!cancelled) setDictInfo(updated.dictionary); })
+      .catch(() => { if (!cancelled) setDictInfo(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verdict]);
 
   async function check() {
     if (!card || verdict || checking) return;
@@ -160,6 +183,13 @@ export function ReviewCard({ session, onFinished }: Props) {
           </button>
         </div>
       ) : null}
+
+      {verdict && dictInfo && (
+        <div className="vf-dict">
+          <span className="vf-dict-pos">{dictInfo.partOfSpeech}</span>
+          <span className="vf-dict-text">{dictInfo.example ?? dictInfo.definition}</span>
+        </div>
+      )}
 
       {suggestShelve && (
         <div className="vf-shelve-suggest">

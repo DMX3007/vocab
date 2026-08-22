@@ -190,6 +190,7 @@ export default defineContentScript({
           onDisableSite: async () => {
             await settingsStore.update((s) => addToBlacklist(s, hostname)); unmount();
           },
+          onLookupDictionary: (wordId: string) => wordClient.lookupDictionary(wordId, new Date()),
         }),
         { kind: 'overlay' },
       );

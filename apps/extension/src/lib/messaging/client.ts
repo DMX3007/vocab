@@ -59,6 +59,11 @@ export const wordClient = {
   async exportLibrary(): Promise<Word[]> {
     return reviveWords(await send({ type: 'EXPORT_LIBRARY', payload: {} }));
   },
+  /** Looks up (and caches) an example sentence/definition for a word.
+   *  Cheap to call repeatedly — a no-op fetch once it's cached. */
+  async lookupDictionary(wordId: string, now: Date): Promise<Word> {
+    return reviveWord(await send({ type: 'LOOKUP_DICTIONARY', payload: { wordId, now: now.toISOString() } }));
+  },
 };
 
 export type WordClient = typeof wordClient;

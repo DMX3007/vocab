@@ -23,6 +23,7 @@ export type RequestMap = {
   UNSHELVE_WORD: { wordId: string; now: string };
   CLEAR_LIBRARY: { langTo: string; now: string };
   EXPORT_LIBRARY: Record<string, never>;
+  LOOKUP_DICTIONARY: { wordId: string; now: string };
 };
 
 export type ResponseMap = {
@@ -40,6 +41,7 @@ export type ResponseMap = {
   UNSHELVE_WORD: WireWord;
   CLEAR_LIBRARY: number;
   EXPORT_LIBRARY: WireWord[];
+  LOOKUP_DICTIONARY: WireWord;
 };
 
 

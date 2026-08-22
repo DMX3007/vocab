@@ -441,6 +441,31 @@
   cursor: not-allowed;
 }
 
+.vf-dict {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 2px solid rgba(28, 26, 23, 0.16);
+  font-size: 12.5px;
+  color: #5c4f45;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vf-dict-pos {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a6f64;
+}
+
+.vf-dict-text {
+  font-family: Georgia, serif;
+  font-style: italic;
+  line-height: 1.4;
+}
+
 .vf-shelve-suggest {
   margin-top: 12px;
   padding: 10px 12px;

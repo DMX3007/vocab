@@ -29,6 +29,8 @@ function word(overrides: Partial<Word> = {}): Word {
     updatedAt: NOW,
     deletedAt: null,
     shelvedAt: null,
+    dictionary: null,
+    dictionaryFetchedAt: null,
     ...overrides,
   };
 }

@@ -179,6 +179,35 @@ describe('getAllWordsEverywhere', () => {
   });
 });
 
+describe('setDictionaryInfo', () => {
+  const info = { partOfSpeech: 'noun', definition: 'Courage.', example: 'She showed fortitude.', phonetic: null };
+
+  it('caches the lookup result and stamps dictionaryFetchedAt', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const updated = await repo.setDictionaryInfo(w.id, info, later(1000));
+    expect(updated.dictionary).toEqual(info);
+    expect(updated.dictionaryFetchedAt?.getTime()).toBe(later(1000).getTime());
+  });
+
+  it('also stamps dictionaryFetchedAt for a "nothing found" result (info: null)', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const updated = await repo.setDictionaryInfo(w.id, null, later(1000));
+    expect(updated.dictionary).toBeNull();
+    expect(updated.dictionaryFetchedAt).not.toBeNull();
+  });
+
+  it('leaves SRS progress and everything else untouched', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const reviewed = await repo.recordReview(w.id, 4, 'typing', NOW);
+    const updated = await repo.setDictionaryInfo(w.id, info, later(1000));
+    expect(updated.srsState).toEqual(reviewed.srsState);
+  });
+
+  it('throws for an id that does not exist', async () => {
+    await expect(repo.setDictionaryInfo('nope', info, NOW)).rejects.toThrow();
+  });
+});
+
 describe('getAllWords (scoped to the active target language)', () => {
   it('lists words of the requested language but hides soft-deleted ones', async () => {
     const a = await repo.saveWord(sample, NOW);
