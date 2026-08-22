@@ -221,6 +221,7 @@ export function Popup() {
             onAlgoChange={handleDefaultAlgoChange}
             onStartReview={handleStartReview}
             ready={ready}
+            onDueCountChange={setDueCount}
           />
         )}
         {tab === 'progress' && <ProgressPane words={words} logs={logs} />}
