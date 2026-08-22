@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Icon } from './icons';
 import {
   wordStatus,
@@ -10,6 +10,7 @@ import {
 } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
 import { ALGO_LABELS } from '../lib/review/algo';
+import { trackedWords, msUntilDue, formatCountdown } from '../lib/review/live-queue';
 import type { Word } from '../lib/storage/types';
 import type { AlgoId } from '@vocabflow/core';
 
@@ -30,15 +31,26 @@ interface Props {
 const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New' };
 
 export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onSelectModeChange }: Props) {
-  const now = new Date();
   const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const now = new Date(nowMs);
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const filtered = useMemo(
     () => sortWords(filterByAlgo(filterWords(words, search), algoFilter), sort),
     [words, search, algoFilter, sort],
   );
+  // A live countdown is only worth the per-second recompute for the words
+  // actually close to due — same MAX_TRACKED_WORDS cap the Review tab uses,
+  // so a library of thousands of words never means thousands of live
+  // timers, just a cheap Set lookup per card.
+  const trackedIds = useMemo(() => new Set(trackedWords(words).map((w) => w.id)), [words]);
 
   function toggleSelectMode() {
     const next = !selectMode;
@@ -124,6 +136,8 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
         <div className="library-grid">
           {filtered.map((w) => {
             const status = wordStatus(w, now);
+            const showCountdown = status !== 'due' && trackedIds.has(w.id);
+            const pillLabel = showCountdown ? formatCountdown(msUntilDue(w, now)) : STATUS_LABEL[status];
             const selected = selectedIds.has(w.id);
             let source = '';
             try {
@@ -164,7 +178,7 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                       <span className="lib-card-source">{source}</span>
                       <span className="lib-card-algo">{ALGO_LABELS[w.srsState.algo]}</span>
                     </div>
-                    <span className={`lib-card-status ${status}`}>{STATUS_LABEL[status]}</span>
+                    <span className={`lib-card-status ${status}`} title={showCountdown ? `Due in ${pillLabel}` : undefined}>{pillLabel}</span>
                   </div>
                 </div>
               </div>

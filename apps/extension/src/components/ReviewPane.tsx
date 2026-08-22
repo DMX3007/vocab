@@ -149,12 +149,16 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
         </div>
       )}
 
-      {upcoming.length > 0 && (
-        <div>
-          <div className="section-divider">Up next</div>
-          {upcoming.map((w) => renderRow(w, formatCountdown(msUntilDue(w, new Date(now))), 'countdown-pill'))}
-        </div>
-      )}
+      <div>
+        <div className="section-divider">Up next</div>
+        {upcoming.length > 0 ? (
+          upcoming.map((w) => renderRow(w, formatCountdown(msUntilDue(w, new Date(now))), 'countdown-pill'))
+        ) : (
+          <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
+            Nothing scheduled soon — this fills in once a word's next review is a little ways off.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
