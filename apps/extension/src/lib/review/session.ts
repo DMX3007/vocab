@@ -111,6 +111,21 @@ export class ReviewSession {
     return this.toCard(word);
   }
 
+  /** Swaps the current card for a different one already queued this session.
+   *  The skipped word is NOT graded and its SRS state doesn't change — it's
+   *  simply deferred to a random later spot in the same session, so nothing
+   *  is dropped, it just isn't what's shown right now. No-op with 0 or 1
+   *  card left, since there's nothing else to switch to. */
+  shuffle(): void {
+    if (this.isFinished) return;
+    const remaining = this.queue.length - this.index;
+    if (remaining <= 1) return;
+    const [current] = this.queue.splice(this.index, 1);
+    const otherCount = this.queue.length - this.index;
+    const offset = 1 + Math.floor(this.rng() * otherCount);
+    this.queue.splice(this.index + offset, 0, current!);
+  }
+
   /** Grades the answer, persists it (SRS + log), and advances to the next card. */
   async answer(text: string, context: GradeContext, now: Date): Promise<GradeResult> {
     if (this.isFinished) {
