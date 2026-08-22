@@ -16,6 +16,8 @@ export function ReviewCard({ session, onFinished }: Props) {
   const [answer, setAnswer] = useState('');
   const [verdict, setVerdict] = useState<GradeResult | null>(null);
   const [done, setDone] = useState({ index: 0, total: session.total });
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number>(Date.now());
 
@@ -25,19 +27,25 @@ export function ReviewCard({ session, onFinished }: Props) {
   }, [card]);
 
   async function check() {
-    if (!card || verdict) return;
+    if (!card || verdict || checking) return;
+    setError(null);
+    setChecking(true);
     const latencyMs = Date.now() - startedAt.current;
     try {
       const result = await session.answer(answer, { latencyMs }, new Date());
       setVerdict(result);
-    } catch (error) {
-      console.error(error, 'Error: while checking answer') // TODO: show user correct user error
+    } catch (err) {
+      console.error(err, 'Error: while checking answer');
+      setError('Something went wrong checking that answer — try again.');
+    } finally {
+      setChecking(false);
     }
   }
 
   function next() {
     setVerdict(null);
     setAnswer('');
+    setError(null);
     setDone((d) => ({ ...d, index: d.index + 1 }));
     if (session.isFinished) {
       onFinished();
@@ -52,6 +60,7 @@ export function ReviewCard({ session, onFinished }: Props) {
     if (verdict) return;
     session.shuffle();
     setAnswer('');
+    setError(null);
     setCard(session.currentCard);
   }
 
@@ -110,19 +119,22 @@ export function ReviewCard({ session, onFinished }: Props) {
           </button>
         </div>
       ) : (
-        <div className="vf-card-actions">
-          <button
-            className="vf-card-btn-ghost"
-            onClick={shuffle}
-            disabled={session.remaining <= 1}
-            title="Show a different word instead"
-          >
-            <Icon name="shuffle" size={13} /> Shuffle
-          </button>
-          <button className="vf-card-btn" onClick={check} disabled={!answer.trim()}>
-            Check {'\u2192'}
-          </button>
-        </div>
+        <>
+          {error && <div className="vf-hint">{error}</div>}
+          <div className="vf-card-actions">
+            <button
+              className="vf-card-btn-ghost"
+              onClick={shuffle}
+              disabled={session.remaining <= 1}
+              title="Show a different word instead"
+            >
+              <Icon name="shuffle" size={13} /> Shuffle
+            </button>
+            <button className="vf-card-btn" onClick={check} disabled={!answer.trim() || checking}>
+              {checking ? 'Checking\u2026' : <>Check {'\u2192'}</>}
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
