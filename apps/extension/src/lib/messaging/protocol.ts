@@ -24,6 +24,11 @@ export type RequestMap = {
   CLEAR_LIBRARY: { langTo: string; now: string };
   EXPORT_LIBRARY: Record<string, never>;
   LOOKUP_DICTIONARY: { wordId: string; now: string };
+  UPDATE_WORD: {
+    wordId: string;
+    changes: { term?: string; translations?: string[]; contextSentence?: string };
+    now: string;
+  };
 };
 
 export type ResponseMap = {
@@ -42,6 +47,7 @@ export type ResponseMap = {
   CLEAR_LIBRARY: number;
   EXPORT_LIBRARY: WireWord[];
   LOOKUP_DICTIONARY: WireWord;
+  UPDATE_WORD: WireWord;
 };
 
 

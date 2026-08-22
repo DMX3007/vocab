@@ -130,15 +130,26 @@ export class WordRepository {
     return words.length;
   }
 
-  /** Edits the translations only. Term, context and SRS progress are untouched. */
+  /** Edits term/translations/contextSentence — whichever are passed. SRS
+   *  progress is always untouched. If the term itself changes, the cached
+   *  dictionary lookup (see setDictionaryInfo) is cleared: it belongs to
+   *  whatever word this used to be, not the corrected one. */
   async updateWord(
     id: string,
-    changes: { translations: string[] },
+    changes: { term?: string; translations?: string[]; contextSentence?: string },
     now: Date,
   ): Promise<Word> {
     const word = await this.db.words.get(id);
     if (!word) throw new Error(`Word not found: ${id}`);
-    const updated: Word = { ...word, translations: changes.translations, updatedAt: now };
+    const termChanged = changes.term !== undefined && changes.term !== word.term;
+    const updated: Word = {
+      ...word,
+      ...(changes.term !== undefined ? { term: changes.term } : {}),
+      ...(changes.translations !== undefined ? { translations: changes.translations } : {}),
+      ...(changes.contextSentence !== undefined ? { contextSentence: changes.contextSentence } : {}),
+      ...(termChanged ? { dictionary: null, dictionaryFetchedAt: null } : {}),
+      updatedAt: now,
+    };
     await this.db.words.put(updated);
     return updated;
   }

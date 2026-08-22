@@ -81,6 +81,8 @@ export default defineBackground(() => {
         const info = await fetchDictionaryInfo(word.term);
         return repo.setDictionaryInfo(word.id, info, new Date(message.payload.now));
       }
+      case 'UPDATE_WORD':
+        return repo.updateWord(message.payload.wordId, message.payload.changes, new Date(message.payload.now));
       case 'TRANSLATE':
         // Runs here, not in the content script: a service worker's fetch
         // isn't subject to the host page's CSP, so this stays reliable

@@ -237,7 +237,7 @@ describe('countWords (per language, for the dropdown badges)', () => {
   });
 });
 
-describe('updateWord (translation only)', () => {
+describe('updateWord', () => {
   it('replaces the translations and bumps updatedAt, without resetting SRS progress', async () => {
     const w = await repo.saveWord(sample, NOW);
     await repo.recordReview(w.id, 4, 'typing', NOW); // advance SRS a bit
@@ -249,9 +249,63 @@ describe('updateWord (translation only)', () => {
     // SRS untouched: same phase/step as before the edit
     expect(updated.srsState.stepIndex).toBe(before.srsState.stepIndex);
     expect(updated.srsState.phase).toBe(before.srsState.phase);
-    // term and context are read-only — unchanged
+    // fields not passed are left alone
     expect(updated.term).toBe('fortitude');
     expect(updated.contextSentence).toBe(sample.contextSentence);
+  });
+
+  it('edits the term alone', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const updated = await repo.updateWord(w.id, { term: 'resilience' }, later(1000));
+    expect(updated.term).toBe('resilience');
+    expect(updated.translations).toEqual([sample.translation]);
+    expect(updated.contextSentence).toBe(sample.contextSentence);
+  });
+
+  it('edits the context sentence alone', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const updated = await repo.updateWord(w.id, { contextSentence: 'A new example.' }, later(1000));
+    expect(updated.contextSentence).toBe('A new example.');
+    expect(updated.term).toBe(sample.term);
+    expect(updated.translations).toEqual([sample.translation]);
+  });
+
+  it('edits multiple fields at once', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const updated = await repo.updateWord(
+      w.id,
+      { term: 'resilience', translations: ['стойкость', 'выносливость'], contextSentence: 'A new example.' },
+      later(1000),
+    );
+    expect(updated.term).toBe('resilience');
+    expect(updated.translations).toEqual(['стойкость', 'выносливость']);
+    expect(updated.contextSentence).toBe('A new example.');
+  });
+
+  it('clears the cached dictionary lookup when the term changes', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.setDictionaryInfo(w.id, { partOfSpeech: 'noun', definition: 'strength', example: null, phonetic: null }, NOW);
+
+    const updated = await repo.updateWord(w.id, { term: 'resilience' }, later(1000));
+    expect(updated.dictionary).toBeNull();
+    expect(updated.dictionaryFetchedAt).toBeNull();
+  });
+
+  it('keeps the cached dictionary lookup when the term is unchanged', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.setDictionaryInfo(w.id, { partOfSpeech: 'noun', definition: 'strength', example: null, phonetic: null }, NOW);
+
+    const updated = await repo.updateWord(w.id, { translations: ['непреклонность'] }, later(1000));
+    expect(updated.dictionary).toEqual({ partOfSpeech: 'noun', definition: 'strength', example: null, phonetic: null });
+    expect(updated.dictionaryFetchedAt).not.toBeNull();
+  });
+
+  it('keeps the cached dictionary lookup when the term is passed but identical', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.setDictionaryInfo(w.id, { partOfSpeech: 'noun', definition: 'strength', example: null, phonetic: null }, NOW);
+
+    const updated = await repo.updateWord(w.id, { term: sample.term }, later(1000));
+    expect(updated.dictionary).toEqual({ partOfSpeech: 'noun', definition: 'strength', example: null, phonetic: null });
   });
 });
 

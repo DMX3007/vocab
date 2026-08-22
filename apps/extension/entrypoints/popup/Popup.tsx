@@ -205,6 +205,12 @@ export function Popup() {
     await refresh();
   }
 
+  async function handleEditWord(id: string, changes: { term: string; translations: string[]; contextSentence: string }) {
+    await wordClient.updateWord(id, changes, new Date());
+    showToast('Word updated');
+    await refresh();
+  }
+
   /** Nothing else is due — bring the oldest-shelved word back into rotation
    *  and start reviewing it immediately, rather than leaving Review empty
    *  while shelved words just sit there. */
@@ -343,6 +349,7 @@ export function Popup() {
             onMoveAlgo={handleMoveAlgo}
             onShelve={handleShelve}
             onUnshelve={handleUnshelve}
+            onEdit={handleEditWord}
             onExport={handleExportLibrary}
             onClearLibrary={handleClearLibrary}
             onSelectModeChange={setLibrarySelecting}

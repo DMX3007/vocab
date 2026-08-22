@@ -12,6 +12,7 @@ import { isMastered } from '../lib/review/progress';
 import { ALGO_LABELS } from '../lib/review/algo';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import { speak } from '../lib/tts';
+import { EditWordModal } from './EditWordModal';
 import type { Word } from '../lib/storage/types';
 import type { AlgoId } from '@vocabflow/core';
 
@@ -25,6 +26,7 @@ interface Props {
   onMoveAlgo: (ids: string[], algo: AlgoId) => void;
   onShelve: (id: string) => void;
   onUnshelve: (id: string) => void;
+  onEdit: (id: string, changes: { term: string; translations: string[]; contextSentence: string }) => void;
   /** Downloads every word, every language, as JSON — a full backup. */
   onExport: () => void;
   /** Soft-deletes every word CURRENTLY shown here (this language only) —
@@ -38,11 +40,12 @@ interface Props {
 
 const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New', shelved: 'Shelved' };
 
-export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onExport, onClearLibrary, onSelectModeChange }: Props) {
+export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onEdit, onExport, onClearLibrary, onSelectModeChange }: Props) {
   const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [editingWord, setEditingWord] = useState<Word | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const now = new Date(nowMs);
 
@@ -211,6 +214,13 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                       <div className="lib-card-actions">
                         <button
                           className="lib-card-shelve"
+                          onClick={() => setEditingWord(w)}
+                          title="Edit word, translation, or example"
+                        >
+                          <Icon name="edit" />
+                        </button>
+                        <button
+                          className="lib-card-shelve"
                           onClick={() => (w.shelvedAt ? onUnshelve(w.id) : onShelve(w.id))}
                           title={w.shelvedAt ? 'Bring back into review' : 'Set aside for now — skip it in review until you bring it back'}
                         >
@@ -270,6 +280,12 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
           </div>
         </div>
       )}
+
+      <EditWordModal
+        word={editingWord}
+        onClose={() => setEditingWord(null)}
+        onSave={(id, changes) => { onEdit(id, changes); setEditingWord(null); }}
+      />
     </div>
   );
 }

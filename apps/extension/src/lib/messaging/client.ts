@@ -64,6 +64,14 @@ export const wordClient = {
   async lookupDictionary(wordId: string, now: Date): Promise<Word> {
     return reviveWord(await send({ type: 'LOOKUP_DICTIONARY', payload: { wordId, now: now.toISOString() } }));
   },
+  /** Edits term/translations/contextSentence — pass only what changed. */
+  async updateWord(
+    wordId: string,
+    changes: { term?: string; translations?: string[]; contextSentence?: string },
+    now: Date,
+  ): Promise<Word> {
+    return reviveWord(await send({ type: 'UPDATE_WORD', payload: { wordId, changes, now: now.toISOString() } }));
+  },
 };
 
 export type WordClient = typeof wordClient;

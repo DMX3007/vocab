@@ -41,6 +41,10 @@ const PATHS: Record<string, React.ReactNode> = {
     <line x1="3.3" y1="12.7" x2="4.5" y2="11.5" />
     <line x1="11.5" y1="4.5" x2="12.7" y2="3.3" />
   </>,
+  edit: <>
+    {P('M10.7 2.7l2.6 2.6L5.5 13.1l-3.2.7.7-3.2z')}
+    <line x1="9.2" y1="4.2" x2="11.8" y2="6.8" />
+  </>,
   archive: <>
     <rect x="2.5" y="3" width="11" height="3" rx="1" />
     {P('M3.5 6v6.5a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V6')}
