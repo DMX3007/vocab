@@ -1,5 +1,5 @@
 import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog } from '../storage/types';
-import type { AlgoId, Grade } from '@vocabflow/core';
+import type { AlgoId, Grade } from '@vocably/core';
 import type { AlgoFilter } from '../review/library';
 
 // Why this exists: in a Chrome extension the content script runs in the

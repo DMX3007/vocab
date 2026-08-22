@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, DEFAULT_LEITNER_CONFIG } from '@vocabflow/core';
+import { DEFAULT_CONFIG, DEFAULT_LEITNER_CONFIG } from '@vocably/core';
 import type { ReviewLog, Word } from '../storage/types';
 import { isMastered, MASTERED_INTERVAL_DAYS } from './progress';
 

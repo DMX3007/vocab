@@ -15,11 +15,11 @@ import type { Message } from '../src/lib/messaging/protocol';
 // MV3: the worker may be killed when idle; browser.alarms wakes it back up,
 // and Dexie/browser.storage reopen lazily, so we keep no long-lived state.
 
-const ALARM = 'vocabflow-review';
+const ALARM = 'vocably-review';
 const TICK_MINUTES = 1; // check often; the throttle/cap keep it polite
 
 export default defineBackground(() => {
-  console.log('[VocabFlow] service worker alive');
+  console.log('[Vocably] service worker alive');
   const repo = new WordRepository();
   const ready = repo.open();
   const settingsStore = new SettingsStore(browser.storage.local);
@@ -33,7 +33,7 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     const msg = message as Message
     handle(msg).then(sendResponse).catch((err) => {
-      console.error('[VocabFlow] message error', msg.type, err);
+      console.error('[Vocably] message error', msg.type, err);
       sendResponse({ __error: String(err) });
     });
     return true;

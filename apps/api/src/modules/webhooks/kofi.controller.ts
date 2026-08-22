@@ -57,9 +57,9 @@ export class KofiWebhookController {
 
     await this.email.send({
       to: payload.email,
-      subject: 'Your VocabFlow Premium license',
+      subject: 'Your Vocably Premium license',
       text: [
-        `Thank you for supporting VocabFlow!`,
+        `Thank you for supporting Vocably!`,
         ``,
         `Your license key: ${license.key}`,
         ``,

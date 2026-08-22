@@ -37,7 +37,7 @@ describe('SettingsStore', () => {
 
   it('merges stored partial settings over the defaults (forward-compatible)', async () => {
     // an older/newer build might have saved only some fields
-    const storage = fakeStorage({ vocabflow_settings: { blacklist: ['youtube.com'] } });
+    const storage = fakeStorage({ vocably_settings: { blacklist: ['youtube.com'] } });
     const store = new SettingsStore(storage);
     const loaded = await store.load();
     expect(loaded.blacklist).toEqual(['youtube.com']); // from storage
@@ -49,7 +49,7 @@ describe('SettingsStore', () => {
     const store = new SettingsStore(storage);
     const next = { ...defaultSettings(), pausedUntil: '2026-06-10T15:00:00.000Z' };
     await store.save(next);
-    expect(storage._data['vocabflow_settings']).toEqual(next);
+    expect(storage._data['vocably_settings']).toEqual(next);
   });
 
   it('update loads, applies a change function, and saves the result', async () => {
@@ -57,7 +57,7 @@ describe('SettingsStore', () => {
     const store = new SettingsStore(storage);
     const result = await store.update((s) => ({ ...s, blacklist: [...s.blacklist, 'mail.com'] }));
     expect(result.blacklist).toEqual(['mail.com']);
-    expect((storage._data['vocabflow_settings'] as { blacklist: string[] }).blacklist).toEqual(['mail.com']);
+    expect((storage._data['vocably_settings'] as { blacklist: string[] }).blacklist).toEqual(['mail.com']);
   });
 
   it('subscribe fires when settings change (this is the cross-tab sync hook)', async () => {

@@ -16,17 +16,17 @@ import type { LibrarySort, AlgoFilter } from '../../src/lib/review/library';
 import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
 import { FREE_WORD_CAP } from '../../src/lib/plan';
-import type { AlgoId } from '@vocabflow/core';
+import type { AlgoId } from '@vocably/core';
 import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
-const PLAN_STATE_KEY = 'vocabflow_plan_state';
-const LICENSE_KEY_STORAGE = 'vocabflow_license_key';
+const PLAN_STATE_KEY = 'vocably_plan_state';
+const LICENSE_KEY_STORAGE = 'vocably_license_key';
 // Point this at your real Ko-fi page before shipping — see the licensing
 // runbook. Payment always happens on Ko-fi's own site, in a new tab, never
 // inside the extension itself.
-const KOFI_URL = 'https://ko-fi.com/vocabflow';
-const THEME_KEY = 'vocabflow_theme';
+const KOFI_URL = 'https://ko-fi.com/vocably';
+const THEME_KEY = 'vocably_theme';
 
 type TabId = 'review' | 'progress' | 'library' | 'plan';
 /** null = follow the OS/browser's own dark/light setting. */
@@ -234,7 +234,7 @@ export function Popup() {
   async function handleExportLibrary() {
     const all = await wordClient.exportLibrary();
     const date = new Date().toISOString().slice(0, 10);
-    downloadJson(`vocabflow-export-${date}.json`, all);
+    downloadJson(`vocably-export-${date}.json`, all);
     showToast(`Exported ${all.length} word${all.length === 1 ? '' : 's'}`);
   }
 
@@ -304,7 +304,7 @@ export function Popup() {
         <div className="brand">
           <BrandMark />
           <div>
-            <div className="brand-name">Vocab<em>flow</em></div>
+            <div className="brand-name">Vocab<em>ly</em></div>
             <div className="overline">
               <span className={`tier-pill ${planState === 'premium' ? 'premium' : ''}`}>
                 {planState === 'premium' ? '★ PREMIUM' : planState === 'free' ? 'FREE' : 'BETA'}
@@ -431,10 +431,12 @@ export function Popup() {
   );
 }
 
+// Placeholder mark for the Vocably rename — a plain serif V standing in
+// for a proper logo until one gets designed.
 function BrandMark() {
   return (
     <div className="brand-mark">
-      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20 }}>&amp;</span>
+      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20 }}>V</span>
     </div>
   );
 }

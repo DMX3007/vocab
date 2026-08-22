@@ -5,7 +5,7 @@ import {
   type GradeContext,
   type GradeResult,
   type Grade,
-} from '@vocabflow/core';
+} from '@vocably/core';
 import type { Word, ReviewMode } from '../storage/types';
 import { sortForReview, type AlgoFilter } from './library';
 

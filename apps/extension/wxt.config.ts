@@ -11,7 +11,7 @@ export default defineConfig({
     build: { target: 'es2021' },
   }),
   manifest: {
-    name: 'VocabFlow',
+    name: 'Vocably',
     description: 'Learn vocabulary from the pages you read.',
     // We need to read selections and show review cards on any page.
     // This triggers a broader permission prompt and a stricter store

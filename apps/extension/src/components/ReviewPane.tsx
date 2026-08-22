@@ -7,7 +7,7 @@ import { sortForReview, type AlgoFilter } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
 import { computeWordStatsById, algoProgressLabel, estimateReviewsToMastery } from '../lib/review/word-stats';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
-import type { AlgoId } from '@vocabflow/core';
+import type { AlgoId } from '@vocably/core';
 
 interface Props {
   words: Word[];

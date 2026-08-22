@@ -1,4 +1,4 @@
-import type { SrsState } from '@vocabflow/core';
+import type { SrsState } from '@vocably/core';
 
 /** One cached dictionary lookup (see lib/dictionary/freeDictionary.ts) —
  *  a definition, its part of speech, and an example sentence when the

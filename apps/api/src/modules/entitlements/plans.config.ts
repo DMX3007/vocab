@@ -1,4 +1,4 @@
-import type { AlgoId } from '@vocabflow/core';
+import type { AlgoId } from '@vocably/core';
 
 export type PlanId = 'free' | 'premium';
 

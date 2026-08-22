@@ -21,7 +21,7 @@ export function HelpSheet({ open, onClose }: Props) {
     <div className={`scrim ${open ? 'open' : ''}`} onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <div className="sheet-title">How VocabFlow works</div>
+        <div className="sheet-title">How Vocably works</div>
         <div className="sheet-sub">A quick tour, any time you need it.</div>
 
         <div className="tips">

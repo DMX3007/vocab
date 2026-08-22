@@ -1,7 +1,7 @@
 import { canInterrupt, type InterruptionSettings } from '../interruption';
 import { DEFAULT_TARGET_LANG } from '../languages';
 import { localDateKey } from './progress';
-import type { AlgoId } from '@vocabflow/core';
+import type { AlgoId } from '@vocably/core';
 
 // Decides whether the review overlay may pop on the active tab right now.
 // Pure and synchronous: the caller gathers the page context and the stored

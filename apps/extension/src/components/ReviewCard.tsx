@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ReviewSession, ReviewCard as Card } from '../lib/review/session';
-import type { GradeResult } from '@vocabflow/core';
+import type { GradeResult } from '@vocably/core';
 import type { Word } from '../lib/storage/types';
 import { Icon } from './icons';
 import { speak } from '../lib/tts';

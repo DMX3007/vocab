@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DEFAULT_CONFIG } from '@vocabflow/core';
+import { DEFAULT_CONFIG } from '@vocably/core';
 import { WordRepository } from '../src/lib/storage/word-repository';
 import { ReviewSession, DEFAULT_SESSION_CONFIG } from '../src/lib/review/session';
 
@@ -17,7 +17,7 @@ const minutesAgo = (n: number) => new Date(NOW.getTime() - n * 60_000);
 
 beforeEach(async () => {
   globalThis.indexedDB = new IDBFactory();
-  repo = new WordRepository(`vocabflow-session-${Date.now()}-${dbCounter++}`);
+  repo = new WordRepository(`vocably-session-${Date.now()}-${dbCounter++}`);
   await repo.open();
 });
 

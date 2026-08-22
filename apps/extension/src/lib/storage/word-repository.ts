@@ -6,7 +6,7 @@ import {
   type AlgoId,
   type Grade,
   type SrsAlgorithm,
-} from '@vocabflow/core';
+} from '@vocably/core';
 import type { DictionaryInfo, ReviewLog, ReviewMode, SaveWordInput, Word } from './types';
 
 // A tiny id generator. crypto.randomUUID exists in extension contexts and
@@ -36,7 +36,7 @@ export class WordRepository {
     reviewLogs: Table<ReviewLog, string>;
   };
 
-  constructor(databaseName = 'vocabflow') {
+  constructor(databaseName = 'vocably') {
     this.db = new Dexie(databaseName) as typeof this.db;
     this.db.version(1).stores({
       // Indexed fields only. deletedAt is NOT indexed: IndexedDB can't index

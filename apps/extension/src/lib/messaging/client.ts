@@ -1,5 +1,5 @@
 import type { SaveWordInput, Word, ReviewMode, ReviewLog } from '../storage/types';
-import type { AlgoId, Grade } from '@vocabflow/core';
+import type { AlgoId, Grade } from '@vocably/core';
 import type { Message, ResponseMap, MessageType } from './protocol';
 import { reviveWord, reviveWords, reviveReviewLogs } from './revive';
 

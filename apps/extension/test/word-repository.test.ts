@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'; // gives Node a real in-memory IndexedDB
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DEFAULT_CONFIG } from '@vocabflow/core';
+import { DEFAULT_CONFIG } from '@vocably/core';
 import { WordRepository } from '../src/lib/storage/word-repository';
 
 // A fresh, isolated database per test so they never bleed into each other.
@@ -10,7 +10,7 @@ let dbCounter = 0;
 
 beforeEach(async () => {
   globalThis.indexedDB = new IDBFactory(); // wipe global IndexedDB state
-  repo = new WordRepository(`vocabflow-test-${Date.now()}-${dbCounter++}`);
+  repo = new WordRepository(`vocably-test-${Date.now()}-${dbCounter++}`);
   await repo.open();
 });
 

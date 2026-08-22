@@ -14,7 +14,7 @@ import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib
 import { speak } from '../lib/tts';
 import { EditWordModal } from './EditWordModal';
 import type { Word } from '../lib/storage/types';
-import type { AlgoId } from '@vocabflow/core';
+import type { AlgoId } from '@vocably/core';
 
 interface Props {
   words: Word[];

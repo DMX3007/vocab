@@ -1,4 +1,4 @@
-import { DEFAULT_LEITNER_CONFIG } from '@vocabflow/core';
+import { DEFAULT_LEITNER_CONFIG } from '@vocably/core';
 import type { Word, ReviewLog } from '../storage/types';
 import type { OverlaySettings } from './overlay-policy';
 

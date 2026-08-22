@@ -5,7 +5,7 @@ import { defaultSettings, type OverlaySettings } from './overlay-policy';
 // the subscribe() hook is what makes a pause set on one tab calm all tabs:
 // each tab's content script subscribes and reacts to the change event.
 
-const KEY = 'vocabflow_settings';
+const KEY = 'vocably_settings';
 
 /** The slice of the chrome.storage.local API we depend on (injected for tests). */
 export interface StorageArea {

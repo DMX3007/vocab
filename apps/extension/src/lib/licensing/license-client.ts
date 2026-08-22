@@ -1,4 +1,4 @@
-// Validates a pasted license key against the VocabFlow API. Runs in the
+// Validates a pasted license key against the Vocably API. Runs in the
 // service worker (like TRANSLATE in mymemory.ts) so it isn't subject to
 // whatever CSP the current tab happens to have, and stays reliable
 // regardless of which site the popup was opened from.

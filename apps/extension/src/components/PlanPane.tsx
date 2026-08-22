@@ -94,7 +94,7 @@ function UpgradeView({
       <div className="pricing-card">
         <div className="pricing-head">
           <div>
-            <div className="overline">VocabFlow</div>
+            <div className="overline">Vocably</div>
             <div className="pricing-name">Premium</div>
           </div>
           <div className="pricing-price">
@@ -169,7 +169,7 @@ function PremiumActiveView({ onDeactivate }: { onDeactivate: () => void }) {
         <div className="active-mark"><Icon name="check" size={16} /></div>
         <div className="overline">Plan</div>
         <div className="active-title"><span className="serif-italic">Premium</span> {'·'} Active</div>
-        <div className="active-sub">Thank you for supporting VocabFlow.</div>
+        <div className="active-sub">Thank you for supporting Vocably.</div>
         <div className="active-meta">
           <div className="meta-row"><span className="meta-k">Words saved</span><span className="meta-v">{'∞'}</span></div>
         </div>

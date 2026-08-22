@@ -1,4 +1,4 @@
-import type { AlgoId } from '@vocabflow/core';
+import type { AlgoId } from '@vocably/core';
 
 // Shared display names for the two algorithms, so the tray selector, the
 // Library badges/filter, and the Plan tab all say the same thing.
