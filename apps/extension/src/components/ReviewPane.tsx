@@ -3,7 +3,7 @@ import { Icon } from './icons';
 import type { Word, ReviewLog } from '../lib/storage/types';
 import { SUPPORTED_LANGUAGES } from '../lib/languages';
 import { ALGO_OPTIONS, ALGO_LABELS } from '../lib/review/algo';
-import type { AlgoFilter } from '../lib/review/library';
+import { sortForReview, type AlgoFilter } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
 import { computeWordStatsById, algoProgressLabel, estimateReviewsToMastery } from '../lib/review/word-stats';
 import type { AlgoId } from '@vocabflow/core';
@@ -32,9 +32,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
   const statsById = useMemo(() => computeWordStatsById(logs), [logs]);
 
   const now = Date.now();
-  const allDue = words
-    .filter((w) => w.srsState.dueAt.getTime() <= now)
-    .sort((a, b) => a.srsState.dueAt.getTime() - b.srsState.dueAt.getTime());
+  const allDue = sortForReview(words.filter((w) => w.srsState.dueAt.getTime() <= now));
   const due = allDue.filter((w) => reviewFilter === 'all' || w.srsState.algo === reviewFilter);
 
   return (

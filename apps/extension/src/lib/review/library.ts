@@ -15,6 +15,27 @@ export function wordStatus(word: Word, now: Date): WordStatus {
   return 'fresh';
 }
 
+/** A word that hasn't graduated its algorithm's first ladder step yet: SM-2
+ *  still walking the learning steps, or Leitner never reviewed at all.
+ *  Same "fresh" bucket wordStatus() reports, exposed on its own since the
+ *  review queue needs it independently of the due/mastered/learning label. */
+export function isFreshWord(word: Word): boolean {
+  return word.srsState.intervalDays === 0;
+}
+
+/** Review queue order: brand-new words first (so learning stays a priority
+ *  instead of getting crowded out by an ever-growing repeat backlog), then
+ *  everything else most-overdue first. Each group keeps its own due-order
+ *  internally — this only decides which group goes first. */
+export function sortForReview(words: Word[]): Word[] {
+  return [...words].sort((a, b) => {
+    const aFresh = isFreshWord(a);
+    const bFresh = isFreshWord(b);
+    if (aFresh !== bFresh) return aFresh ? -1 : 1;
+    return a.srsState.dueAt.getTime() - b.srsState.dueAt.getTime();
+  });
+}
+
 export type LibrarySort = 'added' | 'due' | 'alpha' | 'mastered';
 
 export function sortWords(words: Word[], sort: LibrarySort): Word[] {

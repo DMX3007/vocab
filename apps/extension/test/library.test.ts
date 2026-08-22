@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wordStatus, sortWords, filterWords, filterByAlgo } from '../src/lib/review/library';
+import { wordStatus, sortWords, filterWords, filterByAlgo, isFreshWord, sortForReview } from '../src/lib/review/library';
 import type { Word } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00Z');
@@ -77,6 +77,45 @@ describe('filterWords', () => {
   });
   it('empty query returns everything', () => {
     expect(filterWords(words, '  ')).toEqual(words);
+  });
+});
+
+describe('isFreshWord', () => {
+  it('true while intervalDays is still 0 (never graduated the first ladder step)', () => {
+    expect(isFreshWord(word({ srsState: { intervalDays: 0 } }))).toBe(true);
+  });
+  it('false once the interval has grown at all', () => {
+    expect(isFreshWord(word({ srsState: { intervalDays: 1 } }))).toBe(false);
+  });
+});
+
+describe('sortForReview', () => {
+  it('puts every fresh word ahead of every repeat word, regardless of due order', () => {
+    const overdueRepeat = word({ id: 'overdue-repeat', srsState: { intervalDays: 10, dueAt: new Date(NOW.getTime() - 1_000_000) } });
+    const newerFresh = word({ id: 'newer-fresh', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 1_000) } });
+    // the repeat word is far more overdue, but the fresh word must still come first
+    expect(sortForReview([overdueRepeat, newerFresh]).map((w) => w.id)).toEqual(['newer-fresh', 'overdue-repeat']);
+  });
+
+  it('orders within the fresh group by due time, most-overdue first', () => {
+    const freshA = word({ id: 'a', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 5_000) } });
+    const freshB = word({ id: 'b', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 50_000) } });
+    expect(sortForReview([freshA, freshB]).map((w) => w.id)).toEqual(['b', 'a']);
+  });
+
+  it('orders within the repeat group by due time, most-overdue first', () => {
+    const repeatA = word({ id: 'a', srsState: { intervalDays: 5, dueAt: new Date(NOW.getTime() - 5_000) } });
+    const repeatB = word({ id: 'b', srsState: { intervalDays: 5, dueAt: new Date(NOW.getTime() - 50_000) } });
+    expect(sortForReview([repeatA, repeatB]).map((w) => w.id)).toEqual(['b', 'a']);
+  });
+
+  it('does not mutate the input array (order stays as given, even though the result reorders)', () => {
+    const repeat = word({ id: 'repeat', srsState: { intervalDays: 10, dueAt: new Date(NOW.getTime() - 1_000_000) } });
+    const fresh = word({ id: 'fresh', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 1_000) } });
+    const words = [repeat, fresh]; // already in "repeat first" order — sortForReview must flip the OUTPUT, not this array
+    const result = sortForReview(words);
+    expect(words.map((w) => w.id)).toEqual(['repeat', 'fresh']); // input untouched
+    expect(result.map((w) => w.id)).toEqual(['fresh', 'repeat']); // output reordered
   });
 });
 

@@ -52,6 +52,26 @@ describe('ReviewSession (normal mode)', () => {
     expect(session.currentCard!.term).toBe('older');
   });
 
+  it('prioritizes brand-new words ahead of the repeat backlog, even when the backlog is far more overdue', async () => {
+    // A word that already graduated review and is now badly overdue —
+    // "ordered" repeat material with a long history behind it.
+    const repeat = await save('candor', 'откровенность', minutesAgo(60 * 24 * 30));
+    const tenDaysAgo = new Date(NOW.getTime() - 10 * 24 * 60 * 60_000);
+    await repo.recordReview(repeat.id, 5, 'typing', tenDaysAgo); // graduates to review, interval 4d
+    const graduated = (await repo.getWord(repeat.id))!;
+    expect(graduated.srsState.intervalDays).toBeGreaterThan(0); // confirms it's "repeat", not fresh
+    expect(graduated.srsState.dueAt.getTime()).toBeLessThan(NOW.getTime()); // and well overdue by now
+
+    // A word that was just added — barely due, never reviewed.
+    await save('fortitude', 'стойкость', minutesAgo(1));
+
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW);
+
+    expect(session.currentCard!.term).toBe('fortitude'); // new word wins despite being far less overdue
+    expect(session.total).toBe(2);
+  });
+
   it('each card exposes a direction and what to show vs. what to ask', async () => {
     await save('fortitude', 'стойкость', minutesAgo(30));
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
