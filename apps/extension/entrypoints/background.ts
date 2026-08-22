@@ -69,6 +69,10 @@ export default defineBackground(() => {
         return repo.shelveWord(message.payload.wordId, new Date(message.payload.now));
       case 'UNSHELVE_WORD':
         return repo.unshelveWord(message.payload.wordId, new Date(message.payload.now));
+      case 'CLEAR_LIBRARY':
+        return repo.clearLibrary(message.payload.langTo, new Date(message.payload.now));
+      case 'EXPORT_LIBRARY':
+        return repo.getAllWordsEverywhere();
       case 'TRANSLATE':
         // Runs here, not in the content script: a service worker's fetch
         // isn't subject to the host page's CSP, so this stays reliable

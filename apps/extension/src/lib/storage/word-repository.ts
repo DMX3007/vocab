@@ -107,6 +107,27 @@ export class WordRepository {
     return (await this.liveWordsOf(langTo)).length;
   }
 
+  /** Every live word across every language, full fidelity — for a JSON
+   *  export/backup, not scoped to whatever language happens to be active. */
+  async getAllWordsEverywhere(): Promise<Word[]> {
+    const words = await this.db.words.toArray();
+    return words.filter((w) => w.deletedAt === null).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  /** Soft-deletes every live word of ONE language — "Clear library".
+   *  Review logs are untouched, same as deleteWord: Progress stats and
+   *  earned XP/streak history survive a clear. Returns how many were
+   *  cleared, for the confirmation UI. */
+  async clearLibrary(langTo: string, now: Date): Promise<number> {
+    const words = await this.liveWordsOf(langTo);
+    await this.db.transaction('rw', this.db.words, async () => {
+      for (const word of words) {
+        await this.db.words.put({ ...word, deletedAt: now, updatedAt: now });
+      }
+    });
+    return words.length;
+  }
+
   /** Edits the translations only. Term, context and SRS progress are untouched. */
   async updateWord(
     id: string,

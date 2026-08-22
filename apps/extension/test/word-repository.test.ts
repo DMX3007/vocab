@@ -132,6 +132,53 @@ describe('shelveWord / unshelveWord', () => {
   });
 });
 
+describe('clearLibrary', () => {
+  it('soft-deletes every live word of the given language and returns the count', async () => {
+    await repo.saveWord(sample, NOW);
+    await repo.saveWord({ ...sample, term: 'virtues', translation: 'добродетели' }, NOW);
+    await repo.saveWord({ ...sample, term: 'casa', translation: 'дом', langTo: 'es' }, NOW);
+
+    const cleared = await repo.clearLibrary('ru', later(1000));
+    expect(cleared).toBe(2);
+    expect(await repo.getAllWords('ru')).toHaveLength(0);
+    expect(await repo.getAllWords('es')).toHaveLength(1); // a different language is untouched
+  });
+
+  it('leaves review logs intact — clearing the word list is not clearing history', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.recordReview(w.id, 4, 'typing', NOW);
+    await repo.clearLibrary('ru', later(1000));
+    expect(await repo.getReviewLogs(w.id)).toHaveLength(1);
+  });
+
+  it('is a no-op (returns 0) when the language has no live words', async () => {
+    await repo.saveWord(sample, NOW);
+    await repo.deleteWord((await repo.getAllWords('ru'))[0]!.id, NOW);
+    expect(await repo.clearLibrary('ru', later(1000))).toBe(0);
+  });
+
+  it('already-shelved words get cleared too, not just the visibly-due ones', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.shelveWord(w.id, NOW);
+    expect(await repo.clearLibrary('ru', later(1000))).toBe(1);
+  });
+});
+
+describe('getAllWordsEverywhere', () => {
+  it('spans every language, unlike getAllWords', async () => {
+    await repo.saveWord(sample, NOW);
+    await repo.saveWord({ ...sample, term: 'casa', translation: 'дом', langTo: 'es' }, NOW);
+    const all = await repo.getAllWordsEverywhere();
+    expect(all.map((w) => w.langTo).sort()).toEqual(['es', 'ru']);
+  });
+
+  it('excludes soft-deleted words', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.deleteWord(w.id, NOW);
+    expect(await repo.getAllWordsEverywhere()).toHaveLength(0);
+  });
+});
+
 describe('getAllWords (scoped to the active target language)', () => {
   it('lists words of the requested language but hides soft-deleted ones', async () => {
     const a = await repo.saveWord(sample, NOW);

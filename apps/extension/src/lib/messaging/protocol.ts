@@ -21,6 +21,8 @@ export type RequestMap = {
   TRANSLATE: { term: string; langFrom: string; langTo: string };
   SHELVE_WORD: { wordId: string; now: string };
   UNSHELVE_WORD: { wordId: string; now: string };
+  CLEAR_LIBRARY: { langTo: string; now: string };
+  EXPORT_LIBRARY: Record<string, never>;
 };
 
 export type ResponseMap = {
@@ -36,6 +38,8 @@ export type ResponseMap = {
   TRANSLATE: string;
   SHELVE_WORD: WireWord;
   UNSHELVE_WORD: WireWord;
+  CLEAR_LIBRARY: number;
+  EXPORT_LIBRARY: WireWord[];
 };
 
 

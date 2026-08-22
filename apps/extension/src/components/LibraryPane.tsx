@@ -25,6 +25,11 @@ interface Props {
   onMoveAlgo: (ids: string[], algo: AlgoId) => void;
   onShelve: (id: string) => void;
   onUnshelve: (id: string) => void;
+  /** Downloads every word, every language, as JSON — a full backup. */
+  onExport: () => void;
+  /** Soft-deletes every word CURRENTLY shown here (this language only) —
+   *  confirmed inline first, see the sheet below. */
+  onClearLibrary: () => void;
   /** Popup renders the "Add word" FAB as a sibling, so it needs to know
    *  when select mode is active to hide it (the bulk-move bar covers the
    *  same corner of the screen). */
@@ -33,10 +38,11 @@ interface Props {
 
 const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New', shelved: 'Shelved' };
 
-export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onSelectModeChange }: Props) {
+export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onExport, onClearLibrary, onSelectModeChange }: Props) {
   const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const now = new Date(nowMs);
 
@@ -81,6 +87,11 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     onSelectModeChange?.(false);
   }
 
+  function handleConfirmClear() {
+    onClearLibrary();
+    setConfirmClearOpen(false);
+  }
+
   if (words.length === 0) {
     return (
       <div className="empty">
@@ -103,7 +114,15 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
       <div className="lib-banner">
         <div className="lib-banner-row">
           <div className="lib-banner-title"><span className="serif-italic">Library</span></div>
-          <div className="lib-banner-count">{words.length} <span className="muted">words</span></div>
+          <div className="lib-banner-right">
+            <button className="icon-btn" onClick={onExport} title="Export this library as JSON">
+              <Icon name="download" size={14} />
+            </button>
+            <button className="icon-btn danger" onClick={() => setConfirmClearOpen(true)} title="Clear library">
+              <Icon name="trash" size={14} />
+            </button>
+            <div className="lib-banner-count">{words.length} <span className="muted">words</span></div>
+          </div>
         </div>
         <div className="lib-bucket-row">
           <div className="lib-bucket leaf"><span className="dot" /><strong>{mastered}</strong> mastered</div>
@@ -232,6 +251,23 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
           <button className="lib-select-cancel" onClick={toggleSelectMode} title="Cancel">
             <Icon name="close" size={13} />
           </button>
+        </div>
+      )}
+
+      {confirmClearOpen && (
+        <div className="scrim open" onClick={() => setConfirmClearOpen(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="sheet-title">Clear library?</div>
+            <div className="sheet-sub">
+              This deletes all {words.length} word{words.length === 1 ? '' : 's'} shown here. Your XP, streak, and
+              review history are kept — only the word list goes.
+            </div>
+            <div className="confirm-actions">
+              <button className="btn-secondary" onClick={() => setConfirmClearOpen(false)}>Cancel</button>
+              <button className="btn-danger" onClick={handleConfirmClear}>Delete all</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

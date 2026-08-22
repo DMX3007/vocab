@@ -3,6 +3,7 @@ import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
 import { resume, type OverlaySettings } from '../../src/lib/review/overlay-policy';
 import { applyStreakMaintenance } from '../../src/lib/review/progress';
+import { downloadJson } from '../../src/lib/export';
 import { ReviewPane } from '../../src/components/ReviewPane';
 import { LibraryPane } from '../../src/components/LibraryPane';
 import { ProgressPane } from '../../src/components/ProgressPane';
@@ -178,6 +179,20 @@ export function Popup() {
     await refresh();
   }
 
+  async function handleExportLibrary() {
+    const all = await wordClient.exportLibrary();
+    const date = new Date().toISOString().slice(0, 10);
+    downloadJson(`vocabflow-export-${date}.json`, all);
+    showToast(`Exported ${all.length} word${all.length === 1 ? '' : 's'}`);
+  }
+
+  async function handleClearLibrary() {
+    const targetLang = settings?.targetLang ?? DEFAULT_TARGET_LANG;
+    const count = await wordClient.clearLibrary(targetLang, new Date());
+    showToast(`Cleared ${count} word${count === 1 ? '' : 's'}`);
+    await refresh();
+  }
+
   async function handleShelve(id: string) {
     await wordClient.shelveWord(id, new Date());
     showToast('Set aside — it won’t come up in review for now');
@@ -328,6 +343,8 @@ export function Popup() {
             onMoveAlgo={handleMoveAlgo}
             onShelve={handleShelve}
             onUnshelve={handleUnshelve}
+            onExport={handleExportLibrary}
+            onClearLibrary={handleClearLibrary}
             onSelectModeChange={setLibrarySelecting}
           />
         )}

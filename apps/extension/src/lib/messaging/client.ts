@@ -51,6 +51,14 @@ export const wordClient = {
   async unshelveWord(wordId: string, now: Date): Promise<Word> {
     return reviveWord(await send({ type: 'UNSHELVE_WORD', payload: { wordId, now: now.toISOString() } }));
   },
+  /** Soft-deletes every word of one language. Returns how many were cleared. */
+  async clearLibrary(langTo: string, now: Date): Promise<number> {
+    return send({ type: 'CLEAR_LIBRARY', payload: { langTo, now: now.toISOString() } });
+  },
+  /** Every live word across every language, for a full-fidelity JSON export. */
+  async exportLibrary(): Promise<Word[]> {
+    return reviveWords(await send({ type: 'EXPORT_LIBRARY', payload: {} }));
+  },
 };
 
 export type WordClient = typeof wordClient;
