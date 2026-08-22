@@ -29,12 +29,28 @@ const save = (term: string, translation: string, createdAt: Date) =>
 // rng that always picks 'forward' so card direction is deterministic in tests
 const forwardRng = () => 0.0;
 
+// The product default is one word per session (see DEFAULT_SESSION_CONFIG);
+// tests that exercise multi-card queue mechanics — ordering, advancing,
+// shuffling — opt into a bigger batch explicitly rather than relying on it.
+const multiCardTuning = { maxCards: 20 };
+
 describe('ReviewSession (normal mode)', () => {
-  it('starts with a snapshot of due words for the active language', async () => {
+  it('defaults to just the single most-urgent due word, not the whole backlog', async () => {
     await save('fortitude', 'стойкость', minutesAgo(30));
     await save('virtues', 'добродетели', minutesAgo(20));
 
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW);
+
+    expect(session.total).toBe(1);
+    expect(session.currentCard!.term).toBe('fortitude'); // most-overdue of the two
+  });
+
+  it('starts with a snapshot of due words for the active language', async () => {
+    await save('fortitude', 'стойкость', minutesAgo(30));
+    await save('virtues', 'добродетели', minutesAgo(20));
+
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng, multiCardTuning);
     await session.start('ru', NOW);
 
     expect(session.total).toBe(2);
@@ -69,7 +85,7 @@ describe('ReviewSession (normal mode)', () => {
     await session.start('ru', NOW);
 
     expect(session.currentCard!.term).toBe('fortitude'); // new word wins despite being far less overdue
-    expect(session.total).toBe(2);
+    expect(session.total).toBe(1); // with the default one-card cap, the repeat word doesn't even get queued
   });
 
   it('each card exposes a direction and what to show vs. what to ask', async () => {
@@ -98,7 +114,7 @@ describe('ReviewSession (normal mode)', () => {
   it('answering grades the response and advances to the next card', async () => {
     await save('older', 'старее', minutesAgo(90));
     await save('newer', 'новее', minutesAgo(5));
-    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng, multiCardTuning);
     await session.start('ru', NOW);
 
     const result = await session.answer('старее', { latencyMs: 2000 }, NOW);
@@ -131,7 +147,7 @@ describe('ReviewSession (normal mode)', () => {
   it('shuffle() swaps the current card for a different one, without grading or dropping it', async () => {
     const a = await save('fortitude', 'стойкость', minutesAgo(30));
     await save('candor', 'откровенность', minutesAgo(20));
-    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng, multiCardTuning);
     await session.start('ru', NOW);
 
     expect(session.currentCard!.wordId).toBe(a.id); // most-overdue first, as usual
@@ -170,7 +186,7 @@ describe('ReviewSession (normal mode)', () => {
   it('finishes when every card is answered', async () => {
     await save('a', 'а', minutesAgo(30));
     await save('b', 'б', minutesAgo(20));
-    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng, multiCardTuning);
     await session.start('ru', NOW);
 
     await session.answer('а', { latencyMs: 1000 }, NOW);
@@ -210,7 +226,7 @@ describe('ReviewSession (normal mode)', () => {
       'leitner',
     );
 
-    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng, multiCardTuning);
     await session.start('ru', NOW, { algoFilter: 'all' });
     expect(session.total).toBe(2);
   });

@@ -127,7 +127,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
       {due.length > 0 && (
         <div style={{ padding: '0 14px 12px' }}>
           <button className="btn-primary" onClick={() => onStartReview(reviewFilter)} disabled={!ready}>
-            <Icon name="sparkle" size={13} /> Review {due.length} {due.length === 1 ? 'word' : 'words'}
+            <Icon name="sparkle" size={13} /> Review &ldquo;{due[0]!.term}&rdquo; {'→'}
           </button>
         </div>
       )}

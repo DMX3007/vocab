@@ -25,12 +25,15 @@ export interface SessionConfig {
 }
 
 export interface SessionTuning {
-  /** Soft cap so a big backlog doesn't dump 80 cards at once and burn the user out. */
+  /** How many words one "Review" click queues. Matches the live due list's
+   *  one-at-a-time model: you get the single most-urgent word (see
+   *  sortForReview — fresh words first, then most-overdue), answer it, and
+   *  the session ends there rather than marching through a stacked batch. */
   maxCards: number;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionTuning = {
-  maxCards: 20,
+  maxCards: 1,
 };
 
 /** One card as presented to the UI. */
