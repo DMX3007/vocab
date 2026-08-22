@@ -162,6 +162,24 @@ describe('ReviewSession (normal mode)', () => {
     expect((await repo.getReviewLogs(a.id))).toHaveLength(0); // never graded by the shuffle itself
   });
 
+  it('shuffle() works under the default one-word-per-session cap, as long as more than one word is due', async () => {
+    // Regression: maxCards: 1 must not leave shuffle with nothing to swap
+    // to just because only one card is ever GRADED per session — the pool
+    // of candidates it can shuffle through is separate from that cap.
+    const a = await save('fortitude', 'стойкость', minutesAgo(30));
+    await save('candor', 'откровенность', minutesAgo(20));
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng); // default tuning: maxCards 1
+
+    await session.start('ru', NOW);
+    expect(session.total).toBe(1); // still just one word gets graded...
+    expect(session.canShuffle).toBe(true); // ...but shuffle has another candidate to offer
+    expect(session.currentCard!.wordId).toBe(a.id);
+
+    session.shuffle();
+    expect(session.currentCard!.wordId).not.toBe(a.id); // swapped to the other due word
+    expect(session.total).toBe(1); // the one-word cap itself is unaffected by shuffling
+  });
+
   it('shuffle() is a no-op with only one card left (nothing else to switch to)', async () => {
     const a = await save('fortitude', 'стойкость', minutesAgo(30));
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);

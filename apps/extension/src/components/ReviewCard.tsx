@@ -125,7 +125,7 @@ export function ReviewCard({ session, onFinished }: Props) {
             <button
               className="vf-card-btn-ghost"
               onClick={shuffle}
-              disabled={session.remaining <= 1}
+              disabled={!session.canShuffle}
               title="Show a different word instead"
             >
               <Icon name="shuffle" size={13} /> Shuffle

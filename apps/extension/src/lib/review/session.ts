@@ -61,8 +61,16 @@ export interface ReviewCard {
  * above decides whether to start a session at all (canInterrupt).
  */
 export class ReviewSession {
-  private queue: Word[] = [];
+  // ALL sorted/filtered due candidates, uncapped — shuffle draws its
+  // alternatives from here. `maxCards` only limits how many ever get
+  // GRADED (via answeredCount below); it never limits how many candidates
+  // are available to shuffle through before committing to one. Without
+  // this split, maxCards: 1 (the default: one word per session) would
+  // leave shuffle with nothing to switch to, since there'd be nothing
+  // left in the pool once the single active card was taken.
+  private pool: Word[] = [];
   private index = 0;
+  private answeredCount = 0;
   private started = false;
 
   constructor(
@@ -72,14 +80,15 @@ export class ReviewSession {
     private readonly tuning: SessionTuning = DEFAULT_SESSION_CONFIG,
   ) {}
 
-  /** Builds the snapshot: brand-new words first, then everything else
-   *  most-overdue first, capped (see sortForReview) — so a growing repeat
-   *  backlog never crowds new words out of the session. With { includeAll }
-   *  it queues every (non-deleted) word regardless of due date — used by
-   *  the manual "force review" trigger for testing. With { algoFilter } set
-   *  to a specific algorithm, only that algorithm's words are queued — lets
-   *  the popup start a session scoped to "just Leitner" or "just SM-2"
-   *  instead of everything due. */
+  /** Builds the candidate pool: brand-new words first, then everything else
+   *  most-overdue first (see sortForReview) — so a growing repeat backlog
+   *  never crowds new words out. The pool itself is uncapped; only
+   *  `total`/`remaining` (below) are capped at maxCards. With
+   *  { includeAll } it pools every (non-deleted) word regardless of due
+   *  date — used by the manual "force review" trigger for testing. With
+   *  { algoFilter } set to a specific algorithm, only that algorithm's
+   *  words are pooled — lets the popup start a session scoped to "just
+   *  Leitner" or "just SM-2" instead of everything due. */
   async start(
     langTo: string,
     now: Date,
@@ -91,43 +100,51 @@ export class ReviewSession {
     const filtered = !options.algoFilter || options.algoFilter === 'all'
       ? pool
       : pool.filter((w) => w.srsState.algo === options.algoFilter);
-    this.queue = sortForReview(filtered).slice(0, this.tuning.maxCards);
+    this.pool = sortForReview(filtered);
     this.index = 0;
+    this.answeredCount = 0;
     this.started = true;
   }
 
   get total(): number {
-    return this.queue.length;
+    return Math.min(this.pool.length, this.tuning.maxCards);
   }
 
   get remaining(): number {
-    return Math.max(0, this.queue.length - this.index);
+    return Math.max(0, this.total - this.answeredCount);
   }
 
   get isFinished(): boolean {
-    return this.started && this.index >= this.queue.length;
+    return this.started && (this.answeredCount >= this.tuning.maxCards || this.index >= this.pool.length);
+  }
+
+  /** Whether shuffle() would actually do anything right now — the UI uses
+   *  this to disable the Shuffle button, rather than `remaining` (which is
+   *  capped at maxCards and says nothing about how big the pool is). */
+  get canShuffle(): boolean {
+    return !this.isFinished && this.pool.length - this.index > 1;
   }
 
   get currentCard(): ReviewCard | null {
     if (this.isFinished) return null;
-    const word = this.queue[this.index];
+    const word = this.pool[this.index];
     if (!word) return null;
     return this.toCard(word);
   }
 
-  /** Swaps the current card for a different one already queued this session.
-   *  The skipped word is NOT graded and its SRS state doesn't change — it's
-   *  simply deferred to a random later spot in the same session, so nothing
-   *  is dropped, it just isn't what's shown right now. No-op with 0 or 1
-   *  card left, since there's nothing else to switch to. */
+  /** Swaps the current card for a different one from the pool. The skipped
+   *  word is NOT graded and its SRS state doesn't change — it's simply
+   *  deferred to a random later spot in the pool, so nothing is dropped,
+   *  it just isn't what's shown right now. No-op once nothing else in the
+   *  pool is left to switch to (regardless of maxCards). */
   shuffle(): void {
     if (this.isFinished) return;
-    const remaining = this.queue.length - this.index;
+    const remaining = this.pool.length - this.index;
     if (remaining <= 1) return;
-    const [current] = this.queue.splice(this.index, 1);
-    const otherCount = this.queue.length - this.index;
+    const [current] = this.pool.splice(this.index, 1);
+    const otherCount = this.pool.length - this.index;
     const offset = 1 + Math.floor(this.rng() * otherCount);
-    this.queue.splice(this.index + offset, 0, current!);
+    this.pool.splice(this.index + offset, 0, current!);
   }
 
   /** Grades the answer, persists it (SRS + log), and advances to the next card. */
@@ -135,13 +152,14 @@ export class ReviewSession {
     if (this.isFinished) {
       throw new Error('Cannot answer: the session is already finished.');
     }
-    const word = this.queue[this.index]!;
+    const word = this.pool[this.index]!;
     const card = this.toCard(word);
 
     const result = gradeAnswer(text, card.expected, context);
     await this.repo.recordReview(word.id, result.grade, 'typing', now);
 
     this.index += 1;
+    this.answeredCount += 1;
     return result;
   }
 
