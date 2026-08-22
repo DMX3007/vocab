@@ -46,11 +46,12 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     () => sortWords(filterByAlgo(filterWords(words, search), algoFilter), sort),
     [words, search, algoFilter, sort],
   );
-  // A live countdown is only worth the per-second recompute for the words
-  // actually close to due — same MAX_TRACKED_WORDS cap the Review tab uses,
-  // so a library of thousands of words never means thousands of live
-  // timers, just a cheap Set lookup per card.
-  const trackedIds = useMemo(() => new Set(trackedWords(words).map((w) => w.id)), [words]);
+  // A live countdown is only worth computing for words that aren't due yet
+  // (a due word's pill is just the static "Due" label) — and only for the
+  // MAX_TRACKED_WORDS soonest of those, so a library with a big due backlog
+  // doesn't fill the whole tracked pool with words that don't even need a
+  // countdown, leaving nothing tracked for the words that do.
+  const trackedIds = new Set(trackedWords(words.filter((w) => w.srsState.dueAt.getTime() > nowMs)).map((w) => w.id));
 
   function toggleSelectMode() {
     const next = !selectMode;

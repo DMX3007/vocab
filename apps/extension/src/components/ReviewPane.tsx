@@ -30,6 +30,11 @@ const ALGO_FILTER_LABEL: Record<AlgoFilter, string> = { all: 'All algorithms', s
  *  tracked pool is capped much higher (see live-queue.ts) — this is just
  *  how many of those are worth showing before the list gets noisy. */
 const UPCOMING_DISPLAY_LIMIT = 5;
+/** How many due rows actually get rendered — keeps the DOM light with a
+ *  big backlog. The due COUNT everywhere else (button, header, ribbon) is
+ *  never capped: checking "is this due" is cheap for any number of words,
+ *  so there's no reason to under-report it just to bound the list length. */
+const DUE_DISPLAY_LIMIT = 20;
 
 // Review tab: the target-language + default-algorithm tray, a "which algo
 // to review right now" filter, a start-review button, and the due list
@@ -39,15 +44,16 @@ const UPCOMING_DISPLAY_LIMIT = 5;
 //
 // The due list is LIVE: a shared clock ticks every second so a word rises
 // straight from "Up next" into "Due now" the moment its own time comes,
-// with no need to reopen or refresh the popup. Only the soonest-due
-// MAX_TRACKED_WORDS words are ever tracked/re-sorted, so this stays cheap
-// no matter how large the library grows — the real review session still
-// pulls a fresh, uncapped list from storage when you actually start one.
+// with no need to reopen or refresh the popup. Being "due" is cheap to
+// check regardless of library size, so that part is never capped — only
+// the UPCOMING (not-yet-due) words get a bounded MAX_TRACKED_WORDS pool,
+// since formatting a live countdown for each of them is the one thing
+// that actually costs something every tick. The real review session still
+// pulls a fresh list from storage when you actually start one.
 export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, ready, onDueCountChange }: Props) {
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
   const [now, setNow] = useState(() => Date.now());
   const statsById = useMemo(() => computeWordStatsById(logs), [logs]);
-  const tracked = useMemo(() => trackedWords(words), [words]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -55,15 +61,16 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
   }, []);
 
   const matchesFilter = (w: Word) => reviewFilter === 'all' || w.srsState.algo === reviewFilter;
-  const allDue = sortForReview(tracked.filter((w) => w.srsState.dueAt.getTime() <= now));
+  const allDue = sortForReview(words.filter((w) => w.srsState.dueAt.getTime() <= now));
   const due = allDue.filter(matchesFilter);
 
   useEffect(() => {
     onDueCountChange?.(allDue.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDue.length]);
-  const upcoming = tracked
-    .filter((w) => w.srsState.dueAt.getTime() > now && matchesFilter(w))
+
+  const upcoming = trackedWords(words.filter((w) => w.srsState.dueAt.getTime() > now))
+    .filter(matchesFilter)
     .slice(0, UPCOMING_DISPLAY_LIMIT);
 
   function renderRow(w: Word, pill: React.ReactNode, pillClassName: string) {
@@ -145,7 +152,12 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
       ) : (
         <div>
           <div className="section-divider">Due now {'·'} {due.length}</div>
-          {due.map((w) => renderRow(w, 'Due', 'due-pill'))}
+          {due.slice(0, DUE_DISPLAY_LIMIT).map((w) => renderRow(w, 'Due', 'due-pill'))}
+          {due.length > DUE_DISPLAY_LIMIT && (
+            <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
+              +{due.length - DUE_DISPLAY_LIMIT} more due — start a review to work through the rest.
+            </div>
+          )}
         </div>
       )}
 
