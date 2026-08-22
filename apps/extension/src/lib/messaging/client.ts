@@ -42,6 +42,9 @@ export const wordClient = {
   async moveWordsAlgo(wordIds: string[], algo: AlgoId, now: Date): Promise<Word[]> {
     return reviveWords(await send({ type: 'MOVE_WORDS_ALGO', payload: { wordIds, algo, now: now.toISOString() } }));
   },
+  async translate(term: string, langFrom: string, langTo: string): Promise<string> {
+    return send({ type: 'TRANSLATE', payload: { term, langFrom, langTo } });
+  },
 };
 
 export type WordClient = typeof wordClient;

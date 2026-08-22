@@ -14,11 +14,15 @@ interface TooltipProps {
   /** called when the user saves; the host wires this to the repository */
   onSave: (payload: SavePayload, langFrom: string, langTo: string) => void;
   onDismiss: () => void;
+  /** fetches a translation for AUTO; the host wires this to the translate
+   *  provider so this component stays network-free and easy to test */
+  onAutoTranslate: (term: string, langFrom: string, langTo: string) => Promise<string>;
 }
 
 // A "dumb" view over the tooltip state machine: it renders state and
-// dispatches events. No storage, no network here. AUTO is shown but
-// disabled until the translate endpoint exists (see backlog).
+// dispatches events. The actual translate fetch is injected via
+// onAutoTranslate rather than called from here, so this stays testable
+// without mocking messaging/network.
 export function Tooltip({
   term,
   contextSentence,
@@ -27,6 +31,7 @@ export function Tooltip({
   langTo,
   onSave,
   onDismiss,
+  onAutoTranslate,
 }: TooltipProps) {
   const [state, dispatch] = useReducer(tooltipReducer, undefined, () => {
     const initial = initialTooltipState();
@@ -41,6 +46,20 @@ export function Tooltip({
     }
     if (state.status === 'dismissed') onDismiss();
   }, [state.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Runs the actual translate request while the machine is in 'translating'.
+  useEffect(() => {
+    if (state.status !== 'translating') return;
+    let cancelled = false;
+    onAutoTranslate(state.term, langFrom, langTo)
+      .then((translation) => {
+        if (!cancelled) dispatch({ type: 'TRANSLATE_DONE', translation });
+      })
+      .catch(() => {
+        if (!cancelled) dispatch({ type: 'TRANSLATE_FAILED' });
+      });
+    return () => { cancelled = true; };
+  }, [state.status, state.term, langFrom, langTo, onAutoTranslate]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && state.canSave) dispatch({ type: 'SAVE' });
@@ -64,10 +83,19 @@ export function Tooltip({
           value={state.translation}
           onChange={(e) => dispatch({ type: 'EDIT', translation: e.target.value })}
         />
-        <button className="vf-auto" disabled title="Auto-translate - coming soon">
-          AUTO
+        <button
+          className="vf-auto"
+          disabled={state.status === 'translating'}
+          title="Auto-translate this word"
+          onClick={() => dispatch({ type: 'TRANSLATE_AUTO' })}
+        >
+          {state.status === 'translating' ? '…' : 'AUTO'}
         </button>
       </div>
+
+      {state.autoFailed && (
+        <div className="vf-row vf-hint">Auto-translate didn&apos;t work — type it yourself, or try AUTO again.</div>
+      )}
 
       <div className="vf-row vf-foot">
         <button className="vf-x" onClick={() => dispatch({ type: 'DISMISS' })} aria-label="Close">

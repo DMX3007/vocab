@@ -18,6 +18,7 @@ export type RequestMap = {
   DELETE_WORD: { wordId: string; now: string };
   GET_ALL_LOGS: Record<string, never>;
   MOVE_WORDS_ALGO: { wordIds: string[]; algo: AlgoId; now: string };
+  TRANSLATE: { term: string; langFrom: string; langTo: string };
 };
 
 export type ResponseMap = {
@@ -30,6 +31,7 @@ export type ResponseMap = {
   DELETE_WORD: null;
   GET_ALL_LOGS: WireReviewLog[];
   MOVE_WORDS_ALGO: WireWord[];
+  TRANSLATE: string;
 };
 
 

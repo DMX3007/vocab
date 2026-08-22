@@ -1,6 +1,7 @@
 import { WordRepository } from '../src/lib/storage/word-repository';
 import { SettingsStore } from '../src/lib/review/settings-store';
 import { planTick } from '../src/lib/review/scheduler';
+import { translateWord } from '../src/lib/translate/mymemory';
 import type { Message } from '../src/lib/messaging/protocol';
 
 // The service worker owns the database AND drives the review alarm.
@@ -62,6 +63,11 @@ export default defineBackground(() => {
         return repo.getAllReviewLogs();
       case 'MOVE_WORDS_ALGO':
         return repo.moveWordsAlgo(message.payload.wordIds, message.payload.algo, new Date(message.payload.now));
+      case 'TRANSLATE':
+        // Runs here, not in the content script: a service worker's fetch
+        // isn't subject to the host page's CSP, so this stays reliable
+        // across whatever site the tooltip happens to be open on.
+        return translateWord(message.payload.term, message.payload.langFrom, message.payload.langTo);
       default: {
         const exhaustive: never = message
         throw new Error(`Unknown message: ${String(exhaustive)}`);

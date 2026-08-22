@@ -106,6 +106,7 @@ export default defineContentScript({
           term, contextSentence, sourceUrl: location.href,
           langFrom: LANG_FROM, langTo: targetLang, onSave,
           onDismiss: () => showSkipped(term, contextSentence, x, y),
+          onAutoTranslate: (t: string, from: string, to: string) => wordClient.translate(t, from, to),
         }),
         { kind: 'tooltip', x, y }
       );

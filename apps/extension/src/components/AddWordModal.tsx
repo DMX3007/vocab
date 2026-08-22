@@ -14,9 +14,9 @@ type Mode = 'single' | 'bulk' | 'sheet';
 
 // Add-to-library sheet: a single word (term + translation + optional
 // example), a bulk paste mode that parses one "term — translation" pair per
-// line, or a Google Sheet import (public CSV export, no OAuth). There's no
-// auto-translate here — the tooltip's own AUTO button is disabled pending a
-// translate endpoint, so this modal doesn't pretend to have one.
+// line, or a Google Sheet import (public CSV export, no OAuth). No
+// auto-translate here — that's the tooltip's AUTO button; this modal is for
+// words typed or pasted in directly, translation included.
 export function AddWordModal({ open, onClose, onAdd }: Props) {
   const [mode, setMode] = useState<Mode>('single');
   const [term, setTerm] = useState('');

@@ -93,6 +93,12 @@
   cursor: not-allowed;
 }
 
+.vf-hint {
+  font-size: 10.5px;
+  color: #a05a3f;
+  margin-top: 6px;
+}
+
 .vf-foot {
   justify-content: space-between;
   margin-top: 10px;
