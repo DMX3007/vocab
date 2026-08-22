@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wordStatus, sortWords, filterWords, filterByAlgo, isFreshWord, sortForReview } from '../src/lib/review/library';
+import { wordStatus, sortWords, filterWords, filterByAlgo, isFreshWord, sortForReview, isBurstWord } from '../src/lib/review/library';
 import type { Word } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00Z');
@@ -116,6 +116,27 @@ describe('sortForReview', () => {
     const result = sortForReview(words);
     expect(words.map((w) => w.id)).toEqual(['repeat', 'fresh']); // input untouched
     expect(result.map((w) => w.id)).toEqual(['fresh', 'repeat']); // output reordered
+  });
+});
+
+describe('isBurstWord', () => {
+  it('false for a brand-new word (learning, but never attempted)', () => {
+    expect(isBurstWord(word({ srsState: { phase: 'learning', stepIndex: 0 } }))).toBe(false);
+  });
+  it('true once a learning-phase word has been attempted at least once', () => {
+    expect(isBurstWord(word({ srsState: { phase: 'learning', stepIndex: 1 } }))).toBe(true);
+  });
+  it('true for a relearning-phase word already past its first step', () => {
+    expect(isBurstWord(word({ srsState: { phase: 'relearning', stepIndex: 1 } }))).toBe(true);
+  });
+  it('false for a relearning-phase word that has not been attempted yet', () => {
+    expect(isBurstWord(word({ srsState: { phase: 'relearning', stepIndex: 0 } }))).toBe(false);
+  });
+  it('true for a word that was JUST answered incorrectly — a miss resets stepIndex to 0, but lapses catches it', () => {
+    expect(isBurstWord(word({ srsState: { phase: 'learning', stepIndex: 0, lapses: 1 } }))).toBe(true);
+  });
+  it('false once a word has graduated to review, regardless of stepIndex', () => {
+    expect(isBurstWord(word({ srsState: { phase: 'review', stepIndex: 3 } }))).toBe(false);
   });
 });
 

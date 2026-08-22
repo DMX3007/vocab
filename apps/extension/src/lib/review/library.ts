@@ -36,6 +36,24 @@ export function sortForReview(words: Word[]): Word[] {
   });
 }
 
+/** A word actively mid-drill: still on its learning/relearning ladder AND
+ *  already attempted at least once — not a brand-new, untouched word.
+ *  This is what content.ts's fast burst-poll uses to decide whether to
+ *  auto-reappear the review overlay without waiting on the normal ambient
+ *  throttle: a word the user already started drilling deserves a fast
+ *  follow-up, but a whole untouched backlog firing an overlay every few
+ *  seconds would be exactly the nagging the throttle exists to prevent.
+ *
+ *  Checks stepIndex > 0 OR lapses > 0, not just stepIndex: a wrong answer
+ *  resets stepIndex back to 0, which alone would be indistinguishable
+ *  from a word that's never been touched — lapses (which only ever goes
+ *  up) is what actually tells "attempted and just missed" apart from
+ *  "never attempted". */
+export function isBurstWord(word: Word): boolean {
+  const { phase, stepIndex, lapses } = word.srsState;
+  return (phase === 'learning' || phase === 'relearning') && (stepIndex > 0 || lapses > 0);
+}
+
 export type LibrarySort = 'added' | 'due' | 'alpha' | 'mastered';
 
 export function sortWords(words: Word[], sort: LibrarySort): Word[] {

@@ -7,6 +7,7 @@ import {
   addToBlacklist,
   removeFromBlacklist,
   isBlacklisted,
+  isPausedOrSnoozed,
   defaultSettings,
   type OverlayDecision,
   type OverlaySettings,
@@ -113,5 +114,21 @@ describe('blacklist helpers', () => {
   it('removes a host', () => {
     const s = removeFromBlacklist(settings({ blacklist: ['youtube.com', 'mail.com'] }), 'youtube.com');
     expect(s.blacklist).toEqual(['mail.com']);
+  });
+});
+
+describe('isPausedOrSnoozed', () => {
+  it('false with neither set', () => {
+    expect(isPausedOrSnoozed(settings(), NOW)).toBe(false);
+  });
+  it('true while paused', () => {
+    expect(isPausedOrSnoozed(settings({ pausedUntil: inMin(15).toISOString() }), NOW)).toBe(true);
+  });
+  it('true while snoozed', () => {
+    expect(isPausedOrSnoozed(settings({ snoozedUntil: inMin(5).toISOString() }), NOW)).toBe(true);
+  });
+  it('false once the pause/snooze has expired', () => {
+    const past = new Date(NOW.getTime() - 1000).toISOString();
+    expect(isPausedOrSnoozed(settings({ pausedUntil: past, snoozedUntil: past }), NOW)).toBe(false);
   });
 });

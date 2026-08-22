@@ -69,6 +69,11 @@ export type OverlayDecision =
 const isActive = (until: string | null, now: Date): boolean =>
   until !== null && now.getTime() < new Date(until).getTime();
 
+/** True while either an explicit pause or a snooze is still in effect. */
+export function isPausedOrSnoozed(settings: OverlaySettings, now: Date): boolean {
+  return isActive(settings.pausedUntil, now) || isActive(settings.snoozedUntil, now);
+}
+
 /** A host is blacklisted if it equals, or is a subdomain of, a listed domain. */
 export function isBlacklisted(settings: OverlaySettings, host: string): boolean {
   return settings.blacklist.some(

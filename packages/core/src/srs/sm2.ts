@@ -88,7 +88,12 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
    *  gets drilled as many times as it takes. */
   const scheduleLearning = (state: SrsState, grade: Grade, now: Date): SrsState => {
     if (isFailed(grade)) {
-      return { ...state, stepIndex: 0, dueAt: addSeconds(now, secondsAtStep(learningSteps, 0)) };
+      return {
+        ...state,
+        stepIndex: 0,
+        lapses: state.lapses + 1,
+        dueAt: addSeconds(now, secondsAtStep(learningSteps, 0)),
+      };
     }
 
     const pastMandatoryBurst = state.stepIndex >= config.learningBurstSteps;
@@ -114,7 +119,12 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
   /** Forgotten word: short re-learning steps, then back to review. */
   const scheduleRelearning = (state: SrsState, grade: Grade, now: Date): SrsState => {
     if (isFailed(grade)) {
-      return { ...state, stepIndex: 0, dueAt: addMinutes(now, minutesAtStep(relearningSteps, 0)) };
+      return {
+        ...state,
+        stepIndex: 0,
+        lapses: state.lapses + 1,
+        dueAt: addMinutes(now, minutesAtStep(relearningSteps, 0)),
+      };
     }
 
     const nextStepIndex = state.stepIndex + 1;

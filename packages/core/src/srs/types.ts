@@ -11,6 +11,10 @@ export interface SrsState {
   intervalDays: number;
   easeFactor: number;
   repetitions: number;
+  /** every wrong answer, in any phase — including a miss during the
+   *  learning ladder, which resets stepIndex back to 0 and would
+   *  otherwise be indistinguishable from a word that's never been
+   *  attempted at all. Only ever goes up. */
   lapses: number;
 }
 

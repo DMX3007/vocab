@@ -7,10 +7,10 @@ import { analyzeSelection } from '../src/lib/selection';
 import { wordClient } from '../src/lib/messaging/client';
 import { ReviewSession } from '../src/lib/review/session';
 import { SettingsStore } from '../src/lib/review/settings-store';
-import { snooze, pauseFor, addToBlacklist, type PausePreset } from '../src/lib/review/overlay-policy';
+import { snooze, pauseFor, addToBlacklist, isBlacklisted, isPausedOrSnoozed, type PausePreset } from '../src/lib/review/overlay-policy';
 import type { SavePayload } from '../src/lib/tooltip-machine';
 import { ContentCommand } from '@/src/lib/messaging/protocol';
-import type { AlgoFilter } from '../src/lib/review/library';
+import { isBurstWord, type AlgoFilter } from '../src/lib/review/library';
 import TooltipIcon from '@/src/components/TooltipIcon';
 import SkippedChip from '@/src/components/SkippedChip';
 import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
@@ -156,6 +156,13 @@ export default defineContentScript({
       }
     })
 
+    function getPageContext() {
+      const active = document.activeElement;
+      const userIsTyping = !!active && (active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable);
+      return { userIsTyping, isFullscreen: !!document.fullscreenElement };
+    }
+
     // ── review overlay ─────────────────────────────────────────
     async function showOverlay(langTo: string, algoFilter?: AlgoFilter) {
       const session = new ReviewSession(wordClient, { mode: 'normal' });
@@ -179,15 +186,46 @@ export default defineContentScript({
       );
     }
 
+    // ── burst drilling: auto-reappear fast for a word already mid-drill ──
+    // The normal alarm/throttle path (background.ts) checks once a minute
+    // and paces itself to avoid nagging — right for a slow ambient due
+    // backlog, wrong for a card that's supposed to come back in ~25s. This
+    // polls locally, in-page, so it isn't bound by chrome.alarms' 1-minute
+    // floor, and bypasses the throttle/hourly-cap entirely — but ONLY for
+    // words the user already started drilling (isBurstWord), and still
+    // respects pause/snooze/blacklist/typing/fullscreen.
+    const BURST_POLL_MS = 5_000;
+    let burstPollInFlight = false;
+
+    async function pollForBurstDrill() {
+      if (burstPollInFlight) return;
+      if (document.hidden) return; // only the tab actually being looked at
+      if (currentSurface) return; // don't interrupt an existing tooltip/overlay
+      burstPollInFlight = true;
+      try {
+        const settings = await settingsStore.load();
+        if (isPausedOrSnoozed(settings, new Date())) return;
+        if (isBlacklisted(settings, location.hostname)) return;
+
+        const { userIsTyping, isFullscreen } = getPageContext();
+        if (userIsTyping || isFullscreen) return;
+
+        const due = await wordClient.getDueWords(new Date(), settings.targetLang);
+        if (!due.some(isBurstWord)) return;
+
+        await showOverlay(settings.targetLang);
+      } finally {
+        burstPollInFlight = false;
+      }
+    }
+
+    setInterval(() => { void pollForBurstDrill(); }, BURST_POLL_MS);
 
     // ── messages from the background ───────────────────────────
     browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const message = msg as ContentCommand
       if (message?.type === 'GET_PAGE_CONTEXT') {
-        const active = document.activeElement;
-        const userIsTyping = !!active && (active.tagName === 'INPUT' ||
-          active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable);
-        sendResponse({ userIsTyping, isFullscreen: !!document.fullscreenElement });
+        sendResponse(getPageContext());
         return true;
       }
       if (message?.type === 'SHOW_OVERLAY') {
@@ -203,10 +241,7 @@ export default defineContentScript({
     // ── cross-tab sync: if settings change (pause on another tab), close ──
     settingsStore.subscribe((s) => {
       targetLang = s.targetLang;
-      const pausedOrSnoozed =
-        (s.pausedUntil && new Date(s.pausedUntil) > new Date()) ||
-        (s.snoozedUntil && new Date(s.snoozedUntil) > new Date());
-      if (pausedOrSnoozed && currentSurface?.component.kind === 'overlay') unmount();
+      if (isPausedOrSnoozed(s, new Date()) && currentSurface?.component.kind === 'overlay') unmount();
     });
   },
 });

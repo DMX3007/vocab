@@ -87,6 +87,26 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     expect(s.stepIndex).toBe(0);
     expect(s.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
+
+  it('a miss during learning counts as a lapse, even on the very first attempt', () => {
+    // stepIndex resets to 0 on any miss, which alone would make "just
+    // failed" indistinguishable from "never attempted" — lapses is what
+    // tells them apart (used by the fast burst-reappear trigger).
+    const s0 = initialState('sm2', NOW);
+    const s1 = sm2.schedule(s0, 1, NOW); // fail on the first-ever attempt
+    expect(s1.stepIndex).toBe(0);
+    expect(s1.lapses).toBe(1);
+  });
+
+  it('a miss during relearning also counts as a lapse', () => {
+    let s: SrsState = initialState('sm2', NOW);
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) s = sm2.schedule(s, 4, NOW); // graduate
+    s = sm2.schedule(s, 0, new Date(s.dueAt)); // lapse -> relearning (1st lapse)
+    expect(s.lapses).toBe(1);
+    s = sm2.schedule(s, 1, new Date(s.dueAt)); // fail again, still in relearning
+    expect(s.phase).toBe('relearning');
+    expect(s.lapses).toBe(2);
+  });
 });
 
 describe('review phase (SM-2, intervals grow when remembered)', () => {
