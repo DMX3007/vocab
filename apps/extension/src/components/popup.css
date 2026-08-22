@@ -28,6 +28,54 @@
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
 }
 
+/* Dark theme: every screen reads off the same tokens above, so redefining
+   them here is all it takes. Applies automatically when the OS/browser is
+   in dark mode (`prefers-color-scheme`) UNLESS the user picked a theme
+   explicitly via the header toggle (data-theme), and applies unconditionally
+   once they have — the toggle sets data-theme="light"/"dark" on <html> and
+   Popup.tsx leaves it unset to mean "follow the system". */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #18150F;
+    --paper-2: #1E1A12;
+    --paper-3: #272019;
+    --ink: #F2EEE4;
+    --ink-2: #D9D3C4;
+    --ink-3: #A79E8A;
+    --ink-4: #78715F;
+    --ink-5: #5A5344;
+    --rule: #ffffff1f;
+    --rule-2: #ffffff0f;
+
+    --heat: oklch(0.68 0.16 35);
+    --heat-soft: oklch(0.28 0.07 35);
+    --cool: oklch(0.72 0.09 250);
+    --cool-soft: oklch(0.28 0.06 250);
+    --leaf: oklch(0.7 0.12 145);
+    --leaf-soft: oklch(0.28 0.07 145);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #18150F;
+  --paper-2: #1E1A12;
+  --paper-3: #272019;
+  --ink: #F2EEE4;
+  --ink-2: #D9D3C4;
+  --ink-3: #A79E8A;
+  --ink-4: #78715F;
+  --ink-5: #5A5344;
+  --rule: #ffffff1f;
+  --rule-2: #ffffff0f;
+
+  --heat: oklch(0.68 0.16 35);
+  --heat-soft: oklch(0.28 0.07 35);
+  --cool: oklch(0.72 0.09 250);
+  --cool-soft: oklch(0.28 0.06 250);
+  --leaf: oklch(0.7 0.12 145);
+  --leaf-soft: oklch(0.28 0.07 145);
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body {

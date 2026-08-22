@@ -18,8 +18,11 @@ import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
 const PLAN_STATE_KEY = 'vocabflow_plan_state';
+const THEME_KEY = 'vocabflow_theme';
 
 type TabId = 'review' | 'progress' | 'library' | 'plan';
+/** null = follow the OS/browser's own dark/light setting. */
+type ThemePref = 'light' | 'dark' | null;
 
 export function Popup() {
   const [ready, setReady] = useState(false);
@@ -35,6 +38,8 @@ export function Popup() {
   const [sort, setSort] = useState<LibrarySort>('added');
   const [librarySelecting, setLibrarySelecting] = useState(false);
   const [planState, setPlanState] = useState<PlanState>('beta');
+  const [themePref, setThemePref] = useState<ThemePref>(null);
+  const [systemDark, setSystemDark] = useState(false);
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
@@ -66,6 +71,35 @@ export function Popup() {
   useEffect(() => {
     if (tab !== 'library') setLibrarySelecting(false);
   }, [tab]);
+
+  // Theme: load any explicit choice, and track the system preference live so
+  // the header toggle icon (and the "no explicit choice yet" default) stay
+  // correct even if the OS theme changes while the popup happens to be open.
+  useEffect(() => {
+    (async () => {
+      const stored = await browser.storage.local.get(THEME_KEY);
+      const storedTheme = stored[THEME_KEY];
+      if (storedTheme === 'light' || storedTheme === 'dark') setThemePref(storedTheme);
+    })();
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemDark(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (themePref) document.documentElement.setAttribute('data-theme', themePref);
+    else document.documentElement.removeAttribute('data-theme');
+  }, [themePref]);
+
+  const effectiveDark = themePref ? themePref === 'dark' : systemDark;
+
+  function toggleTheme() {
+    const next: ThemePref = effectiveDark ? 'light' : 'dark';
+    setThemePref(next);
+    void browser.storage.local.set({ [THEME_KEY]: next });
+  }
 
   function updatePlanState(next: PlanState) {
     setPlanState(next);
@@ -172,6 +206,13 @@ export function Popup() {
           </div>
         </div>
         <div className="h-actions">
+          <button
+            className="icon-btn"
+            title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={toggleTheme}
+          >
+            <Icon name={effectiveDark ? 'sun' : 'moon'} />
+          </button>
           <button className="icon-btn" title="Help" onClick={() => setHelpOpen(true)}><Icon name="help" /></button>
         </div>
       </div>
