@@ -11,6 +11,7 @@ export function reviveWord(wire: WireWord): Word {
     createdAt: new Date(wire.createdAt),
     updatedAt: new Date(wire.updatedAt),
     deletedAt: wire.deletedAt === null ? null : new Date(wire.deletedAt),
+    shelvedAt: wire.shelvedAt === null ? null : new Date(wire.shelvedAt),
     srsState: { ...wire.srsState, dueAt: new Date(wire.srsState.dueAt) },
   };
 }

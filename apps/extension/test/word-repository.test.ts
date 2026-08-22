@@ -90,6 +90,46 @@ describe('getDueWords (scoped to the active target language)', () => {
     await repo.deleteWord(w.id, NOW);
     expect(await repo.getDueWords(later(1000), 'ru')).toHaveLength(0);
   });
+
+  it('excludes shelved words, even though they are due', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.shelveWord(w.id, NOW);
+    expect(await repo.getDueWords(later(1000), 'ru')).toHaveLength(0);
+  });
+});
+
+describe('shelveWord / unshelveWord', () => {
+  it('shelving hides a word from due, but it still shows up in the Library list', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const shelved = await repo.shelveWord(w.id, NOW);
+    expect(shelved.shelvedAt?.getTime()).toBe(NOW.getTime());
+    expect(await repo.getDueWords(later(1000), 'ru')).toHaveLength(0);
+    const all = await repo.getAllWords('ru');
+    expect(all.map((x) => x.id)).toContain(w.id);
+  });
+
+  it('unshelving clears shelvedAt and makes the word due right away, not whenever it was due before', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    await repo.shelveWord(w.id, NOW);
+    const unshelved = await repo.unshelveWord(w.id, later(999_999));
+    expect(unshelved.shelvedAt).toBeNull();
+    expect(unshelved.srsState.dueAt.getTime()).toBe(later(999_999).getTime());
+    expect(await repo.getDueWords(later(999_999), 'ru')).toHaveLength(1);
+  });
+
+  it('leaves algorithm progress untouched — shelving is not the same as resetting', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const reviewed = await repo.recordReview(w.id, 4, 'typing', NOW);
+    const shelved = await repo.shelveWord(w.id, later(1000));
+    expect(shelved.srsState.stepIndex).toBe(reviewed.srsState.stepIndex);
+    const unshelved = await repo.unshelveWord(w.id, later(2000));
+    expect(unshelved.srsState.stepIndex).toBe(reviewed.srsState.stepIndex);
+  });
+
+  it('throws for an id that does not exist', async () => {
+    await expect(repo.shelveWord('nope', NOW)).rejects.toThrow();
+    await expect(repo.unshelveWord('nope', NOW)).rejects.toThrow();
+  });
 });
 
 describe('getAllWords (scoped to the active target language)', () => {

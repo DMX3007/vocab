@@ -20,6 +20,7 @@ function word(id: string, dueAt: Date): Word {
     createdAt: NOW,
     updatedAt: NOW,
     deletedAt: null,
+    shelvedAt: null,
   };
 }
 

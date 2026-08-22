@@ -178,6 +178,18 @@ export function Popup() {
     await refresh();
   }
 
+  async function handleShelve(id: string) {
+    await wordClient.shelveWord(id, new Date());
+    showToast('Set aside — it won’t come up in review for now');
+    await refresh();
+  }
+
+  async function handleUnshelve(id: string) {
+    await wordClient.unshelveWord(id, new Date());
+    showToast('Back in review rotation');
+    await refresh();
+  }
+
   const pausedUntil = settings?.pausedUntil ? new Date(settings.pausedUntil) : null;
   const snoozedUntil = settings?.snoozedUntil ? new Date(settings.snoozedUntil) : null;
   const isPaused = !!pausedUntil && pausedUntil > new Date();
@@ -299,6 +311,8 @@ export function Popup() {
             setSearch={setSearch}
             onDelete={handleDelete}
             onMoveAlgo={handleMoveAlgo}
+            onShelve={handleShelve}
+            onUnshelve={handleUnshelve}
             onSelectModeChange={setLibrarySelecting}
           />
         )}

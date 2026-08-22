@@ -23,6 +23,7 @@ function word(overrides: Omit<Partial<Word>, 'srsState'> & { srsState?: Partial<
     createdAt: NOW,
     updatedAt: NOW,
     deletedAt: null,
+    shelvedAt: null,
     ...rest,
   };
 }
@@ -46,6 +47,10 @@ describe('wordStatus', () => {
     expect(wordStatus(w, NOW)).toBe('mastered');
     const notYet = word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } });
     expect(wordStatus(notYet, NOW)).toBe('learning');
+  });
+  it('shelved wins over every other status, even an overdue word', () => {
+    const w = word({ shelvedAt: NOW, srsState: { dueAt: new Date(NOW.getTime() - 1000), intervalDays: 30 } });
+    expect(wordStatus(w, NOW)).toBe('shelved');
   });
 });
 

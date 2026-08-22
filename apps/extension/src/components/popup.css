@@ -533,15 +533,22 @@ input, select, textarea { font: inherit; color: inherit; }
 .lib-card.status-mastered .lib-card-strip { background: var(--leaf); }
 .lib-card.status-learning .lib-card-strip { background: var(--cool); }
 .lib-card.status-fresh .lib-card-strip { background: var(--gold); }
+.lib-card.status-shelved { opacity: 0.6; }
+.lib-card.status-shelved:hover { opacity: 1; }
 .lib-card-body { padding: 9px 12px 9px 11px; }
 .lib-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .lib-card-head-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .lib-card-checkbox { flex-shrink: 0; width: 15px; height: 15px; accent-color: var(--ink); cursor: pointer; }
 .lib-card-word { font-family: var(--serif); font-size: 16px; letter-spacing: -0.01em; color: var(--ink); line-height: 1.2; }
-.lib-card-del { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--ink-5); opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s; }
-.lib-card:hover .lib-card-del { opacity: 1; }
+.lib-card-actions { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.lib-card:hover .lib-card-actions { opacity: 1; }
+.lib-card-del { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--ink-5); transition: background 0.15s, color 0.15s; }
 .lib-card-del:hover { background: var(--heat-soft); color: var(--heat); }
 .lib-card-del svg { width: 11px; height: 11px; }
+.lib-card-shelve { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--ink-5); transition: background 0.15s, color 0.15s; }
+.lib-card-shelve:hover { background: var(--rule-2); color: var(--ink); }
+.lib-card-shelve svg { width: 11px; height: 11px; }
+.lib-card.status-shelved .lib-card-shelve { color: var(--cool); }
 .lib-card-speak { width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center; border-radius: 5px; color: var(--ink-5); transition: background 0.15s, color 0.15s; }
 .lib-card-speak:hover { background: var(--rule-2); color: var(--ink); }
 .lib-card-speak svg { width: 11px; height: 11px; }
@@ -555,6 +562,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .lib-card-status.mastered { background: var(--leaf-soft); color: var(--leaf); }
 .lib-card-status.learning { background: var(--cool-soft); color: var(--cool); }
 .lib-card-status.fresh { background: color-mix(in oklch, var(--gold) 22%, transparent); color: color-mix(in oklch, var(--gold) 70%, var(--ink)); }
+.lib-card-status.shelved { background: var(--rule-2); color: var(--ink-4); }
 
 /* ── Select mode: bulk-move bar (covers the FAB while active) ── */
 .lib-select-bar {

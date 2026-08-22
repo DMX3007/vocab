@@ -19,6 +19,8 @@ export type RequestMap = {
   GET_ALL_LOGS: Record<string, never>;
   MOVE_WORDS_ALGO: { wordIds: string[]; algo: AlgoId; now: string };
   TRANSLATE: { term: string; langFrom: string; langTo: string };
+  SHELVE_WORD: { wordId: string; now: string };
+  UNSHELVE_WORD: { wordId: string; now: string };
 };
 
 export type ResponseMap = {
@@ -32,6 +34,8 @@ export type ResponseMap = {
   GET_ALL_LOGS: WireReviewLog[];
   MOVE_WORDS_ALGO: WireWord[];
   TRANSLATE: string;
+  SHELVE_WORD: WireWord;
+  UNSHELVE_WORD: WireWord;
 };
 
 

@@ -65,6 +65,10 @@ export default defineBackground(() => {
         return repo.getAllReviewLogs();
       case 'MOVE_WORDS_ALGO':
         return repo.moveWordsAlgo(message.payload.wordIds, message.payload.algo, new Date(message.payload.now));
+      case 'SHELVE_WORD':
+        return repo.shelveWord(message.payload.wordId, new Date(message.payload.now));
+      case 'UNSHELVE_WORD':
+        return repo.unshelveWord(message.payload.wordId, new Date(message.payload.now));
       case 'TRANSLATE':
         // Runs here, not in the content script: a service worker's fetch
         // isn't subject to the host page's CSP, so this stays reliable

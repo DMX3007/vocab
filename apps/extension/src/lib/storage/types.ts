@@ -23,12 +23,17 @@ export interface Word {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null; // soft delete — kept for future sync
+  /** Set while the user has set this word aside (too hard for now, or
+   *  already known) — excluded from due/review, kept in the Library under
+   *  its own "Shelved" status until un-shelved. */
+  shelvedAt: Date | null;
 }
 
-export type WireWord = Omit<Word, 'createdAt' | 'updatedAt' | 'deletedAt' | 'srsState'> & {
+export type WireWord = Omit<Word, 'createdAt' | 'updatedAt' | 'deletedAt' | 'shelvedAt' | 'srsState'> & {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  shelvedAt: string | null;
   srsState: Omit<Word['srsState'], 'dueAt'> & { dueAt: string };
 };
 

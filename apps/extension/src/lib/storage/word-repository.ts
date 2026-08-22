@@ -78,6 +78,7 @@ export class WordRepository {
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
+      shelvedAt: null,
     };
     await this.db.words.add(word);
     return word;
@@ -87,10 +88,12 @@ export class WordRepository {
     return this.db.words.get(id);
   }
 
-  /** Due words of ONE language: dueAt passed, not deleted. */
+  /** Due words of ONE language: dueAt passed, not deleted, not shelved.
+   *  `!w.shelvedAt` (not `=== null`) also treats a pre-migration row that
+   *  never got the field at all as not-shelved. */
   async getDueWords(now: Date, langTo: string): Promise<Word[]> {
     const words = await this.liveWordsOf(langTo);
-    return words.filter((w) => w.srsState.dueAt.getTime() <= now.getTime());
+    return words.filter((w) => !w.shelvedAt && w.srsState.dueAt.getTime() <= now.getTime());
   }
 
   /** All words of ONE language (for the Library tab), newest first. */
@@ -122,6 +125,32 @@ export class WordRepository {
     const word = await this.db.words.get(id);
     if (!word) return;
     await this.db.words.put({ ...word, deletedAt: now, updatedAt: now });
+  }
+
+  /** Sets a word aside: excluded from getDueWords (and so from review)
+   *  until unshelveWord brings it back. SRS progress is untouched — its
+   *  due date just stops being checked while shelved. */
+  async shelveWord(id: string, now: Date): Promise<Word> {
+    const word = await this.db.words.get(id);
+    if (!word) throw new Error(`Word not found: ${id}`);
+    const updated: Word = { ...word, shelvedAt: now, updatedAt: now };
+    await this.db.words.put(updated);
+    return updated;
+  }
+
+  /** Brings a shelved word back into rotation, due immediately rather than
+   *  dumping however much backlog built up while it was set aside. */
+  async unshelveWord(id: string, now: Date): Promise<Word> {
+    const word = await this.db.words.get(id);
+    if (!word) throw new Error(`Word not found: ${id}`);
+    const updated: Word = {
+      ...word,
+      shelvedAt: null,
+      srsState: { ...word.srsState, dueAt: now },
+      updatedAt: now,
+    };
+    await this.db.words.put(updated);
+    return updated;
   }
 
   /** Records a review: advance SRS via the core scheduler + append a log. */

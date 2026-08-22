@@ -28,6 +28,7 @@ function word(overrides: Partial<Word> = {}): Word {
     createdAt: NOW,
     updatedAt: NOW,
     deletedAt: null,
+    shelvedAt: null,
     ...overrides,
   };
 }

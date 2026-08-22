@@ -6,9 +6,12 @@ import { isMastered } from './progress';
 // badge + banner counts) and how the list is sorted/filtered. Kept separate
 // from the component so the categorization logic is unit-testable.
 
-export type WordStatus = 'due' | 'mastered' | 'learning' | 'fresh';
+export type WordStatus = 'shelved' | 'due' | 'mastered' | 'learning' | 'fresh';
 
 export function wordStatus(word: Word, now: Date): WordStatus {
+  // Checked first: a shelved word is set aside on purpose, so it should
+  // never read as "due" just because time passed while it sat there.
+  if (word.shelvedAt) return 'shelved';
   if (word.srsState.dueAt.getTime() <= now.getTime()) return 'due';
   if (isMastered(word)) return 'mastered';
   if (word.srsState.intervalDays > 0) return 'learning';

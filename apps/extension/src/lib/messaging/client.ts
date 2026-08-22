@@ -45,6 +45,12 @@ export const wordClient = {
   async translate(term: string, langFrom: string, langTo: string): Promise<string> {
     return send({ type: 'TRANSLATE', payload: { term, langFrom, langTo } });
   },
+  async shelveWord(wordId: string, now: Date): Promise<Word> {
+    return reviveWord(await send({ type: 'SHELVE_WORD', payload: { wordId, now: now.toISOString() } }));
+  },
+  async unshelveWord(wordId: string, now: Date): Promise<Word> {
+    return reviveWord(await send({ type: 'UNSHELVE_WORD', payload: { wordId, now: now.toISOString() } }));
+  },
 };
 
 export type WordClient = typeof wordClient;

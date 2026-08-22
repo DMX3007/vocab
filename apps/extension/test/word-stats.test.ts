@@ -26,6 +26,7 @@ function word(overrides: Omit<Partial<Word>, 'srsState'> & { srsState?: Partial<
     createdAt: NOW,
     updatedAt: NOW,
     deletedAt: null,
+    shelvedAt: null,
     ...rest,
   };
 }

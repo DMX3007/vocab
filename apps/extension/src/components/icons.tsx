@@ -41,6 +41,11 @@ const PATHS: Record<string, React.ReactNode> = {
     <line x1="3.3" y1="12.7" x2="4.5" y2="11.5" />
     <line x1="11.5" y1="4.5" x2="12.7" y2="3.3" />
   </>,
+  archive: <>
+    <rect x="2.5" y="3" width="11" height="3" rx="1" />
+    {P('M3.5 6v6.5a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V6')}
+    <line x1="6.5" y1="8.5" x2="9.5" y2="8.5" />
+  </>,
   snowflake: <>
     <line x1="8" y1="2" x2="8" y2="14" />
     <line x1="2.9" y1="4.5" x2="13.1" y2="11.5" />

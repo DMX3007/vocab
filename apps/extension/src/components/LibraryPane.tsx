@@ -23,15 +23,17 @@ interface Props {
   setSearch: (search: string) => void;
   onDelete: (id: string) => void;
   onMoveAlgo: (ids: string[], algo: AlgoId) => void;
+  onShelve: (id: string) => void;
+  onUnshelve: (id: string) => void;
   /** Popup renders the "Add word" FAB as a sibling, so it needs to know
    *  when select mode is active to hide it (the bulk-move bar covers the
    *  same corner of the screen). */
   onSelectModeChange?: (active: boolean) => void;
 }
 
-const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New' };
+const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New', shelved: 'Shelved' };
 
-export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onSelectModeChange }: Props) {
+export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onSelectModeChange }: Props) {
   const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -89,9 +91,12 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     );
   }
 
-  const mastered = words.filter(isMastered).length;
-  const learning = words.filter((w) => w.srsState.intervalDays > 0 && !isMastered(w)).length;
-  const fresh = words.filter((w) => w.srsState.intervalDays === 0).length;
+  // Shelved words sit outside all three buckets — they're deliberately set
+  // aside, not "fresh" or "learning" in the sense those labels imply.
+  const active = words.filter((w) => !w.shelvedAt);
+  const mastered = active.filter(isMastered).length;
+  const learning = active.filter((w) => w.srsState.intervalDays > 0 && !isMastered(w)).length;
+  const fresh = active.filter((w) => w.srsState.intervalDays === 0).length;
 
   return (
     <div className="library-view">
@@ -184,9 +189,18 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                       )}
                     </div>
                     {!selectMode && (
-                      <button className="lib-card-del" onClick={() => onDelete(w.id)} title="Remove">
-                        <Icon name="trash" />
-                      </button>
+                      <div className="lib-card-actions">
+                        <button
+                          className="lib-card-shelve"
+                          onClick={() => (w.shelvedAt ? onUnshelve(w.id) : onShelve(w.id))}
+                          title={w.shelvedAt ? 'Bring back into review' : 'Set aside for now — skip it in review until you bring it back'}
+                        >
+                          <Icon name="archive" />
+                        </button>
+                        <button className="lib-card-del" onClick={() => onDelete(w.id)} title="Remove">
+                          <Icon name="trash" />
+                        </button>
+                      </div>
                     )}
                   </div>
                   <div className="lib-card-tr">{w.translations.join(', ')}</div>
