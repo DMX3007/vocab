@@ -77,6 +77,16 @@ export class ReviewSession {
   private index = 0;
   private answeredCount = 0;
   private started = false;
+  /** The card for the CURRENT index, computed once and reused — not
+   *  recomputed on every read. toCard() rolls a random direction
+   *  (pickDirection), so calling it twice for the same turn (once to show
+   *  the card, again inside answer() to grade it) could roll two DIFFERENT
+   *  directions: the user sees the Russian translation and correctly types
+   *  the English term, but grading independently re-rolled "forward" and
+   *  checked the answer against the translations instead — a real bug,
+   *  not hypothetical. Caching the card the moment its turn starts and
+   *  reusing it for both display and grading makes that impossible. */
+  private currentCardCache: ReviewCard | null = null;
   /** The word just graded by answer(), post-update (fresh lapses/srsState) —
    *  lets the UI decide whether to suggest shelving it without threading a
    *  whole extra round-trip. Null before the first answer of the session. */
@@ -113,6 +123,7 @@ export class ReviewSession {
     this.index = 0;
     this.answeredCount = 0;
     this.started = true;
+    this.refreshCurrentCard();
   }
 
   get total(): number {
@@ -135,10 +146,7 @@ export class ReviewSession {
   }
 
   get currentCard(): ReviewCard | null {
-    if (this.isFinished) return null;
-    const word = this.pool[this.index];
-    if (!word) return null;
-    return this.toCard(word);
+    return this.isFinished ? null : this.currentCardCache;
   }
 
   /** The word behind the verdict currently on screen — null until the
@@ -161,21 +169,26 @@ export class ReviewSession {
     const otherCount = this.pool.length - this.index;
     const offset = 1 + Math.floor(this.rng() * otherCount);
     this.pool.splice(this.index + offset, 0, current!);
+    this.refreshCurrentCard();
   }
 
-  /** Grades the answer, persists it (SRS + log), and advances to the next card. */
+  /** Grades the answer, persists it (SRS + log), and advances to the next
+   *  card. Grades against currentCardCache.expected — the SAME card the
+   *  user was just shown — never a freshly-recomputed one; see
+   *  currentCardCache's comment for why that distinction matters. */
   async answer(text: string, context: GradeContext, now: Date): Promise<GradeResult> {
     if (this.isFinished) {
       throw new Error('Cannot answer: the session is already finished.');
     }
     const word = this.pool[this.index]!;
-    const card = this.toCard(word);
+    const card = this.currentCardCache!;
 
     const result = gradeAnswer(text, card.expected, context);
     this.lastAnswered = await this.repo.recordReview(word.id, result.grade, 'typing', now);
 
     this.index += 1;
     this.answeredCount += 1;
+    this.refreshCurrentCard();
     return result;
   }
 
@@ -187,6 +200,15 @@ export class ReviewSession {
   }
 
   // ── internal ───────────────────────────────────────────────────
+  /** Recomputes currentCardCache from whatever's now at `index` — a fresh
+   *  toCard() call (and so a fresh direction roll) is correct HERE, since
+   *  it's a genuinely new turn. Called after every index/pool change:
+   *  start(), answer() advancing, and shuffle() swapping the active word. */
+  private refreshCurrentCard(): void {
+    const word = this.pool[this.index];
+    this.currentCardCache = word ? this.toCard(word) : null;
+  }
+
   private toCard(word: Word): ReviewCard {
     const direction = pickDirection(this.directionStats(word), this.rng);
     const translations = word.translations;

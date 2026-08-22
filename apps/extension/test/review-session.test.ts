@@ -147,6 +147,35 @@ describe('ReviewSession (normal mode)', () => {
     expect(session.isFinished).toBe(true); // the failed word does NOT reappear now
   });
 
+  it('regression: grades against the exact card shown, even if a second dice roll would pick a different direction', async () => {
+    // pickDirection() is called once inside toCard() to pick 'forward' vs
+    // 'reverse'. If currentCard and answer() each called toCard() (and so
+    // rng()) independently, a rng that returns a different value on its
+    // second call could show the user one direction (e.g. reverse: the
+    // Russian translation, expecting the English term) while grading
+    // against the OTHER (forward: expecting the Russian translation) —
+    // marking a genuinely correct answer wrong. Alternating 0.01/0.99
+    // reproduces that mismatch if the card is ever recomputed mid-turn.
+    await save('fortitude', 'стойкость', minutesAgo(30));
+    let call = 0;
+    const alternatingRng = () => (call++ % 2 === 0 ? 0.01 : 0.99);
+    const session = new ReviewSession(repo, { mode: 'normal' }, alternatingRng);
+    await session.start('ru', NOW);
+
+    const shownCard = session.currentCard!;
+    expect(shownCard.direction).toBe('forward'); // first roll: 0.01 -> forward
+    expect(shownCard.expected).toEqual(['стойкость']);
+
+    // Reading currentCard again must return the SAME card, not re-roll.
+    expect(session.currentCard).toBe(shownCard);
+
+    // Answering with what the shown (forward) card expects must be graded
+    // correct — a second, independent toCard() call inside answer() would
+    // have rolled 'reverse' (expected: ['fortitude']) and marked this wrong.
+    const result = await session.answer('стойкость', { latencyMs: 1000 }, NOW);
+    expect(result.verdict).toBe('correct');
+  });
+
   describe('lastAnsweredWord / shelveLastAnswered', () => {
     it('is null before the first answer', async () => {
       await save('fortitude', 'стойкость', minutesAgo(30));
