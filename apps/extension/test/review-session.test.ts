@@ -108,6 +108,45 @@ describe('ReviewSession (normal mode)', () => {
     expect(session.isFinished).toBe(true); // the failed word does NOT reappear now
   });
 
+  it('shuffle() swaps the current card for a different one, without grading or dropping it', async () => {
+    const a = await save('fortitude', 'стойкость', minutesAgo(30));
+    await save('candor', 'откровенность', minutesAgo(20));
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW);
+
+    expect(session.currentCard!.wordId).toBe(a.id); // most-overdue first, as usual
+    session.shuffle();
+    expect(session.currentCard!.wordId).not.toBe(a.id); // a different word is now showing
+    expect(session.total).toBe(2); // still both queued
+    expect(session.remaining).toBe(2); // nothing was answered
+
+    // the skipped word wasn't dropped — it resurfaces later in the same session
+    await session.answer('откровенность', { latencyMs: 1000 }, NOW);
+    expect(session.currentCard!.wordId).toBe(a.id);
+    expect((await repo.getReviewLogs(a.id))).toHaveLength(0); // never graded by the shuffle itself
+  });
+
+  it('shuffle() is a no-op with only one card left (nothing else to switch to)', async () => {
+    const a = await save('fortitude', 'стойкость', minutesAgo(30));
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW);
+
+    session.shuffle();
+    expect(session.currentCard!.wordId).toBe(a.id);
+    expect(session.total).toBe(1);
+  });
+
+  it('shuffle() is a no-op once the session is finished', async () => {
+    await save('fortitude', 'стойкость', minutesAgo(30));
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW);
+    await session.answer('стойкость', { latencyMs: 1000 }, NOW);
+
+    expect(session.isFinished).toBe(true);
+    expect(() => session.shuffle()).not.toThrow();
+    expect(session.currentCard).toBeNull();
+  });
+
   it('finishes when every card is answered', async () => {
     await save('a', 'а', minutesAgo(30));
     await save('b', 'б', minutesAgo(20));

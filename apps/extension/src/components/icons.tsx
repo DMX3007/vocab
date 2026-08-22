@@ -14,6 +14,13 @@ const PATHS: Record<string, React.ReactNode> = {
   paste: <><rect x="3.5" y="4" width="9" height="10" rx="1" /><path d="M6 4V2.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V4" /></>,
   help: <><circle cx="8" cy="8" r="6.5" /><path d="M6 6.5c0-1.1.9-2 2-2s2 .9 2 2-1 1.5-2 2.2v.6" /><circle cx="8" cy="11.5" r=".6" fill="currentColor" /></>,
   sheet: <><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" /><line x1="2.5" y1="7.5" x2="13.5" y2="7.5" /><line x1="7.5" y1="2.5" x2="7.5" y2="13.5" /></>,
+  shuffle: <>
+    <polyline points="10.7,2 14,2 14,5.3" />
+    <line x1="2.7" y1="13.3" x2="14" y2="2" />
+    <polyline points="14,10.7 14,14 10.7,14" />
+    <line x1="10" y1="10" x2="14" y2="14" />
+    <line x1="2.7" y1="2.7" x2="6" y2="6" />
+  </>,
 };
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {

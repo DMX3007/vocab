@@ -322,6 +322,28 @@
   cursor: not-allowed;
 }
 
+.vf-card-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 44px;
+  border: 1px solid rgba(28, 26, 23, 0.16);
+  border-radius: 12px;
+  background: transparent;
+  color: #1c1a17;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vf-card-btn-ghost:hover:not(:disabled) { background: rgba(28, 26, 23, 0.06); }
+
+.vf-card-btn-ghost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .vf-card-empty {
   display: flex;
   flex-direction: column;

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ReviewSession, ReviewCard as Card } from '../lib/review/session';
 import type { GradeResult } from '@vocabflow/core';
+import { Icon } from './icons';
 
 interface Props {
   session: ReviewSession;
@@ -42,6 +43,15 @@ export function ReviewCard({ session, onFinished }: Props) {
       onFinished();
       return;
     }
+    setCard(session.currentCard);
+  }
+
+  /** Swaps to a different due word — the skipped one isn't graded, it just
+   *  comes back around later in this same session. */
+  function shuffle() {
+    if (verdict) return;
+    session.shuffle();
+    setAnswer('');
     setCard(session.currentCard);
   }
 
@@ -101,6 +111,14 @@ export function ReviewCard({ session, onFinished }: Props) {
         </div>
       ) : (
         <div className="vf-card-actions">
+          <button
+            className="vf-card-btn-ghost"
+            onClick={shuffle}
+            disabled={session.remaining <= 1}
+            title="Show a different word instead"
+          >
+            <Icon name="shuffle" size={13} /> Shuffle
+          </button>
           <button className="vf-card-btn" onClick={check} disabled={!answer.trim()}>
             Check {'\u2192'}
           </button>
