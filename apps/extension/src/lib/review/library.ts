@@ -57,6 +57,18 @@ export function isBurstWord(word: Word): boolean {
   return (phase === 'learning' || phase === 'relearning') && (stepIndex > 0 || lapses > 0);
 }
 
+/** Lapses (see SrsState.lapses) at which a word is worth suggesting a
+ *  shelve for — it's failed enough times in a row that drilling it
+ *  further right now is probably not working. */
+export const SHELVE_SUGGEST_LAPSES = 4;
+
+/** Whether to suggest shelving this word right after a miss — see
+ *  ReviewCard, which shows the suggestion only once per session per word
+ *  (dismissible), never proactively elsewhere. */
+export function shouldSuggestShelving(word: Word): boolean {
+  return !word.shelvedAt && word.srsState.lapses >= SHELVE_SUGGEST_LAPSES;
+}
+
 export type LibrarySort = 'added' | 'due' | 'alpha' | 'mastered';
 
 export function sortWords(words: Word[], sort: LibrarySort): Word[] {

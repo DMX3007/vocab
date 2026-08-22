@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wordStatus, sortWords, filterWords, filterByAlgo, isFreshWord, sortForReview, isBurstWord } from '../src/lib/review/library';
+import { wordStatus, sortWords, filterWords, filterByAlgo, isFreshWord, sortForReview, isBurstWord, shouldSuggestShelving, SHELVE_SUGGEST_LAPSES } from '../src/lib/review/library';
 import type { Word } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00Z');
@@ -51,6 +51,22 @@ describe('wordStatus', () => {
   it('shelved wins over every other status, even an overdue word', () => {
     const w = word({ shelvedAt: NOW, srsState: { dueAt: new Date(NOW.getTime() - 1000), intervalDays: 30 } });
     expect(wordStatus(w, NOW)).toBe('shelved');
+  });
+});
+
+describe('shouldSuggestShelving', () => {
+  it('false below the lapse threshold', () => {
+    expect(shouldSuggestShelving(word({ srsState: { lapses: SHELVE_SUGGEST_LAPSES - 1 } }))).toBe(false);
+  });
+  it('true once lapses reaches the threshold', () => {
+    expect(shouldSuggestShelving(word({ srsState: { lapses: SHELVE_SUGGEST_LAPSES } }))).toBe(true);
+  });
+  it('stays true well past the threshold', () => {
+    expect(shouldSuggestShelving(word({ srsState: { lapses: SHELVE_SUGGEST_LAPSES + 10 } }))).toBe(true);
+  });
+  it('false for a word already shelved — no point suggesting it again', () => {
+    const w = word({ shelvedAt: NOW, srsState: { lapses: SHELVE_SUGGEST_LAPSES + 5 } });
+    expect(shouldSuggestShelving(w)).toBe(false);
   });
 });
 

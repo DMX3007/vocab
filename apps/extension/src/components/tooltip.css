@@ -441,6 +441,48 @@
   cursor: not-allowed;
 }
 
+.vf-shelve-suggest {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(28, 26, 23, 0.06);
+  border-radius: 10px;
+  font-size: 12px;
+  color: #6b5c50;
+  position: relative;
+}
+
+.vf-shelve-suggest-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vf-shelve-suggest-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #1c1a17;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vf-shelve-suggest-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vf-shelve-suggest-dismiss {
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  color: #8a6f64;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .vf-card-empty {
   display: flex;
   flex-direction: column;

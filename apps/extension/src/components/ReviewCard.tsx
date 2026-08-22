@@ -3,6 +3,7 @@ import type { ReviewSession, ReviewCard as Card } from '../lib/review/session';
 import type { GradeResult } from '@vocabflow/core';
 import { Icon } from './icons';
 import { speak } from '../lib/tts';
+import { shouldSuggestShelving } from '../lib/review/library';
 
 interface Props {
   session: ReviewSession;
@@ -19,6 +20,8 @@ export function ReviewCard({ session, onFinished }: Props) {
   const [done, setDone] = useState({ index: 0, total: session.total });
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shelveSuggestionDismissed, setShelveSuggestionDismissed] = useState(false);
+  const [shelving, setShelving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number>(Date.now());
 
@@ -47,12 +50,25 @@ export function ReviewCard({ session, onFinished }: Props) {
     setVerdict(null);
     setAnswer('');
     setError(null);
+    setShelveSuggestionDismissed(false);
     setDone((d) => ({ ...d, index: d.index + 1 }));
     if (session.isFinished) {
       onFinished();
       return;
     }
     setCard(session.currentCard);
+  }
+
+  /** The user agreed the struggling word is worth setting aside — shelve it
+   *  and move on in one step, same as clicking Next/Finish. */
+  async function shelveAndContinue() {
+    setShelving(true);
+    try {
+      await session.shelveLastAnswered(new Date());
+      next();
+    } finally {
+      setShelving(false);
+    }
   }
 
   /** Swaps to a different due word — the skipped one isn't graded, it just
@@ -85,6 +101,10 @@ export function ReviewCard({ session, onFinished }: Props) {
         ? 'vf-almost'
         : 'vf-wrong'
     : '';
+
+  const lastAnswered = session.lastAnsweredWord;
+  const suggestShelve = !!verdict && verdict.verdict !== 'correct' && !shelveSuggestionDismissed
+    && !!lastAnswered && shouldSuggestShelving(lastAnswered);
 
   return (
     <div className={`vf-card ${verdictClass}`} onKeyDown={onKeyDown}>
@@ -139,7 +159,30 @@ export function ReviewCard({ session, onFinished }: Props) {
             {session.remaining > 1 ? 'Next' : 'Finish'} {'\u2192'}
           </button>
         </div>
-      ) : (
+      ) : null}
+
+      {suggestShelve && (
+        <div className="vf-shelve-suggest">
+          <span>Struggling with this one ({lastAnswered!.srsState.lapses} misses) {'\u2014'} set it aside for now?</span>
+          <div className="vf-shelve-suggest-actions">
+            <button
+              className="vf-shelve-suggest-btn"
+              onClick={() => void shelveAndContinue()}
+              disabled={shelving}
+            >
+              {shelving ? 'Shelving\u2026' : 'Shelve'}
+            </button>
+            <button
+              className="vf-shelve-suggest-dismiss"
+              onClick={() => setShelveSuggestionDismissed(true)}
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!verdict && (
         <>
           {error && <div className="vf-hint">{error}</div>}
           <div className="vf-card-actions">

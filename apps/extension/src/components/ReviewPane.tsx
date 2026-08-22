@@ -18,6 +18,9 @@ interface Props {
   algo: AlgoId;
   onAlgoChange: (algo: AlgoId) => void;
   onStartReview: (algoFilter: AlgoFilter) => void;
+  /** Unshelves the single oldest-shelved word and starts a review on it —
+   *  offered only once nothing else is due (see the empty state below). */
+  onReviveShelved: () => void;
   ready: boolean;
   /** Keeps the header ribbon's due count in sync with the live tick below —
    *  without this, a word rising into Due here would leave the ribbon
@@ -51,7 +54,7 @@ const ROW_DISPLAY_LIMIT = 20;
 // keep the DOM light with a big backlog — the counts stay accurate either
 // way. The real review session still pulls a fresh list from storage when
 // you actually start one.
-export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, ready, onDueCountChange }: Props) {
+export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, onReviveShelved, ready, onDueCountChange }: Props) {
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
   const [now, setNow] = useState(() => Date.now());
   const statsById = useMemo(() => computeWordStatsById(logs), [logs]);
@@ -62,7 +65,12 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
   }, []);
 
   const matchesFilter = (w: Word) => reviewFilter === 'all' || w.srsState.algo === reviewFilter;
-  const allDue = sortForReview(words.filter((w) => w.srsState.dueAt.getTime() <= now));
+  // Shelved words keep whatever dueAt they had the moment they were set
+  // aside, which can easily read as "due" here even though getDueWords (the
+  // repository, and so the real review session) already excludes them —
+  // filter them out client-side too so this list never disagrees with it.
+  const liveWords = words.filter((w) => !w.shelvedAt);
+  const allDue = sortForReview(liveWords.filter((w) => w.srsState.dueAt.getTime() <= now));
   const due = allDue.filter(matchesFilter);
 
   useEffect(() => {
@@ -70,8 +78,13 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDue.length]);
 
-  const allUpcoming = trackedWords(words.filter((w) => w.srsState.dueAt.getTime() > now)).filter(matchesFilter);
+  const allUpcoming = trackedWords(liveWords.filter((w) => w.srsState.dueAt.getTime() > now)).filter(matchesFilter);
   const upcoming = allUpcoming.slice(0, ROW_DISPLAY_LIMIT);
+
+  const shelvedWords = useMemo(
+    () => [...words.filter((w) => w.shelvedAt)].sort((a, b) => a.shelvedAt!.getTime() - b.shelvedAt!.getTime()),
+    [words],
+  );
 
   function renderRow(w: Word, pill: React.ReactNode, pillClassName: string) {
     const stats = statsById.get(w.id);
@@ -148,6 +161,16 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
               ? `Nothing due in ${ALGO_FILTER_LABEL[reviewFilter]} right now — try All algorithms.`
               : 'Nothing due right now. Come back later — or browse Library.'}
           </div>
+          {shelvedWords.length > 0 && (
+            <div className="revive-shelved">
+              <div className="revive-shelved-text">
+                {shelvedWords.length} shelved word{shelvedWords.length === 1 ? '' : 's'} set aside earlier.
+              </div>
+              <button className="btn-secondary" onClick={onReviveShelved} disabled={!ready}>
+                <Icon name="archive" size={13} /> Bring back &ldquo;{shelvedWords[0]!.term}&rdquo;
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div>

@@ -147,6 +147,44 @@ describe('ReviewSession (normal mode)', () => {
     expect(session.isFinished).toBe(true); // the failed word does NOT reappear now
   });
 
+  describe('lastAnsweredWord / shelveLastAnswered', () => {
+    it('is null before the first answer', async () => {
+      await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', NOW);
+      expect(session.lastAnsweredWord).toBeNull();
+    });
+
+    it('holds the just-graded word, with its post-answer SRS state', async () => {
+      const w = await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', NOW);
+      await session.answer('totally wrong', { latencyMs: 2000 }, NOW);
+      expect(session.lastAnsweredWord?.id).toBe(w.id);
+      expect(session.lastAnsweredWord?.srsState.lapses).toBe(1); // a miss counts as a lapse
+    });
+
+    it('shelveLastAnswered shelves the just-graded word and it stops showing up as due', async () => {
+      const w = await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', NOW);
+      await session.answer('totally wrong', { latencyMs: 2000 }, NOW);
+
+      await session.shelveLastAnswered(NOW);
+      expect(session.lastAnsweredWord?.shelvedAt).not.toBeNull();
+      const stored = await repo.getWord(w.id);
+      expect(stored?.shelvedAt).not.toBeNull();
+      expect(await repo.getDueWords(minutesAgo(-1000), 'ru')).toHaveLength(0);
+    });
+
+    it('is a no-op before any answer has happened', async () => {
+      await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', NOW);
+      await expect(session.shelveLastAnswered(NOW)).resolves.toBeUndefined();
+    });
+  });
+
   it('shuffle() swaps the current card for a different one, without grading or dropping it', async () => {
     const a = await save('fortitude', 'стойкость', minutesAgo(30));
     await save('candor', 'откровенность', minutesAgo(20));

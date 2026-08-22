@@ -190,6 +190,20 @@ export function Popup() {
     await refresh();
   }
 
+  /** Nothing else is due — bring the oldest-shelved word back into rotation
+   *  and start reviewing it immediately, rather than leaving Review empty
+   *  while shelved words just sit there. */
+  async function handleReviveShelved() {
+    const shelved = words
+      .filter((w) => w.shelvedAt)
+      .sort((a, b) => a.shelvedAt!.getTime() - b.shelvedAt!.getTime());
+    const oldest = shelved[0];
+    if (!oldest) return;
+    await wordClient.unshelveWord(oldest.id, new Date());
+    await refresh();
+    await handleStartReview('all');
+  }
+
   const pausedUntil = settings?.pausedUntil ? new Date(settings.pausedUntil) : null;
   const snoozedUntil = settings?.snoozedUntil ? new Date(settings.snoozedUntil) : null;
   const isPaused = !!pausedUntil && pausedUntil > new Date();
@@ -288,6 +302,7 @@ export function Popup() {
             algo={settings?.defaultAlgo ?? 'sm2'}
             onAlgoChange={handleDefaultAlgoChange}
             onStartReview={handleStartReview}
+            onReviveShelved={handleReviveShelved}
             ready={ready}
             onDueCountChange={setDueCount}
           />

@@ -16,6 +16,7 @@ export interface SessionDataSource {
   getDueWords(now: Date, langTo: string): Promise<Word[]>;
   getAllWords(langTo: string): Promise<Word[]>;
   recordReview(wordId: string, grade: Grade, mode: ReviewMode, now: Date): Promise<Word>;
+  shelveWord(wordId: string, now: Date): Promise<Word>;
 }
 
 export type SessionMode = 'normal'; // 'intensive' (Yagodkin) arrives in its own loop
@@ -76,6 +77,10 @@ export class ReviewSession {
   private index = 0;
   private answeredCount = 0;
   private started = false;
+  /** The word just graded by answer(), post-update (fresh lapses/srsState) —
+   *  lets the UI decide whether to suggest shelving it without threading a
+   *  whole extra round-trip. Null before the first answer of the session. */
+  private lastAnswered: Word | null = null;
 
   constructor(
     private readonly repo: SessionDataSource,
@@ -136,6 +141,13 @@ export class ReviewSession {
     return this.toCard(word);
   }
 
+  /** The word behind the verdict currently on screen — null until the
+   *  first answer(). See shouldSuggestShelving in library.ts for how the
+   *  UI uses this. */
+  get lastAnsweredWord(): Word | null {
+    return this.lastAnswered;
+  }
+
   /** Swaps the current card for a different one from the pool. The skipped
    *  word is NOT graded and its SRS state doesn't change — it's simply
    *  deferred to a random later spot in the pool, so nothing is dropped,
@@ -160,11 +172,18 @@ export class ReviewSession {
     const card = this.toCard(word);
 
     const result = gradeAnswer(text, card.expected, context);
-    await this.repo.recordReview(word.id, result.grade, 'typing', now);
+    this.lastAnswered = await this.repo.recordReview(word.id, result.grade, 'typing', now);
 
     this.index += 1;
     this.answeredCount += 1;
     return result;
+  }
+
+  /** Shelves the word behind the verdict currently on screen (see
+   *  lastAnsweredWord) — a no-op if nothing's been answered yet. */
+  async shelveLastAnswered(now: Date): Promise<void> {
+    if (!this.lastAnswered) return;
+    this.lastAnswered = await this.repo.shelveWord(this.lastAnswered.id, now);
   }
 
   // ── internal ───────────────────────────────────────────────────
