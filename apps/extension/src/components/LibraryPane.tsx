@@ -10,7 +10,7 @@ import {
 } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
 import { ALGO_LABELS } from '../lib/review/algo';
-import { trackedWords, msUntilDue, formatCountdown } from '../lib/review/live-queue';
+import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import type { Word } from '../lib/storage/types';
 import type { AlgoId } from '@vocabflow/core';
 
@@ -46,11 +46,12 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     () => sortWords(filterByAlgo(filterWords(words, search), algoFilter), sort),
     [words, search, algoFilter, sort],
   );
-  // A live countdown is only worth computing for words that aren't due yet
-  // (a due word's pill is just the static "Due" label) — and only for the
-  // MAX_TRACKED_WORDS soonest of those, so a library with a big due backlog
-  // doesn't fill the whole tracked pool with words that don't even need a
-  // countdown, leaving nothing tracked for the words that do.
+  // Every card gets a live timer, not just a static status label: a due
+  // word shows how long it's been waiting, a not-yet-due one shows how
+  // long until it's due. Computing "how overdue" is cheap for any number
+  // of due words, so that part is unbounded — only the not-yet-due side
+  // uses the MAX_TRACKED_WORDS pool, since formatting a countdown is the
+  // one part with a real per-tick cost.
   const trackedIds = new Set(trackedWords(words.filter((w) => w.srsState.dueAt.getTime() > nowMs)).map((w) => w.id));
 
   function toggleSelectMode() {
@@ -138,7 +139,11 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
           {filtered.map((w) => {
             const status = wordStatus(w, now);
             const showCountdown = status !== 'due' && trackedIds.has(w.id);
-            const pillLabel = showCountdown ? formatCountdown(msUntilDue(w, now)) : STATUS_LABEL[status];
+            const pillLabel = status === 'due'
+              ? formatOverdue(-msUntilDue(w, now))
+              : showCountdown
+                ? formatCountdown(msUntilDue(w, now))
+                : STATUS_LABEL[status];
             const selected = selectedIds.has(w.id);
             let source = '';
             try {

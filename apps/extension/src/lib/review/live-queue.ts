@@ -39,3 +39,12 @@ export function formatCountdown(ms: number): string {
   const totalDays = Math.floor(totalHours / 24);
   return `${totalDays}d`;
 }
+
+/** The overdue counterpart to formatCountdown — "how long has this word
+ *  been waiting", for words whose due time has already passed. Every due
+ *  word gets one of these; it isn't just a static "Due" label. */
+export function formatOverdue(ms: number): string {
+  const clamped = Math.max(0, ms);
+  if (clamped < 5000) return 'just now';
+  return `${formatCountdown(clamped)} overdue`;
+}

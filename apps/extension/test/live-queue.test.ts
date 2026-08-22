@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { trackedWords, msUntilDue, formatCountdown, MAX_TRACKED_WORDS } from '../src/lib/review/live-queue';
+import { trackedWords, msUntilDue, formatCountdown, formatOverdue, MAX_TRACKED_WORDS } from '../src/lib/review/live-queue';
 import type { Word } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00Z');
@@ -78,5 +78,20 @@ describe('formatCountdown', () => {
   });
   it('never goes negative — clamps to 0s', () => {
     expect(formatCountdown(-5_000)).toBe('0s');
+  });
+});
+
+describe('formatOverdue', () => {
+  it('reads "just now" for a word that only just became due', () => {
+    expect(formatOverdue(2_000)).toBe('just now');
+  });
+  it('shows elapsed time past the "just now" threshold', () => {
+    expect(formatOverdue(5 * 60_000)).toBe('5m overdue');
+  });
+  it('scales the same way formatCountdown does for larger gaps', () => {
+    expect(formatOverdue(2 * 86_400_000)).toBe('2d overdue');
+  });
+  it('clamps a negative input to "just now" rather than going negative', () => {
+    expect(formatOverdue(-1_000)).toBe('just now');
   });
 });

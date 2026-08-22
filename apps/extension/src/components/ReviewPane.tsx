@@ -6,7 +6,7 @@ import { ALGO_OPTIONS, ALGO_LABELS } from '../lib/review/algo';
 import { sortForReview, type AlgoFilter } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
 import { computeWordStatsById, algoProgressLabel, estimateReviewsToMastery } from '../lib/review/word-stats';
-import { trackedWords, msUntilDue, formatCountdown } from '../lib/review/live-queue';
+import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import type { AlgoId } from '@vocabflow/core';
 
 interface Props {
@@ -26,15 +26,11 @@ interface Props {
 }
 
 const ALGO_FILTER_LABEL: Record<AlgoFilter, string> = { all: 'All algorithms', sm2: 'SM-2 only', leitner: 'Leitner only' };
-/** How many not-yet-due words get a visible countdown row. The underlying
- *  tracked pool is capped much higher (see live-queue.ts) — this is just
- *  how many of those are worth showing before the list gets noisy. */
-const UPCOMING_DISPLAY_LIMIT = 5;
-/** How many due rows actually get rendered — keeps the DOM light with a
- *  big backlog. The due COUNT everywhere else (button, header, ribbon) is
- *  never capped: checking "is this due" is cheap for any number of words,
- *  so there's no reason to under-report it just to bound the list length. */
-const DUE_DISPLAY_LIMIT = 20;
+/** How many rows actually get rendered per section — keeps the DOM light
+ *  with a big backlog. The due COUNT elsewhere (button, header, ribbon) is
+ *  never capped by this: checking "is this due" is cheap for any number of
+ *  words, so there's no reason to under-report it just to bound the list. */
+const ROW_DISPLAY_LIMIT = 20;
 
 // Review tab: the target-language + default-algorithm tray, a "which algo
 // to review right now" filter, a start-review button, and the due list
@@ -42,14 +38,19 @@ const DUE_DISPLAY_LIMIT = 20;
 // (its algorithm, ladder position, track record, and an estimate of how
 // many more reviews stand between it and "mastered").
 //
-// The due list is LIVE: a shared clock ticks every second so a word rises
-// straight from "Up next" into "Due now" the moment its own time comes,
-// with no need to reopen or refresh the popup. Being "due" is cheap to
-// check regardless of library size, so that part is never capped — only
-// the UPCOMING (not-yet-due) words get a bounded MAX_TRACKED_WORDS pool,
-// since formatting a live countdown for each of them is the one thing
-// that actually costs something every tick. The real review session still
-// pulls a fresh list from storage when you actually start one.
+// EVERY row carries a live timer, not just the upcoming ones: a due word
+// shows how long it's been waiting (formatOverdue), an upcoming one shows
+// how long until it's due (formatCountdown) — both tick on the same shared
+// clock, so a word visibly rises from "Up next" into "Due now" the moment
+// its own time comes, with no need to reopen or refresh the popup. Being
+// "due" is cheap to check regardless of library size, so the due list/count
+// are never capped — only the UPCOMING (not-yet-due) words get a bounded
+// MAX_TRACKED_WORDS pool, since formatting a live countdown for each of
+// them is the one thing that actually costs something every tick. Both
+// sections additionally cap how many ROWS render (ROW_DISPLAY_LIMIT) to
+// keep the DOM light with a big backlog — the counts stay accurate either
+// way. The real review session still pulls a fresh list from storage when
+// you actually start one.
 export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, ready, onDueCountChange }: Props) {
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
   const [now, setNow] = useState(() => Date.now());
@@ -69,9 +70,8 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDue.length]);
 
-  const upcoming = trackedWords(words.filter((w) => w.srsState.dueAt.getTime() > now))
-    .filter(matchesFilter)
-    .slice(0, UPCOMING_DISPLAY_LIMIT);
+  const allUpcoming = trackedWords(words.filter((w) => w.srsState.dueAt.getTime() > now)).filter(matchesFilter);
+  const upcoming = allUpcoming.slice(0, ROW_DISPLAY_LIMIT);
 
   function renderRow(w: Word, pill: React.ReactNode, pillClassName: string) {
     const stats = statsById.get(w.id);
@@ -152,19 +152,26 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
       ) : (
         <div>
           <div className="section-divider">Due now {'·'} {due.length}</div>
-          {due.slice(0, DUE_DISPLAY_LIMIT).map((w) => renderRow(w, 'Due', 'due-pill'))}
-          {due.length > DUE_DISPLAY_LIMIT && (
+          {due.slice(0, ROW_DISPLAY_LIMIT).map((w) => renderRow(w, formatOverdue(-msUntilDue(w, new Date(now))), 'due-pill'))}
+          {due.length > ROW_DISPLAY_LIMIT && (
             <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
-              +{due.length - DUE_DISPLAY_LIMIT} more due — start a review to work through the rest.
+              +{due.length - ROW_DISPLAY_LIMIT} more due — start a review to work through the rest.
             </div>
           )}
         </div>
       )}
 
       <div>
-        <div className="section-divider">Up next</div>
+        <div className="section-divider">Up next {allUpcoming.length > 0 ? `· ${allUpcoming.length}` : ''}</div>
         {upcoming.length > 0 ? (
-          upcoming.map((w) => renderRow(w, formatCountdown(msUntilDue(w, new Date(now))), 'countdown-pill'))
+          <>
+            {upcoming.map((w) => renderRow(w, formatCountdown(msUntilDue(w, new Date(now))), 'countdown-pill'))}
+            {allUpcoming.length > ROW_DISPLAY_LIMIT && (
+              <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
+                +{allUpcoming.length - ROW_DISPLAY_LIMIT} more upcoming
+              </div>
+            )}
+          </>
         ) : (
           <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
             Nothing scheduled soon — this fills in once a word's next review is a little ways off.
