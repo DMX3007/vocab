@@ -47,6 +47,10 @@ export interface ReviewCard {
   expected: string[];
   contextSentence: string;
   sourceUrl: string;
+  /** language of `term` / language of the translations — lets the UI look
+   *  up the right voice for pronunciation without threading Word around. */
+  langFrom: string;
+  langTo: string;
 }
 
 /**
@@ -181,6 +185,8 @@ export class ReviewSession {
       expected,
       contextSentence: word.contextSentence,
       sourceUrl: word.sourceUrl,
+      langFrom: word.langFrom,
+      langTo: word.langTo,
     };
   }
 

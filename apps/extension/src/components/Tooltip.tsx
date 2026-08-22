@@ -4,6 +4,8 @@ import {
   initialTooltipState,
   type SavePayload,
 } from '../lib/tooltip-machine';
+import { Icon } from './icons';
+import { speak } from '../lib/tts';
 
 interface TooltipProps {
   term: string;
@@ -69,7 +71,18 @@ export function Tooltip({
   return (
     <div className="vf-tooltip" onKeyDown={onKeyDown}>
       <div className="vf-row vf-head">
-        <span className="vf-term">{term}</span>
+        <div className="vf-row" style={{ gap: 6 }}>
+          <span className="vf-term">{term}</span>
+          <button
+            type="button"
+            className="vf-speak-btn vf-speak-btn-sm"
+            onClick={() => speak(term, langFrom)}
+            title="Pronounce"
+            aria-label="Pronounce"
+          >
+            <Icon name="volume" size={12} />
+          </button>
+        </div>
         <span className="vf-langs">
           {langFrom.toUpperCase()} {'\u2192'} <b>{langTo.toUpperCase()}</b>
         </span>

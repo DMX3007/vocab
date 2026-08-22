@@ -245,15 +245,43 @@
   color: #8a6f64;
 }
 
+.vf-card-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
 .vf-card-prompt {
   font-family: Georgia, serif;
   font-style: italic;
   font-size: 42px;
   letter-spacing: -0.02em;
   line-height: 1;
-  margin: 16px 0 4px;
   color: #b5501f;
   position: relative;
+}
+
+.vf-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid rgba(28, 26, 23, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: #1c1a17;
+  cursor: pointer;
+  position: relative;
+}
+
+.vf-speak-btn:hover { background: rgba(28, 26, 23, 0.06); }
+
+.vf-speak-btn-sm {
+  width: 22px;
+  height: 22px;
 }
 
 .vf-card-ctx {

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ReviewSession, ReviewCard as Card } from '../lib/review/session';
 import type { GradeResult } from '@vocabflow/core';
 import { Icon } from './icons';
+import { speak } from '../lib/tts';
 
 interface Props {
   session: ReviewSession;
@@ -92,7 +93,18 @@ export function ReviewCard({ session, onFinished }: Props) {
         <span className="vf-card-dir">{card.direction === 'forward' ? 'EN → RU' : 'RU → EN'}</span>
       </div>
 
-      <div className="vf-card-prompt">{card.prompt}</div>
+      <div className="vf-card-prompt-row">
+        <div className="vf-card-prompt">{card.prompt}</div>
+        <button
+          type="button"
+          className="vf-speak-btn"
+          onClick={() => speak(card.prompt, card.direction === 'forward' ? card.langFrom : card.langTo)}
+          title="Pronounce"
+          aria-label="Pronounce"
+        >
+          <Icon name="volume" size={16} />
+        </button>
+      </div>
       {card.contextSentence && <div className="vf-card-ctx">{card.contextSentence}</div>}
 
       <input
@@ -114,6 +126,15 @@ export function ReviewCard({ session, onFinished }: Props) {
                 : 'Answer:'}
           </span>
           <span className="vf-card-answer">{card.expected.join(', ')}</span>
+          <button
+            type="button"
+            className="vf-speak-btn"
+            onClick={() => speak(card.expected[0]!, card.direction === 'forward' ? card.langTo : card.langFrom)}
+            title="Pronounce"
+            aria-label="Pronounce"
+          >
+            <Icon name="volume" size={14} />
+          </button>
           <button className="vf-card-btn" onClick={next}>
             {session.remaining > 1 ? 'Next' : 'Finish'} {'\u2192'}
           </button>

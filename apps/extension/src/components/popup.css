@@ -486,6 +486,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .lib-card:hover .lib-card-del { opacity: 1; }
 .lib-card-del:hover { background: var(--heat-soft); color: var(--heat); }
 .lib-card-del svg { width: 11px; height: 11px; }
+.lib-card-speak { width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center; border-radius: 5px; color: var(--ink-5); transition: background 0.15s, color 0.15s; }
+.lib-card-speak:hover { background: var(--rule-2); color: var(--ink); }
+.lib-card-speak svg { width: 11px; height: 11px; }
 .lib-card-tr { font-size: 12px; color: var(--ink-3); line-height: 1.4; margin-top: 1px; }
 .lib-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--rule-2); }
 .lib-card-foot-main { display: flex; align-items: center; gap: 6px; min-width: 0; }

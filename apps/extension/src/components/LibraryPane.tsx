@@ -11,6 +11,7 @@ import {
 import { isMastered } from '../lib/review/progress';
 import { ALGO_LABELS } from '../lib/review/algo';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
+import { speak } from '../lib/tts';
 import type { Word } from '../lib/storage/types';
 import type { AlgoId } from '@vocabflow/core';
 
@@ -171,6 +172,16 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                         />
                       )}
                       <div className="lib-card-word">{w.term}</div>
+                      {!selectMode && (
+                        <button
+                          className="lib-card-speak"
+                          onClick={(e) => { e.stopPropagation(); speak(w.term, w.langFrom); }}
+                          title="Pronounce"
+                          aria-label="Pronounce"
+                        >
+                          <Icon name="volume" />
+                        </button>
+                      )}
                     </div>
                     {!selectMode && (
                       <button className="lib-card-del" onClick={() => onDelete(w.id)} title="Remove">
