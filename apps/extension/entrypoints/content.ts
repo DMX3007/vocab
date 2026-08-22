@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Tooltip } from '../src/components/Tooltip';
 import { ReviewOverlay } from '../src/components/ReviewOverlay';
+import { StreakReminder } from '../src/components/StreakReminder';
 import tooltipCss from '../src/components/tooltip.css?inline';
 import { analyzeSelection } from '../src/lib/selection';
 import { wordClient } from '../src/lib/messaging/client';
@@ -20,7 +21,10 @@ import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
 // (selection, session, policy, settings) is unit-tested; this file is the
 // thin DOM glue, verified by the manual checklist.
 
-type ComponentPlacements = | { kind: 'icon' | 'tooltip' | 'skipped'; x: number; y: number; } | { kind: 'overlay'; };
+type ComponentPlacements =
+  | { kind: 'icon' | 'tooltip' | 'skipped'; x: number; y: number; }
+  | { kind: 'overlay'; }
+  | { kind: 'streak'; };
 
 type Surface = { host: HTMLDivElement; root: Root; component: ComponentPlacements };
 
@@ -41,9 +45,14 @@ export default defineContentScript({
       unmount();
       let host = document.createElement('div');
 
-      host.style.cssText = component.kind !== 'overlay'
-        ? `position:absolute;z-index:2147483647;left:${component.x}px;top:${component.y}px;`
-        : 'position:fixed;inset:0;z-index:2147483647;';
+      host.style.cssText = component.kind === 'overlay'
+        ? 'position:fixed;inset:0;z-index:2147483647;'
+        : component.kind === 'streak'
+          // Covers the viewport (so the card's own fixed corner position
+          // works) but never blocks the page underneath — only the card
+          // itself (see .vf-streak-card's pointer-events:auto) is clickable.
+          ? 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;'
+          : `position:absolute;z-index:2147483647;left:${component.x}px;top:${component.y}px;`;
 
       document.body.appendChild(host);
       const shadow = host.attachShadow({ mode: 'open' });
@@ -186,6 +195,18 @@ export default defineContentScript({
       );
     }
 
+    // ── streak-at-risk reminder ────────────────────────────────
+    function showStreakReminder(streak: number, todayCount: number, dailyGoal: number) {
+      mount(
+        React.createElement(StreakReminder, {
+          streak, todayCount, dailyGoal,
+          onReviewNow: () => { void showOverlay(targetLang); },
+          onDismiss: unmount,
+        }),
+        { kind: 'streak' },
+      );
+    }
+
     // ── burst drilling: auto-reappear fast for a word already mid-drill ──
     // The normal alarm/throttle path (background.ts) checks once a minute
     // and paces itself to avoid nagging — right for a slow ambient due
@@ -233,6 +254,10 @@ export default defineContentScript({
         // Acknowledge immediately — showOverlay's own await(s) shouldn't hold
         // up the sender (the popup awaits this to know a content script is
         // here before closing itself).
+        sendResponse(true);
+      }
+      if (message?.type === 'SHOW_STREAK_REMINDER') {
+        showStreakReminder(message.streak, message.todayCount, message.dailyGoal);
         sendResponse(true);
       }
       return true;  // WXT 0.19 types require every path to return true

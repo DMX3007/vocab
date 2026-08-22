@@ -9,6 +9,8 @@ import {
   isBlacklisted,
   isPausedOrSnoozed,
   defaultSettings,
+  shouldShowStreakReminder,
+  markStreakReminderShown,
   type OverlayDecision,
   type OverlaySettings,
   type PageContext,
@@ -130,5 +132,44 @@ describe('isPausedOrSnoozed', () => {
   it('false once the pause/snooze has expired', () => {
     const past = new Date(NOW.getTime() - 1000).toISOString();
     expect(isPausedOrSnoozed(settings({ pausedUntil: past, snoozedUntil: past }), NOW)).toBe(false);
+  });
+});
+
+describe('shouldShowStreakReminder', () => {
+  // Local-time literals (no 'Z'): shouldShowStreakReminder reads local hours,
+  // so the test needs to control that directly, not UTC.
+  const EVENING = new Date('2026-06-10T20:00:00');
+  const AFTERNOON = new Date('2026-06-10T14:00:00');
+  const stats = { todayCount: 2, dailyGoal: 10, streak: 5 };
+
+  it('fires when the goal is unmet, a streak is on the line, and it is late', () => {
+    expect(shouldShowStreakReminder(stats, settings(), page, EVENING)).toBe(true);
+  });
+
+  it('does not fire before the risk hour — there is still time today', () => {
+    expect(shouldShowStreakReminder(stats, settings(), page, AFTERNOON)).toBe(false);
+  });
+
+  it('does not fire once the goal is already met', () => {
+    expect(shouldShowStreakReminder({ ...stats, todayCount: 10 }, settings(), page, EVENING)).toBe(false);
+  });
+
+  it('does not fire with no streak to protect', () => {
+    expect(shouldShowStreakReminder({ ...stats, streak: 0 }, settings(), page, EVENING)).toBe(false);
+  });
+
+  it('does not fire twice in the same day', () => {
+    const s = markStreakReminderShown(settings(), EVENING);
+    expect(shouldShowStreakReminder(stats, s, page, EVENING)).toBe(false);
+    // but does again the next day
+    const nextDay = new Date(EVENING.getTime() + 24 * 60 * 60_000);
+    expect(shouldShowStreakReminder(stats, s, page, nextDay)).toBe(true);
+  });
+
+  it('respects pause/snooze/blacklist/typing/fullscreen like the ambient overlay does', () => {
+    expect(shouldShowStreakReminder(stats, settings({ pausedUntil: new Date(EVENING.getTime() + 1000).toISOString() }), page, EVENING)).toBe(false);
+    expect(shouldShowStreakReminder(stats, settings({ blacklist: ['example.com'] }), page, EVENING)).toBe(false);
+    expect(shouldShowStreakReminder(stats, settings(), { ...page, userIsTyping: true }, EVENING)).toBe(false);
+    expect(shouldShowStreakReminder(stats, settings(), { ...page, isFullscreen: true }, EVENING)).toBe(false);
   });
 });

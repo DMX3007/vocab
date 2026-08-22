@@ -1,5 +1,6 @@
 import { DEFAULT_LEITNER_CONFIG } from '@vocabflow/core';
 import type { Word, ReviewLog } from '../storage/types';
+import type { OverlaySettings } from './overlay-policy';
 
 // Turns the raw word + review-log history into the numbers the Progress tab
 // shows. Pure and synchronous — the popup fetches words/logs via wordClient,
@@ -13,7 +14,9 @@ const XP_PER_PASS = 10;
 const XP_PER_LEVEL = 100;
 /** A word is "mastered" once its SRS interval has grown past three weeks. */
 export const MASTERED_INTERVAL_DAYS = 21;
-const DAILY_GOAL = 10;
+/** Used only as a fallback when a caller doesn't pass its own goal —
+ *  overlay-policy.ts's defaultSettings() owns the real default. */
+const FALLBACK_DAILY_GOAL = 10;
 
 /** Algo-aware "mastered": Leitner's box ladder tops out at 16 days, which
  *  never crosses MASTERED_INTERVAL_DAYS — so for Leitner, "mastered" means
@@ -55,9 +58,12 @@ export interface ProgressStats {
 }
 
 const MS_PER_DAY = 86_400_000;
-const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
+export const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
+const EMPTY_SET: ReadonlySet<string> = new Set();
 
-function localDateKey(d: Date): string {
+/** Exported so the streak-freeze maintenance below (and its tests) key
+ *  dates the exact same way the streak computation itself does. */
+export function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
@@ -68,15 +74,18 @@ function startOfLocalDay(d: Date): Date {
 }
 
 /** Consecutive-day streak ending today, or ending yesterday if today has no review yet
- *  (a streak isn't broken by a day that hasn't finished). */
-function computeStreak(logs: ReviewLog[], now: Date): number {
+ *  (a streak isn't broken by a day that hasn't finished). A date in `frozenDates`
+ *  (a missed day auto-covered by a banked streak freeze — see applyStreakMaintenance)
+ *  counts exactly like a day with a real review. */
+function computeStreak(logs: ReviewLog[], now: Date, frozenDates: ReadonlySet<string> = EMPTY_SET): number {
   const daysWithReviews = new Set(logs.map((l) => localDateKey(l.reviewedAt)));
+  const isActiveDay = (d: Date) => daysWithReviews.has(localDateKey(d)) || frozenDates.has(localDateKey(d));
   const cursor = new Date(now);
-  if (!daysWithReviews.has(localDateKey(cursor))) {
+  if (!isActiveDay(cursor)) {
     cursor.setDate(cursor.getDate() - 1);
   }
   let streak = 0;
-  while (daysWithReviews.has(localDateKey(cursor))) {
+  while (isActiveDay(cursor)) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -84,9 +93,11 @@ function computeStreak(logs: ReviewLog[], now: Date): number {
 }
 
 /** Longest-ever run of consecutive review-days, scanning the full history once. */
-function computeLongestStreak(logs: ReviewLog[]): number {
-  if (logs.length === 0) return 0;
-  const dayTimes = Array.from(new Set(logs.map((l) => localDateKey(l.reviewedAt))))
+function computeLongestStreak(logs: ReviewLog[], frozenDates: ReadonlySet<string> = EMPTY_SET): number {
+  const dayKeys = new Set(logs.map((l) => localDateKey(l.reviewedAt)));
+  for (const key of frozenDates) dayKeys.add(key);
+  if (dayKeys.size === 0) return 0;
+  const dayTimes = Array.from(dayKeys)
     .map((key) => {
       const [y, m, d] = key.split('-').map(Number);
       return new Date(y!, m!, d!).getTime();
@@ -121,7 +132,13 @@ function computeDailyReviews(logs: ReviewLog[], now: Date): Record<number, numbe
   return dailyReviews;
 }
 
-export function computeProgressStats(words: Word[], logs: ReviewLog[], now: Date): ProgressStats {
+export function computeProgressStats(
+  words: Word[],
+  logs: ReviewLog[],
+  now: Date,
+  dailyGoal: number = FALLBACK_DAILY_GOAL,
+  frozenDates: ReadonlySet<string> = EMPTY_SET,
+): ProgressStats {
   const totalReviews = logs.length;
   const correctReviews = logs.filter((l) => l.grade >= PASS_GRADE).length;
   const accuracy = totalReviews > 0 ? Math.round((correctReviews / totalReviews) * 100) : 0;
@@ -136,7 +153,7 @@ export function computeProgressStats(words: Word[], logs: ReviewLog[], now: Date
   const todayCount = dailyReviews[todayIdx] ?? 0;
 
   const mastered = words.filter(isMastered).length;
-  const streak = computeStreak(logs, now);
+  const streak = computeStreak(logs, now, frozenDates);
 
   return {
     totalReviews,
@@ -150,11 +167,73 @@ export function computeProgressStats(words: Word[], logs: ReviewLog[], now: Date
     dailyReviews,
     todayIdx,
     todayCount,
-    goal: DAILY_GOAL,
+    goal: dailyGoal,
     mastered,
-    longestStreak: Math.max(streak, computeLongestStreak(logs)),
+    longestStreak: Math.max(streak, computeLongestStreak(logs, frozenDates)),
     nextMilestone: computeNextMilestone(streak),
   };
+}
+
+export interface StreakMaintenanceResult {
+  settings: OverlaySettings;
+  /** Whether anything actually changed — the caller only needs to persist
+   *  settings back to storage when this is true. */
+  changed: boolean;
+}
+
+/**
+ * Runs once per popup load, before stats are computed, to keep the streak-
+ * freeze bookkeeping current:
+ *
+ * 1. Consumes a banked freeze if YESTERDAY has no review log, is not
+ *    already frozen, and a streak was actually in progress going into it
+ *    (the day before yesterday was reviewed or itself frozen) — otherwise
+ *    there'd be nothing to protect. Only ever looks at yesterday: if the
+ *    extension goes unopened for several days, only the most recent gap
+ *    gets a chance at rescue, older gaps stay broken. Today is never
+ *    touched — the day isn't over, so there's nothing to rescue yet.
+ * 2. Awards one new freeze the first time the (freeze-adjusted) streak
+ *    crosses a milestone it hasn't been credited for yet.
+ *
+ * Pure: returns a new settings object rather than mutating, same as every
+ * other overlay-policy.ts settings function.
+ */
+export function applyStreakMaintenance(
+  logs: ReviewLog[],
+  settings: OverlaySettings,
+  now: Date,
+): StreakMaintenanceResult {
+  let next = settings;
+  let changed = false;
+
+  const daysWithReviews = new Set(logs.map((l) => localDateKey(l.reviewedAt)));
+  const frozen = new Set(next.frozenDates);
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = localDateKey(yesterday);
+
+  const dayBefore = new Date(now);
+  dayBefore.setDate(dayBefore.getDate() - 2);
+  const dayBeforeKey = localDateKey(dayBefore);
+
+  const yesterdayMissed = !daysWithReviews.has(yesterdayKey) && !frozen.has(yesterdayKey);
+  const streakWasActive = daysWithReviews.has(dayBeforeKey) || frozen.has(dayBeforeKey);
+
+  if (yesterdayMissed && streakWasActive && next.streakFreezes > 0) {
+    frozen.add(yesterdayKey);
+    next = { ...next, frozenDates: [...frozen], streakFreezes: next.streakFreezes - 1 };
+    changed = true;
+  }
+
+  const streak = computeStreak(logs, now, frozen);
+  const milestoneHit = [...STREAK_MILESTONES].reverse().find((m) => streak >= m) ?? 0;
+  if (milestoneHit > next.lastMilestoneAwarded) {
+    next = { ...next, streakFreezes: next.streakFreezes + 1, lastMilestoneAwarded: milestoneHit };
+    changed = true;
+  }
+
+  return { settings: next, changed };
 }
 
 export interface Achievement {

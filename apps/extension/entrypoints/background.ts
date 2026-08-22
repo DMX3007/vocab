@@ -1,6 +1,8 @@
 import { WordRepository } from '../src/lib/storage/word-repository';
 import { SettingsStore } from '../src/lib/review/settings-store';
 import { planTick } from '../src/lib/review/scheduler';
+import { shouldShowStreakReminder, markStreakReminderShown } from '../src/lib/review/overlay-policy';
+import { computeProgressStats } from '../src/lib/review/progress';
 import { translateWord } from '../src/lib/translate/mymemory';
 import type { Message } from '../src/lib/messaging/protocol';
 
@@ -112,10 +114,43 @@ export default defineBackground(() => {
 
     const { dueCount, host, pageCtx, tabId } = context
     const result = planTick(settings, { host, dueCount, ...pageCtx }, now);
-    if (!result.show) return;
+    if (result.show) {
+      if (result.settings) await settingsStore.save(result.settings);
+      browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: settings.targetLang }).catch(() => { });
+      return;
+    }
 
-    if (result.settings) await settingsStore.save(result.settings);
-    browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: settings.targetLang }).catch(() => { });
+    // The ambient due-word overlay isn't showing this tick (throttled,
+    // paused, etc.) — check whether a separate, once-a-day streak nudge
+    // should fire instead. The two never show in the same tick: a visit
+    // from the ambient overlay already gives the user a chance to review.
+    await checkStreakReminder(settings, host, pageCtx, tabId, now);
+  }
+
+  async function checkStreakReminder(
+    settings: Awaited<ReturnType<typeof settingsStore.load>>,
+    host: string,
+    pageCtx: { userIsTyping: boolean; isFullscreen: boolean },
+    tabId: number,
+    now: Date,
+  ): Promise<void> {
+    const logs = await repo.getAllReviewLogs();
+    const stats = computeProgressStats([], logs, now, settings.dailyGoal, new Set(settings.frozenDates));
+    const fire = shouldShowStreakReminder(
+      { todayCount: stats.todayCount, dailyGoal: stats.goal, streak: stats.streak },
+      settings,
+      { host, ...pageCtx },
+      now,
+    );
+    if (!fire) return;
+
+    await settingsStore.save(markStreakReminderShown(settings, now));
+    browser.tabs.sendMessage(tabId, {
+      type: 'SHOW_STREAK_REMINDER',
+      streak: stats.streak,
+      todayCount: stats.todayCount,
+      dailyGoal: stats.goal,
+    }).catch(() => { });
   }
 
   async function askPageContext(tabId: number): Promise<{ userIsTyping: boolean; isFullscreen: boolean } | null> {

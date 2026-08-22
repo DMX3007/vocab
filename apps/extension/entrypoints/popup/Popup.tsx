@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
 import { resume, type OverlaySettings } from '../../src/lib/review/overlay-policy';
+import { applyStreakMaintenance } from '../../src/lib/review/progress';
 import { ReviewPane } from '../../src/components/ReviewPane';
 import { LibraryPane } from '../../src/components/LibraryPane';
 import { ProgressPane } from '../../src/components/ProgressPane';
@@ -48,11 +49,21 @@ export function Popup() {
       wordClient.getDueWords(new Date(), s.targetLang),
       wordClient.getAllReviewLogs(),
     ]);
+    // Consumes a banked streak freeze for a missed yesterday, and awards a
+    // new one on a fresh milestone — see progress.ts. Runs on every popup
+    // open since there's no reliable "midnight" hook otherwise.
+    const maintenance = applyStreakMaintenance(allLogs, s, new Date());
+    if (maintenance.changed) await settingsStore.save(maintenance.settings);
     setWords(all);
     setDueCount(due.length);
     setLogs(allLogs);
-    setSettings(s);
+    setSettings(maintenance.settings);
   }, []);
+
+  async function handleDailyGoalChange(dailyGoal: number) {
+    await settingsStore.update((s) => ({ ...s, dailyGoal }));
+    await refresh();
+  }
 
   useEffect(() => {
     (async () => {
@@ -172,7 +183,11 @@ export function Popup() {
   const isPaused = !!pausedUntil && pausedUntil > new Date();
   const isSnoozed = !!snoozedUntil && snoozedUntil > new Date();
 
-  const stats = computeProgressStats(words, logs, new Date());
+  const stats = computeProgressStats(
+    words, logs, new Date(),
+    settings?.dailyGoal ?? 10,
+    new Set(settings?.frozenDates ?? []),
+  );
   const tabs: { id: TabId; label: string; badge?: number; count?: number }[] = [
     { id: 'review', label: 'Review', badge: dueCount },
     { id: 'progress', label: 'Progress' },
@@ -265,7 +280,16 @@ export function Popup() {
             onDueCountChange={setDueCount}
           />
         )}
-        {tab === 'progress' && <ProgressPane words={words} logs={logs} />}
+        {tab === 'progress' && (
+          <ProgressPane
+            words={words}
+            logs={logs}
+            dailyGoal={settings?.dailyGoal ?? 10}
+            frozenDates={settings?.frozenDates ?? []}
+            streakFreezes={settings?.streakFreezes ?? 0}
+            onDailyGoalChange={handleDailyGoalChange}
+          />
+        )}
         {tab === 'library' && (
           <LibraryPane
             words={words}

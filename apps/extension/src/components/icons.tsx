@@ -41,6 +41,11 @@ const PATHS: Record<string, React.ReactNode> = {
     <line x1="3.3" y1="12.7" x2="4.5" y2="11.5" />
     <line x1="11.5" y1="4.5" x2="12.7" y2="3.3" />
   </>,
+  snowflake: <>
+    <line x1="8" y1="2" x2="8" y2="14" />
+    <line x1="2.9" y1="4.5" x2="13.1" y2="11.5" />
+    <line x1="13.1" y1="4.5" x2="2.9" y2="11.5" />
+  </>,
   shuffle: <>
     <polyline points="10.7,2 14,2 14,5.3" />
     <line x1="2.7" y1="13.3" x2="14" y2="2" />

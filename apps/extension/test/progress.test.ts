@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeProgressStats, isMastered, ACHIEVEMENTS } from '../src/lib/review/progress';
+import { computeProgressStats, isMastered, ACHIEVEMENTS, applyStreakMaintenance } from '../src/lib/review/progress';
+import { defaultSettings } from '../src/lib/review/overlay-policy';
 import type { Word, ReviewLog } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00'); // a Saturday, local time
@@ -118,6 +119,87 @@ describe('computeProgressStats', () => {
   it('nextMilestone picks the smallest milestone still ahead', () => {
     const logs = Array.from({ length: 3 }, (_, i) => log('w1', 5, i));
     expect(computeProgressStats([], logs, NOW).nextMilestone).toBe(7); // streak is 3
+  });
+
+  it('goal defaults to 10 but uses whatever dailyGoal the caller passes', () => {
+    expect(computeProgressStats([], [], NOW).goal).toBe(10);
+    expect(computeProgressStats([], [], NOW, 25).goal).toBe(25);
+  });
+
+  it('a frozen date counts as active for both streak and longestStreak', () => {
+    // reviewed today and 2 days ago, but NOT yesterday — a real gap without freezing
+    const logs = [log('w1', 5, 0), log('w1', 5, 2)];
+    expect(computeProgressStats([], logs, NOW).streak).toBe(1); // just today; yesterday's gap breaks it
+
+    const yesterday = new Date(NOW.getTime() - 1 * 86_400_000);
+    const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+    const frozen = new Set([yesterdayKey]);
+    const stats = computeProgressStats([], logs, NOW, 10, frozen);
+    expect(stats.streak).toBe(3); // today + frozen yesterday + 2-days-ago, now unbroken
+    expect(stats.longestStreak).toBe(3);
+  });
+});
+
+describe('applyStreakMaintenance', () => {
+  const settings = (over: Partial<ReturnType<typeof defaultSettings>> = {}) => ({
+    ...defaultSettings(),
+    ...over,
+  });
+
+  it('consumes a freeze to cover a missed yesterday when a streak was active going into it', () => {
+    // reviewed 2 days ago (streak was active), nothing yesterday, nothing today yet
+    const logs = [log('w1', 5, 2)];
+    const s = settings({ streakFreezes: 1 });
+    const result = applyStreakMaintenance(logs, s, NOW);
+    expect(result.changed).toBe(true);
+    expect(result.settings.streakFreezes).toBe(0);
+    expect(result.settings.frozenDates).toHaveLength(1);
+  });
+
+  it('does not consume a freeze with none banked', () => {
+    const logs = [log('w1', 5, 2)];
+    const s = settings({ streakFreezes: 0 });
+    const result = applyStreakMaintenance(logs, s, NOW);
+    expect(result.settings.frozenDates).toEqual([]);
+  });
+
+  it('does not consume a freeze across a real two-day gap (nothing to protect)', () => {
+    // neither yesterday NOR the day before has a review — no streak was active to protect
+    const logs = [log('w1', 5, 3)];
+    const s = settings({ streakFreezes: 1 });
+    const result = applyStreakMaintenance(logs, s, NOW);
+    expect(result.settings.streakFreezes).toBe(1); // untouched
+    expect(result.settings.frozenDates).toEqual([]);
+  });
+
+  it('does not double-consume once yesterday is already frozen', () => {
+    const logs = [log('w1', 5, 2)];
+    const once = applyStreakMaintenance(logs, settings({ streakFreezes: 2 }), NOW);
+    const twice = applyStreakMaintenance(logs, once.settings, NOW);
+    expect(twice.changed).toBe(false);
+    expect(twice.settings.streakFreezes).toBe(1); // still just the one freeze spent
+  });
+
+  it('awards a freeze the first time a streak milestone is crossed', () => {
+    const logs = Array.from({ length: 3 }, (_, i) => log('w1', 5, i)); // streak of 3
+    const result = applyStreakMaintenance(logs, settings({ streakFreezes: 0 }), NOW);
+    expect(result.changed).toBe(true);
+    expect(result.settings.streakFreezes).toBe(1);
+    expect(result.settings.lastMilestoneAwarded).toBe(3);
+  });
+
+  it('does not re-award the same milestone twice', () => {
+    const logs = Array.from({ length: 3 }, (_, i) => log('w1', 5, i));
+    const first = applyStreakMaintenance(logs, settings({ streakFreezes: 0 }), NOW);
+    const second = applyStreakMaintenance(logs, first.settings, NOW);
+    expect(second.changed).toBe(false);
+    expect(second.settings.streakFreezes).toBe(1);
+  });
+
+  it('reports changed: false when there is nothing to do', () => {
+    const result = applyStreakMaintenance([], settings(), NOW);
+    expect(result.changed).toBe(false);
+    expect(result.settings).toEqual(settings());
   });
 });
 

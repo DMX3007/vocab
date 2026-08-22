@@ -1,5 +1,6 @@
 import { canInterrupt, type InterruptionSettings } from '../interruption';
 import { DEFAULT_TARGET_LANG } from '../languages';
+import { localDateKey } from './progress';
 import type { AlgoId } from '@vocabflow/core';
 
 // Decides whether the review overlay may pop on the active tab right now.
@@ -28,6 +29,19 @@ export interface OverlaySettings {
   targetLang: string;
   /** the scheduler NEW words are saved with; existing words keep whatever they were saved/moved onto */
   defaultAlgo: AlgoId;
+  /** reviews per day the Progress tab's goal bar targets; user-editable */
+  dailyGoal: number;
+  /** banked "cover one missed day" credits, Duolingo-style — see applyStreakMaintenance */
+  streakFreezes: number;
+  /** date-keys (progress.ts's localDateKey) of days a freeze covered, so a
+   *  missed day still counts as active for streak purposes */
+  frozenDates: string[];
+  /** highest streak milestone a freeze has already been awarded for, so
+   *  crossing it again (e.g. after a freeze bridges a gap) doesn't re-pay it */
+  lastMilestoneAwarded: number;
+  /** date-key of the last time the streak-at-risk reminder was shown, so it
+   *  fires at most once per day */
+  lastStreakReminderDate: string | null;
 }
 
 export function defaultSettings(): OverlaySettings {
@@ -41,6 +55,11 @@ export function defaultSettings(): OverlaySettings {
     shownInLastHour: 0,
     targetLang: DEFAULT_TARGET_LANG,
     defaultAlgo: 'sm2',
+    dailyGoal: 10,
+    streakFreezes: 1,
+    frozenDates: [],
+    lastMilestoneAwarded: 0,
+    lastStreakReminderDate: null,
   };
 }
 
@@ -151,4 +170,36 @@ export function addToBlacklist(settings: OverlaySettings, host: string): Overlay
 
 export function removeFromBlacklist(settings: OverlaySettings, host: string): OverlaySettings {
   return { ...settings, blacklist: settings.blacklist.filter((h) => h !== host) };
+}
+
+// ── streak-at-risk reminder ──────────────────────────────────────
+/** Local hour after which "still haven't hit today's goal" starts to mean
+ *  the streak is genuinely on the line, not just "there's still time". */
+export const STREAK_RISK_HOUR = 19;
+
+/** Whether to nudge that today's goal isn't met and an existing streak is
+ *  about to break. Distinct from decideOverlay: this ignores the ambient
+ *  due-word throttle/cap entirely (it isn't about due words at all) and
+ *  fires at most once a day, gated only by pause/snooze/blacklist plus
+ *  "is it actually late, and is there a streak worth protecting". */
+export function shouldShowStreakReminder(
+  params: { todayCount: number; dailyGoal: number; streak: number },
+  settings: OverlaySettings,
+  page: { host: string; userIsTyping: boolean; isFullscreen: boolean },
+  now: Date,
+): boolean {
+  if (params.todayCount >= params.dailyGoal) return false;
+  if (params.streak <= 0) return false;
+  if (now.getHours() < STREAK_RISK_HOUR) return false;
+  if (settings.lastStreakReminderDate === localDateKey(now)) return false;
+  if (isPausedOrSnoozed(settings, now)) return false;
+  if (isBlacklisted(settings, page.host)) return false;
+  if (page.userIsTyping || page.isFullscreen) return false;
+  return true;
+}
+
+/** Records that the reminder fired today, so shouldShowStreakReminder
+ *  won't fire again until tomorrow. */
+export function markStreakReminderShown(settings: OverlaySettings, now: Date): OverlaySettings {
+  return { ...settings, lastStreakReminderDate: localDateKey(now) };
 }

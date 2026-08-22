@@ -454,13 +454,21 @@ input, select, textarea { font: inherit; color: inherit; }
 .flame-wrap .flame { filter: drop-shadow(0 0 12px color-mix(in oklch, var(--heat) 80%, transparent)); animation: flicker 1.6s ease-in-out infinite; }
 @keyframes flicker { 0%, 100% { transform: scale(1) translateY(0); opacity: 1; } 50% { transform: scale(1.04) translateY(-1px); opacity: 0.92; } }
 
-.daily-card { margin: 0 14px 14px; padding: 14px 16px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 12px; }
+.daily-card { margin: 0 14px 14px; padding: 14px 16px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 12px; transition: background 0.2s, border-color 0.2s; }
+.daily-card.met { background: var(--leaf-soft); border-color: color-mix(in oklch, var(--leaf) 40%, transparent); }
 .daily-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-.daily-title { font-family: var(--serif); font-size: 16px; }
-.daily-count { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--ink); letter-spacing: -0.01em; }
+.daily-title { font-family: var(--serif); font-size: 16px; display: inline-flex; align-items: center; gap: 5px; }
+.daily-card.met .daily-title { color: var(--leaf); }
+.daily-count { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--ink); letter-spacing: -0.01em; display: inline-flex; align-items: baseline; }
 .daily-count .muted { font-family: var(--sans); font-size: 11px; color: var(--ink-4); font-style: normal; margin-left: 4px; }
+.daily-goal-select {
+  font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--ink);
+  background: none; border: none; border-bottom: 1px dashed var(--ink-5); cursor: pointer;
+  padding: 0 2px; appearance: none;
+}
 .daily-track { position: relative; height: 20px; background: var(--paper-3); border-radius: 99px; overflow: hidden; }
 .daily-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--leaf) 0%, color-mix(in oklch, var(--leaf) 70%, var(--gold) 30%) 100%); border-radius: 99px; transition: width 1s cubic-bezier(.2,.7,.2,1); }
+.daily-card.met .daily-fill { background: var(--leaf); }
 
 .stat-trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 14px 14px; }
 .stat-card { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }

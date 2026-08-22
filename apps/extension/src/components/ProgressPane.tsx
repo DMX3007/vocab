@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { computeProgressStats, ACHIEVEMENTS } from '../lib/review/progress';
+import { Icon } from './icons';
 import type { Word, ReviewLog } from '../lib/storage/types';
 
 interface Props {
   words: Word[];
   logs: ReviewLog[];
+  dailyGoal: number;
+  frozenDates: string[];
+  streakFreezes: number;
+  onDailyGoalChange: (goal: number) => void;
 }
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const GOAL_PRESETS = [5, 10, 15, 20, 30, 50];
 
-export function ProgressPane({ words, logs }: Props) {
-  const stats = computeProgressStats(words, logs, new Date());
+export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreezes, onDailyGoalChange }: Props) {
+  const stats = computeProgressStats(words, logs, new Date(), dailyGoal, new Set(frozenDates));
   const maxDay = Math.max(1, ...Object.values(stats.dailyReviews));
   const goalPct = Math.min(100, (stats.todayCount / stats.goal) * 100);
+  const goalMet = stats.todayCount >= stats.goal;
 
   // Animate the two fills in on mount, like the approved design.
   const [animGoal, setAnimGoal] = useState(0);
@@ -45,14 +52,32 @@ export function ProgressPane({ words, logs }: Props) {
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #ffffff20', display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 10, color: '#ffffffa0' }}>
           <span>Personal best {'·'} {stats.longestStreak} {stats.longestStreak === 1 ? 'day' : 'days'}</span>
+          <span title="Banked freezes auto-cover one missed day each, so an off day doesn't reset your streak">
+            <Icon name="snowflake" size={10} /> {streakFreezes}
+          </span>
           <span>Next milestone {'·'} {stats.nextMilestone}</span>
         </div>
       </div>
 
-      <div className="daily-card">
+      <div className={`daily-card ${goalMet ? 'met' : ''}`}>
         <div className="daily-head">
-          <div className="daily-title">Today&rsquo;s goal</div>
-          <div className="daily-count">{stats.todayCount} / {stats.goal} <span className="muted">reviews</span></div>
+          <div className="daily-title">
+            {goalMet ? <><Icon name="check" size={12} /> Goal complete</> : "Today's goal"}
+          </div>
+          <div className="daily-count">
+            {stats.todayCount} / {' '}
+            <select
+              className="daily-goal-select"
+              value={stats.goal}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onDailyGoalChange(Number(e.target.value))}
+            >
+              {(GOAL_PRESETS.includes(stats.goal) ? GOAL_PRESETS : [...GOAL_PRESETS, stats.goal].sort((a, b) => a - b)).map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>{' '}
+            <span className="muted">reviews</span>
+          </div>
         </div>
         <div className="daily-track">
           <div className="daily-fill" style={{ width: `${animGoal}%` }} />
