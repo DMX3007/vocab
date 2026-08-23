@@ -59,6 +59,16 @@ describe('decideOverlay', () => {
     expect(reasonOf(d)).toBe('paused');
   });
 
+  it('waits while paused indefinitely, with no expiry', () => {
+    const s = settings({ pausedIndefinitely: true });
+    const d = decideOverlay(s, page, NOW);
+    expect(d.action).toBe('wait');
+    expect(reasonOf(d)).toBe('paused');
+    // still waiting, no matter how far into the future
+    const farFuture = new Date(NOW.getTime() + 365 * 24 * 60 * 60_000);
+    expect(decideOverlay(s, page, farFuture).action).toBe('wait');
+  });
+
   it('waits on a blacklisted host (and its subdomains)', () => {
     const s = settings({ blacklist: ['youtube.com'] });
     expect(reasonOf(decideOverlay(s, { ...page, host: 'youtube.com' }, NOW))).toBe('blacklisted');
@@ -92,14 +102,23 @@ describe('snooze / pause / resume', () => {
     expect(new Date(tomorrow).getTime()).toBeGreaterThan(inMin(60).getTime());
   });
 
-  it('resume clears both pause and snooze immediately (manual override)', () => {
+  it('pauseFor supports an indefinite preset with no expiry timestamp', () => {
+    const s = pauseFor(settings(), NOW, 'indefinite');
+    expect(s.pausedIndefinitely).toBe(true);
+    expect(s.pausedUntil).toBeNull();
+    expect(isPausedOrSnoozed(s, new Date(NOW.getTime() + 365 * 24 * 60 * 60_000))).toBe(true);
+  });
+
+  it('resume clears pause, snooze, and the indefinite pause immediately (manual override)', () => {
     const paused = settings({
       pausedUntil: inMin(600).toISOString(),
       snoozedUntil: inMin(15).toISOString(),
+      pausedIndefinitely: true,
     });
     const r = resume(paused);
     expect(r.pausedUntil).toBeNull();
     expect(r.snoozedUntil).toBeNull();
+    expect(r.pausedIndefinitely).toBe(false);
     expect(decideOverlay(r, page, NOW).action).toBe('show');
   });
 });

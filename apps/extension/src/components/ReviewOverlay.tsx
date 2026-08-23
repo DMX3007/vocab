@@ -40,6 +40,7 @@ export function ReviewOverlay({ session, host, onClose, onSnooze, onPause, onDis
                 <button onClick={() => onPause('15m')}>{t('overlay.pause15m')}</button>
                 <button onClick={() => onPause('1h')}>{t('overlay.pause1h')}</button>
                 <button onClick={() => onPause('tomorrow')}>{t('overlay.pauseTomorrow')}</button>
+                <button onClick={() => onPause('indefinite')}>{t('overlay.pauseIndefinite')}</button>
               </div>
             )}
           </div>

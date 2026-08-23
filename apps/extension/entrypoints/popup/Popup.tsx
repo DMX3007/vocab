@@ -281,7 +281,7 @@ export function Popup() {
 
   const pausedUntil = settings?.pausedUntil ? new Date(settings.pausedUntil) : null;
   const snoozedUntil = settings?.snoozedUntil ? new Date(settings.snoozedUntil) : null;
-  const isPaused = !!pausedUntil && pausedUntil > new Date();
+  const isPaused = !!settings?.pausedIndefinitely || (!!pausedUntil && pausedUntil > new Date());
   const isSnoozed = !!snoozedUntil && snoozedUntil > new Date();
 
   const stats = computeProgressStats(

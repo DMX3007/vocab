@@ -8,13 +8,17 @@ import type { AlgoId } from '@vocably/core';
 // settings, this only decides. Settings live in chrome.storage (shared
 // across all tabs), so a pause set on one tab silently calms every tab.
 
-export type PausePreset = '15m' | '1h' | 'tomorrow';
+export type PausePreset = '15m' | '1h' | 'tomorrow' | 'indefinite';
 
 export interface OverlaySettings {
   /** ISO string or null. Temporary "remind me later". */
   snoozedUntil: string | null;
   /** ISO string or null. Global "do not disturb" until this time. */
   pausedUntil: string | null;
+  /** Global "do not disturb" with no end time — only resume() clears it.
+   *  Kept separate from pausedUntil (rather than a sentinel value in it) so
+   *  isActive()'s date parsing never has to special-case "forever". */
+  pausedIndefinitely: boolean;
   /** domains where the overlay never appears (matches subdomains too) */
   blacklist: string[];
   /** when the last card was shown, ISO string or null */
@@ -48,6 +52,7 @@ export function defaultSettings(): OverlaySettings {
   return {
     snoozedUntil: null,
     pausedUntil: null,
+    pausedIndefinitely: false,
     blacklist: [],
     lastShownAt: null,
     throttleMinutes: 10,
@@ -90,7 +95,7 @@ const isActive = (until: string | null, now: Date): boolean =>
 
 /** True while either an explicit pause or a snooze is still in effect. */
 export function isPausedOrSnoozed(settings: OverlaySettings, now: Date): boolean {
-  return isActive(settings.pausedUntil, now) || isActive(settings.snoozedUntil, now);
+  return settings.pausedIndefinitely || isActive(settings.pausedUntil, now) || isActive(settings.snoozedUntil, now);
 }
 
 /** A host is blacklisted if it equals, or is a subdomain of, a listed domain. */
@@ -108,6 +113,7 @@ export function decideOverlay(
   if (page.dueCount <= 0) return { action: 'idle', reason: 'nothing_due' };
 
   // Our own overrides first — the user's explicit choices win.
+  if (settings.pausedIndefinitely) return { action: 'wait', reason: 'paused' };
   if (isActive(settings.pausedUntil, now)) return { action: 'wait', reason: 'paused' };
   if (isActive(settings.snoozedUntil, now)) return { action: 'wait', reason: 'snoozed' };
   if (isBlacklisted(settings, page.host)) return { action: 'wait', reason: 'blacklisted' };
@@ -147,6 +153,8 @@ export function snooze(settings: OverlaySettings, now: Date): OverlaySettings {
 }
 
 export function pauseFor(settings: OverlaySettings, now: Date, preset: PausePreset): OverlaySettings {
+  if (preset === 'indefinite') return { ...settings, pausedIndefinitely: true, pausedUntil: null };
+
   let until: Date;
   if (preset === '15m') until = new Date(now.getTime() + 15 * MS_PER_MIN);
   else if (preset === '1h') until = new Date(now.getTime() + 60 * MS_PER_MIN);
@@ -155,12 +163,12 @@ export function pauseFor(settings: OverlaySettings, now: Date, preset: PausePres
     until = new Date(now);
     until.setHours(24, 0, 0, 0);
   }
-  return { ...settings, pausedUntil: until.toISOString() };
+  return { ...settings, pausedUntil: until.toISOString(), pausedIndefinitely: false };
 }
 
 /** Manual override: cancel pause AND snooze right now, even if not expired. */
 export function resume(settings: OverlaySettings): OverlaySettings {
-  return { ...settings, pausedUntil: null, snoozedUntil: null };
+  return { ...settings, pausedUntil: null, snoozedUntil: null, pausedIndefinitely: false };
 }
 
 export function addToBlacklist(settings: OverlaySettings, host: string): OverlaySettings {

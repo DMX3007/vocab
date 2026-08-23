@@ -229,6 +229,7 @@ export const strings = {
   'overlay.pause15m': '15 minutes',
   'overlay.pause1h': '1 hour',
   'overlay.pauseTomorrow': 'Until tomorrow',
+  'overlay.pauseIndefinite': 'Until I resume',
   'overlay.neverOnHost': 'Never on {host}',
   'overlay.disableOnHost': 'Disable on {host}',
 

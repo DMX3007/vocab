@@ -227,6 +227,7 @@ export const strings: Record<TranslationKey, string> = {
   'overlay.pause15m': '15 минут',
   'overlay.pause1h': '1 час',
   'overlay.pauseTomorrow': 'До завтра',
+  'overlay.pauseIndefinite': 'До возобновления',
   'overlay.neverOnHost': 'Никогда на {host}',
   'overlay.disableOnHost': 'Отключить на {host}',
 
