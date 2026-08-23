@@ -254,16 +254,37 @@ input, select, textarea { font: inherit; color: inherit; }
 .tray-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .tray-row.full { grid-column: 1 / -1; }
 .tray-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-4); }
+.select-caret { position: relative; display: inline-flex; max-width: 100%; }
+.select-caret::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ink-4);
+  border-bottom: 1.5px solid var(--ink-4);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
 .tray-value {
-  background: transparent;
-  border: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 6px 24px 6px 10px;
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
-  appearance: none;
-  text-align: right;
   cursor: pointer;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
+.tray-value:hover { border-color: var(--ink-4); }
+.tray-value:focus-visible { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in oklch, var(--gold) 35%, transparent); }
+.tray-value:disabled { cursor: default; opacity: 0.6; }
 
 /* ───────── Word list (Review) ───────── */
 .word-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px dashed var(--rule); transition: background 0.12s; }

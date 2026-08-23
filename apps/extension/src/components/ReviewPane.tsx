@@ -129,27 +129,31 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
       <div className="tray">
         <div className="tray-row full">
           <span className="tray-label">{t('tray.targetLanguage')}</span>
-          <select className="tray-value" value={targetLang} onChange={(e) => onLangChange(e.target.value)} disabled={!ready}>
-            {SUPPORTED_LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
-            ))}
-          </select>
+          <span className="select-caret">
+            <select className="tray-value" value={targetLang} onChange={(e) => onLangChange(e.target.value)} disabled={!ready}>
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
+              ))}
+            </select>
+          </span>
         </div>
         <div className="tray-row full">
           <span className="tray-label">{t('tray.newWordsUse')}</span>
-          <select
-            className="tray-value"
-            value={algoChoiceOf(algo, pace)}
-            onChange={(e) => {
-              const { algo: nextAlgo, pace: nextPace } = parseAlgoChoice(e.target.value as AlgoChoice);
-              onAlgoChange(nextAlgo, nextPace);
-            }}
-            disabled={!ready}
-          >
-            {algoChoiceOptions(t).map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <span className="select-caret">
+            <select
+              className="tray-value"
+              value={algoChoiceOf(algo, pace)}
+              onChange={(e) => {
+                const { algo: nextAlgo, pace: nextPace } = parseAlgoChoice(e.target.value as AlgoChoice);
+                onAlgoChange(nextAlgo, nextPace);
+              }}
+              disabled={!ready}
+            >
+              {algoChoiceOptions(t).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </span>
         </div>
       </div>
 
