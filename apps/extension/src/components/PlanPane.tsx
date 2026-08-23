@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Icon } from './icons';
+import { useI18n } from '../lib/i18n';
 import type { Word } from '../lib/storage/types';
 import { FREE_WORD_CAP } from '../lib/plan';
 
@@ -30,27 +31,28 @@ export function PlanPane({ words, planState, onBuy, onActivateLicense, onDeactiv
 }
 
 function BetaView() {
+  const { t } = useI18n();
   return (
     <div className="plan-pane">
       <div className="info-card info-tip">
-        <h4>Beta access</h4>
+        <h4>{t('plan.betaAccessTitle')}</h4>
         <div className="beta-line">
-          <span className="serif-italic">All features unlocked.</span>
-          <span> No word cap, for now.</span>
+          <span className="serif-italic">{t('plan.betaAllUnlocked')}</span>
+          <span>{t('plan.betaNoCap')}</span>
         </div>
       </div>
 
       <div className="info-card">
-        <h4>Current algorithm</h4>
-        <div className="name">SM-2 (SuperMemo)</div>
-        <p>Classic SuperMemo-2 algorithm. Reviews are spaced using an ease factor updated after each answer.</p>
+        <h4>{t('plan.currentAlgorithm')}</h4>
+        <div className="name">{t('plan.sm2Name')}</div>
+        <p>{t('plan.sm2Desc')}</p>
       </div>
 
       <div className="tips">
-        <h4>Tips for faster learning</h4>
-        <div className="tip-item"><div className="num">1</div><div>Review in the morning — retention is higher after sleep.</div></div>
-        <div className="tip-item"><div className="num">2</div><div>Say the word aloud when reviewing.</div></div>
-        <div className="tip-item"><div className="num">3</div><div>Save words in context — a sentence beats a single word.</div></div>
+        <h4>{t('plan.tipsTitle')}</h4>
+        <div className="tip-item"><div className="num">1</div><div>{t('plan.tip1')}</div></div>
+        <div className="tip-item"><div className="num">2</div><div>{t('plan.tip2')}</div></div>
+        <div className="tip-item"><div className="num">3</div><div>{t('plan.tip3')}</div></div>
       </div>
     </div>
   );
@@ -65,6 +67,7 @@ function UpgradeView({
   onBuy: () => void;
   onActivateLicense: (key: string) => Promise<{ ok: boolean; message: string }>;
 }) {
+  const { t } = useI18n();
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [licenseKey, setLicenseKey] = useState('');
   const [activating, setActivating] = useState(false);
@@ -77,8 +80,8 @@ function UpgradeView({
   // else in the app (both algorithms, typed review, dictionary lookups) is
   // already free for everyone — this list only promises what's real.
   const features = [
-    { free: `${FREE_WORD_CAP} words max`, pro: 'Unlimited words' },
-    { free: 'Free, forever', pro: 'Supports ongoing development' },
+    { free: t('plan.featWordsCapFree', { cap: FREE_WORD_CAP }), pro: t('plan.featWordsCapPremium') },
+    { free: t('plan.featForeverFree'), pro: t('plan.featForeverPremium') },
   ];
 
   async function tryActivate() {
@@ -94,35 +97,35 @@ function UpgradeView({
       <div className="pricing-card">
         <div className="pricing-head">
           <div>
-            <div className="overline">Vocably</div>
-            <div className="pricing-name">Premium</div>
+            <div className="overline">{t('plan.brand')}</div>
+            <div className="pricing-name">{t('plan.premium')}</div>
           </div>
           <div className="pricing-price">
-            <div className="amount">Pay what you want<span className="suffix"></span></div>
-            <div className="price-note">one-time, via Ko-fi</div>
+            <div className="amount">{t('plan.payWhatYouWant')}<span className="suffix"></span></div>
+            <div className="price-note">{t('plan.oneTimeKofi')}</div>
           </div>
         </div>
 
         <button className="cta-btn" onClick={onBuy}>
-          <span>Support &amp; get Premium</span>
+          <span>{t('plan.supportGetPremium')}</span>
           <span className="cta-arrow">→</span>
         </button>
       </div>
 
       <div className={`quota-strip ${nearCap ? 'warn' : ''}`}>
         <div className="quota-row">
-          <span className="quota-label">Your library</span>
+          <span className="quota-label">{t('plan.yourLibrary')}</span>
           <span className="quota-count"><strong>{used}</strong> <span className="muted">/ {FREE_WORD_CAP}</span></span>
         </div>
         <div className="quota-track"><div className="quota-fill" style={{ width: `${pct}%` }} /></div>
-        {nearCap && <div className="quota-msg">You&rsquo;re near the free cap. After {FREE_WORD_CAP}, new words pause until you upgrade.</div>}
+        {nearCap && <div className="quota-msg">{t('plan.nearCapMsg', { cap: FREE_WORD_CAP })}</div>}
       </div>
 
       <div className="features">
         <div className="features-head">
           <div />
-          <div className="features-h-col free">Free</div>
-          <div className="features-h-col pro">Premium</div>
+          <div className="features-h-col free">{t('plan.featFree')}</div>
+          <div className="features-h-col pro">{t('plan.featPremium')}</div>
         </div>
         {features.map((f, i) => (
           <div className="feature-row" key={i}>
@@ -135,7 +138,7 @@ function UpgradeView({
 
       <div className="license-block">
         <button className="license-toggle" aria-expanded={licenseOpen} onClick={() => setLicenseOpen(!licenseOpen)}>
-          <span>Already have a license key?</span>
+          <span>{t('plan.haveLicense')}</span>
           <span className={`chev ${licenseOpen ? 'open' : ''}`}>{'›'}</span>
         </button>
         {licenseOpen && (
@@ -149,7 +152,7 @@ function UpgradeView({
               spellCheck={false}
             />
             <button className="license-activate" onClick={tryActivate} disabled={!licenseKey.trim() || activating}>
-              {activating ? 'Checking…' : 'Activate'}
+              {activating ? t('plan.checking') : t('plan.activate')}
             </button>
             {licenseMsg && (
               <div className={`license-msg ${licenseMsg.ok ? 'ok' : 'err'}`}>{licenseMsg.text}</div>
@@ -162,32 +165,33 @@ function UpgradeView({
 }
 
 function PremiumActiveView({ onDeactivate }: { onDeactivate: () => void }) {
+  const { t } = useI18n();
   const [confirmOff, setConfirmOff] = useState(false);
   return (
     <div className="plan-pane">
       <div className="active-card">
         <div className="active-mark"><Icon name="check" size={16} /></div>
-        <div className="overline">Plan</div>
-        <div className="active-title"><span className="serif-italic">Premium</span> {'·'} Active</div>
-        <div className="active-sub">Thank you for supporting Vocably.</div>
+        <div className="overline">{t('plan.planOverline')}</div>
+        <div className="active-title"><span className="serif-italic">{t('plan.premium')}</span> {'·'} {t('plan.active')}</div>
+        <div className="active-sub">{t('plan.thanksSupporting')}</div>
         <div className="active-meta">
-          <div className="meta-row"><span className="meta-k">Words saved</span><span className="meta-v">{'∞'}</span></div>
+          <div className="meta-row"><span className="meta-k">{t('plan.wordsSaved')}</span><span className="meta-v">{'∞'}</span></div>
         </div>
       </div>
 
       <div className="active-perks">
-        <div className="overline">What&rsquo;s unlocked</div>
-        <div className="perk"><Icon name="check" size={11} /> Unlimited words</div>
+        <div className="overline">{t('plan.whatsUnlocked')}</div>
+        <div className="perk"><Icon name="check" size={11} /> {t('plan.unlimitedWords')}</div>
       </div>
 
       {!confirmOff ? (
-        <button className="ghost-btn danger" onClick={() => setConfirmOff(true)}>Deactivate license</button>
+        <button className="ghost-btn danger" onClick={() => setConfirmOff(true)}>{t('plan.deactivate')}</button>
       ) : (
         <div className="deact-confirm">
-          <div className="deact-msg">Sure? You&rsquo;ll drop back to the free word cap on this browser.</div>
+          <div className="deact-msg">{t('plan.deactivateConfirm')}</div>
           <div className="deact-row">
-            <button className="ghost-btn" onClick={() => setConfirmOff(false)}>Keep Premium</button>
-            <button className="ghost-btn danger" onClick={() => { setConfirmOff(false); onDeactivate(); }}>Yes, deactivate</button>
+            <button className="ghost-btn" onClick={() => setConfirmOff(false)}>{t('plan.keepPremium')}</button>
+            <button className="ghost-btn danger" onClick={() => { setConfirmOff(false); onDeactivate(); }}>{t('plan.yesDeactivate')}</button>
           </div>
         </div>
       )}

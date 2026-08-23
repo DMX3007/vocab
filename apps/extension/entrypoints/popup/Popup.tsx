@@ -16,6 +16,7 @@ import type { LibrarySort, AlgoFilter } from '../../src/lib/review/library';
 import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
 import { FREE_WORD_CAP } from '../../src/lib/plan';
+import { useI18n } from '../../src/lib/i18n';
 import type { AlgoId } from '@vocably/core';
 import '../../src/components/popup.css';
 
@@ -33,6 +34,7 @@ type TabId = 'review' | 'progress' | 'library' | 'plan';
 type ThemePref = 'light' | 'dark' | null;
 
 export function Popup() {
+  const { t, tp, locale, setLocale } = useI18n();
   const [ready, setReady] = useState(false);
   const [words, setWords] = useState<Word[]>([]);
   const [logs, setLogs] = useState<ReviewLog[]>([]);
@@ -132,14 +134,14 @@ export function Popup() {
     try {
       result = await wordClient.activateLicense(key);
     } catch {
-      return { ok: false, message: "Couldn't reach the license server — check your connection and try again." };
+      return { ok: false, message: t('toast.licenseServerError') };
     }
     if (!result.valid) {
-      return { ok: false, message: "That key doesn't look right. Check the format XXXX-XXXX-XXXX-XXXX." };
+      return { ok: false, message: t('toast.licenseBadFormat') };
     }
     await browser.storage.local.set({ [LICENSE_KEY_STORAGE]: key });
     updatePlanState(result.plan === 'premium' ? 'premium' : 'free');
-    return { ok: true, message: 'License accepted. Welcome to Premium.' };
+    return { ok: true, message: t('toast.licenseAccepted') };
   }
 
   /** Checkout always happens on Ko-fi's own page, in a new tab — never a
@@ -168,7 +170,7 @@ export function Popup() {
       await browser.tabs.sendMessage(tab.id, { type: 'SHOW_OVERLAY', langTo: targetLang, algoFilter });
       window.close();
     } catch {
-      showToast('Open a regular webpage first, then review from there.');
+      showToast(t('toast.openWebpageFirst'));
     }
   }
 
@@ -184,7 +186,7 @@ export function Popup() {
 
   async function handleMoveAlgo(wordIds: string[], algo: AlgoId) {
     await wordClient.moveWordsAlgo(wordIds, algo, new Date());
-    showToast(`Moved ${wordIds.length} word${wordIds.length === 1 ? '' : 's'} to ${algo === 'sm2' ? 'SM-2' : 'Leitner'}`);
+    showToast(tp('toast.movedWords', wordIds.length, { algo: algo === 'sm2' ? 'SM-2' : 'Leitner' }));
     await refresh();
   }
 
@@ -202,7 +204,7 @@ export function Popup() {
     // toward stopping a little early, never over the cap.
     const remaining = planState === 'free' ? Math.max(0, FREE_WORD_CAP - words.length) : Infinity;
     if (remaining <= 0) {
-      showToast(`You've hit the free ${FREE_WORD_CAP}-word cap — upgrade in the Plan tab to add more`);
+      showToast(t('toast.capHit', { cap: FREE_WORD_CAP }));
       return;
     }
     const toAdd = inputs.slice(0, remaining);
@@ -219,9 +221,9 @@ export function Popup() {
     }
 
     if (toAdd.length < inputs.length) {
-      showToast(`Added ${toAdd.length} — the rest hit the free ${FREE_WORD_CAP}-word cap. Upgrade in the Plan tab for more.`);
+      showToast(t('toast.addedPartialCap', { n: toAdd.length, cap: FREE_WORD_CAP }));
     } else {
-      showToast(`Added ${toAdd.length} word${toAdd.length === 1 ? '' : 's'}`);
+      showToast(tp('toast.addedWords', toAdd.length));
     }
     await refresh();
   }
@@ -235,31 +237,31 @@ export function Popup() {
     const all = await wordClient.exportLibrary();
     const date = new Date().toISOString().slice(0, 10);
     downloadJson(`vocably-export-${date}.json`, all);
-    showToast(`Exported ${all.length} word${all.length === 1 ? '' : 's'}`);
+    showToast(tp('toast.exportedWords', all.length));
   }
 
   async function handleClearLibrary() {
     const targetLang = settings?.targetLang ?? DEFAULT_TARGET_LANG;
     const count = await wordClient.clearLibrary(targetLang, new Date());
-    showToast(`Cleared ${count} word${count === 1 ? '' : 's'}`);
+    showToast(tp('toast.clearedWords', count));
     await refresh();
   }
 
   async function handleShelve(id: string) {
     await wordClient.shelveWord(id, new Date());
-    showToast('Set aside — it won’t come up in review for now');
+    showToast(t('toast.shelved'));
     await refresh();
   }
 
   async function handleUnshelve(id: string) {
     await wordClient.unshelveWord(id, new Date());
-    showToast('Back in review rotation');
+    showToast(t('toast.unshelved'));
     await refresh();
   }
 
   async function handleEditWord(id: string, changes: { term: string; translations: string[]; contextSentence: string }) {
     await wordClient.updateWord(id, changes, new Date());
-    showToast('Word updated');
+    showToast(t('toast.wordUpdated'));
     await refresh();
   }
 
@@ -288,10 +290,10 @@ export function Popup() {
     new Set(settings?.frozenDates ?? []),
   );
   const tabs: { id: TabId; label: string; badge?: number; count?: number }[] = [
-    { id: 'review', label: 'Review', badge: dueCount },
-    { id: 'progress', label: 'Progress' },
-    { id: 'library', label: 'Library', count: words.length },
-    { id: 'plan', label: 'Plan' },
+    { id: 'review', label: t('tab.review'), badge: dueCount },
+    { id: 'progress', label: t('tab.progress') },
+    { id: 'library', label: t('tab.library'), count: words.length },
+    { id: 'plan', label: t('tab.plan') },
   ];
 
   return (
@@ -307,14 +309,14 @@ export function Popup() {
             <div className="brand-name">Vocab<em>ly</em></div>
             <div className="overline">
               <span className={`tier-pill ${planState === 'premium' ? 'premium' : ''}`}>
-                {planState === 'premium' ? '★ PREMIUM' : planState === 'free' ? 'FREE' : 'BETA'}
+                {planState === 'premium' ? t('tier.premium') : planState === 'free' ? t('tier.free') : t('tier.beta')}
               </span>
               {planState === 'free' ? (
                 <button className="header-quota" onClick={() => setTab('plan')} style={{ marginLeft: 6 }}>
-                  {words.length} / 500 words →
+                  {t('header.quotaLink', { used: words.length, cap: FREE_WORD_CAP })}
                 </button>
               ) : (
-                <span style={{ marginLeft: 6 }}>{words.length} words</span>
+                <span style={{ marginLeft: 6 }}>{tp('header.wordsPlain', words.length)}</span>
               )}
             </div>
           </div>
@@ -322,28 +324,37 @@ export function Popup() {
         <div className="h-actions">
           <button
             className="icon-btn"
-            title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={locale === 'ru' ? 'Switch to English' : 'Переключить на русский'}
+            onClick={() => setLocale(locale === 'ru' ? 'en' : 'ru')}
+          >
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600 }}>
+              {locale === 'ru' ? 'EN' : 'RU'}
+            </span>
+          </button>
+          <button
+            className="icon-btn"
+            title={effectiveDark ? t('theme.toLight') : t('theme.toDark')}
             onClick={toggleTheme}
           >
             <Icon name={effectiveDark ? 'sun' : 'moon'} />
           </button>
-          <button className="icon-btn" title="Help" onClick={() => setHelpOpen(true)}><Icon name="help" /></button>
+          <button className="icon-btn" title={t('help.title')} onClick={() => setHelpOpen(true)}><Icon name="help" /></button>
         </div>
       </div>
 
       <div className="ribbon">
         <div className="ribbon-cell">
           <div className="ribbon-num">{words.length}</div>
-          <div className="ribbon-label">Words</div>
+          <div className="ribbon-label">{t('ribbon.words')}</div>
         </div>
         <div className="ribbon-cell">
           <div className="ribbon-num heat">{dueCount}</div>
-          <div className="ribbon-label">Due now</div>
+          <div className="ribbon-label">{t('ribbon.dueNow')}</div>
           {dueCount > 0 && <Icon name="sparkle" size={12} className="ribbon-spark" />}
         </div>
         <div className="ribbon-cell">
           <div className="ribbon-num gold">{stats.streak}</div>
-          <div className="ribbon-label">Day streak</div>
+          <div className="ribbon-label">{t('ribbon.dayStreak')}</div>
         </div>
       </div>
 
@@ -359,8 +370,8 @@ export function Popup() {
 
       {(isPaused || isSnoozed) && (
         <div className="vf-pausebar">
-          <span>{isPaused ? 'Reminders paused' : 'Snoozed'}</span>
-          <button className="vf-resume" onClick={handleResume}>Resume now</button>
+          <span>{isPaused ? t('pausebar.remindersPaused') : t('pausebar.snoozed')}</span>
+          <button className="vf-resume" onClick={handleResume}>{t('pausebar.resumeNow')}</button>
         </div>
       )}
 
@@ -419,9 +430,9 @@ export function Popup() {
       </div>
 
       {tab === 'library' && !librarySelecting && (
-        <button className="fab" onClick={() => setModalOpen(true)} title="Add new word">
+        <button className="fab" onClick={() => setModalOpen(true)} title={t('fab.addWordTitle')}>
           <Icon name="plus" size={15} />
-          <span className="fab-label">Add word</span>
+          <span className="fab-label">{t('fab.addWord')}</span>
         </button>
       )}
 

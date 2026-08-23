@@ -6,6 +6,7 @@ import {
 } from '../lib/tooltip-machine';
 import { Icon } from './icons';
 import { speak } from '../lib/tts';
+import { useI18n } from '../lib/i18n';
 
 interface TooltipProps {
   term: string;
@@ -35,6 +36,7 @@ export function Tooltip({
   onDismiss,
   onAutoTranslate,
 }: TooltipProps) {
+  const { t } = useI18n();
   const [state, dispatch] = useReducer(tooltipReducer, undefined, () => {
     const initial = initialTooltipState();
     return tooltipReducer(initial, { type: 'SELECT', term, contextSentence, sourceUrl });
@@ -77,8 +79,8 @@ export function Tooltip({
             type="button"
             className="vf-speak-btn vf-speak-btn-sm"
             onClick={() => speak(term, langFrom)}
-            title="Pronounce"
-            aria-label="Pronounce"
+            title={t('library.pronounce')}
+            aria-label={t('library.pronounce')}
           >
             <Icon name="volume" size={12} />
           </button>
@@ -92,26 +94,26 @@ export function Tooltip({
         <input
           ref={inputRef}
           className="vf-input"
-          placeholder="Translation..."
+          placeholder={t('tooltip.translationPlaceholder')}
           value={state.translation}
           onChange={(e) => dispatch({ type: 'EDIT', translation: e.target.value })}
         />
         <button
           className="vf-auto"
           disabled={state.status === 'translating'}
-          title="Auto-translate this word"
+          title={t('tooltip.autoTitle')}
           onClick={() => dispatch({ type: 'TRANSLATE_AUTO' })}
         >
-          {state.status === 'translating' ? '…' : 'AUTO'}
+          {state.status === 'translating' ? '…' : t('tooltip.auto')}
         </button>
       </div>
 
       {state.autoFailed && (
-        <div className="vf-row vf-hint">Auto-translate didn&apos;t work — type it yourself, or try AUTO again.</div>
+        <div className="vf-row vf-hint">{t('tooltip.autoFailed')}</div>
       )}
 
       <div className="vf-row vf-foot">
-        <button className="vf-x" onClick={() => dispatch({ type: 'DISMISS' })} aria-label="Close">
+        <button className="vf-x" onClick={() => dispatch({ type: 'DISMISS' })} aria-label={t('tooltip.close')}>
           {"\u00d7"}
         </button>
         <button
@@ -119,7 +121,7 @@ export function Tooltip({
           disabled={!state.canSave}
           onClick={() => dispatch({ type: 'SAVE' })}
         >
-          Save
+          {t('tooltip.save')}
         </button>
       </div>
     </div>

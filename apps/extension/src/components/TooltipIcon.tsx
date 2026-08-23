@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "./icons";
+import { useI18n } from "../lib/i18n";
 
 type TooltipIconProps = {
     onClick?: () => void;
@@ -11,6 +12,7 @@ type TooltipIconProps = {
 // card (Tooltip); clicking the skip control leaves a quiet "skipped" chip
 // instead, per the approved two-stage design.
 export default function TooltipIcon({ onClick, onSkip }: TooltipIconProps) {
+    const { t } = useI18n();
     const [hover, setHover] = useState(false);
     return (
         <span
@@ -18,7 +20,7 @@ export default function TooltipIcon({ onClick, onSkip }: TooltipIconProps) {
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}
         >
-            <button className="vfst-mark" title="Add to dictionary" onClick={onClick}>
+            <button className="vfst-mark" title={t('trigger.addToDictionary')} onClick={onClick}>
                 <span className="vfst-glyph" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="15" height="15">
                         <path d="M5 5 L12 18 L19 5" fill="none" stroke="currentColor"
@@ -30,12 +32,12 @@ export default function TooltipIcon({ onClick, onSkip }: TooltipIconProps) {
             </button>
             <span className="vfst-body">
                 <span className="vfst-inner">
-                    <span className="vfst-label">Add to dictionary</span>
+                    <span className="vfst-label">{t('trigger.addToDictionary')}</span>
                     <kbd className="vfst-kbd">⌘E</kbd>
                     <button
                         className="vfst-skip"
                         onClick={(e) => { e.stopPropagation(); onSkip?.(); }}
-                        title="Skip — don't save"
+                        title={t('trigger.skipTitle')}
                     >
                         <Icon name="close" size={10} />
                     </button>

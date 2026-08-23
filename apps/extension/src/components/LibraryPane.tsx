@@ -13,6 +13,8 @@ import { ALGO_LABELS } from '../lib/review/algo';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import { speak } from '../lib/tts';
 import { EditWordModal } from './EditWordModal';
+import { useI18n } from '../lib/i18n';
+import type { TranslationKey } from '../lib/i18n';
 import type { Word } from '../lib/storage/types';
 import type { AlgoId } from '@vocably/core';
 
@@ -38,9 +40,16 @@ interface Props {
   onSelectModeChange?: (active: boolean) => void;
 }
 
-const STATUS_LABEL: Record<string, string> = { due: 'Due', mastered: 'Mastered', learning: 'Learning', fresh: 'New', shelved: 'Shelved' };
+const STATUS_KEY: Record<string, TranslationKey> = {
+  due: 'status.due',
+  mastered: 'status.mastered',
+  learning: 'status.learning',
+  fresh: 'status.fresh',
+  shelved: 'status.shelved',
+};
 
 export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onEdit, onExport, onClearLibrary, onSelectModeChange }: Props) {
+  const { t, tp } = useI18n();
   const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -99,8 +108,8 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     return (
       <div className="empty">
         <div className="empty-mark">+</div>
-        <div className="empty-title">Your library is empty</div>
-        <div className="empty-hint">Tap <em>Add word</em> below, or select text on any page.</div>
+        <div className="empty-title">{t('library.emptyTitle')}</div>
+        <div className="empty-hint">{t('library.emptyHint', { addWord: t('library.addWordEm') })}</div>
       </div>
     );
   }
@@ -116,51 +125,51 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     <div className="library-view">
       <div className="lib-banner">
         <div className="lib-banner-row">
-          <div className="lib-banner-title"><span className="serif-italic">Library</span></div>
+          <div className="lib-banner-title"><span className="serif-italic">{t('library.title')}</span></div>
           <div className="lib-banner-right">
-            <button className="icon-btn" onClick={onExport} title="Export this library as JSON">
+            <button className="icon-btn" onClick={onExport} title={t('library.exportTitle')}>
               <Icon name="download" size={14} />
             </button>
-            <button className="icon-btn danger" onClick={() => setConfirmClearOpen(true)} title="Clear library">
+            <button className="icon-btn danger" onClick={() => setConfirmClearOpen(true)} title={t('library.clearTitle')}>
               <Icon name="trash" size={14} />
             </button>
-            <div className="lib-banner-count">{words.length} <span className="muted">words</span></div>
+            <div className="lib-banner-count">{words.length} <span className="muted">{t('ribbon.words').toLowerCase()}</span></div>
           </div>
         </div>
         <div className="lib-bucket-row">
-          <div className="lib-bucket leaf"><span className="dot" /><strong>{mastered}</strong> mastered</div>
-          <div className="lib-bucket cool"><span className="dot" /><strong>{learning}</strong> learning</div>
-          <div className="lib-bucket heat"><span className="dot" /><strong>{fresh}</strong> fresh</div>
+          <div className="lib-bucket leaf"><span className="dot" /><strong>{mastered}</strong> {t('library.bucketMastered')}</div>
+          <div className="lib-bucket cool"><span className="dot" /><strong>{learning}</strong> {t('library.bucketLearning')}</div>
+          <div className="lib-bucket heat"><span className="dot" /><strong>{fresh}</strong> {t('library.bucketFresh')}</div>
         </div>
       </div>
 
       <div className="lib-toolbar">
         <div className="lib-search">
           <Icon name="search" />
-          <input placeholder="Search words…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input placeholder={t('library.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <select className="lib-sort" value={sort} onChange={(e) => setSort(e.target.value as LibrarySort)}>
-          <option value="added">Recent</option>
-          <option value="due">Due soon</option>
-          <option value="alpha">A → Z</option>
-          <option value="mastered">Mastered</option>
+          <option value="added">{t('sort.recent')}</option>
+          <option value="due">{t('sort.due')}</option>
+          <option value="alpha">{t('sort.alpha')}</option>
+          <option value="mastered">{t('sort.mastered')}</option>
         </select>
       </div>
 
       <div className="lib-toolbar2">
         <select className="lib-sort" value={algoFilter} onChange={(e) => setAlgoFilter(e.target.value as AlgoFilter)}>
-          <option value="all">All algorithms</option>
-          <option value="sm2">SM-2 only</option>
-          <option value="leitner">Leitner only</option>
+          <option value="all">{t('algoFilter.all')}</option>
+          <option value="sm2">{t('algoFilter.sm2')}</option>
+          <option value="leitner">{t('algoFilter.leitner')}</option>
         </select>
         <button className={`lib-sort ${selectMode ? 'on' : ''}`} onClick={toggleSelectMode}>
-          {selectMode ? 'Cancel' : 'Select · move'}
+          {selectMode ? t('library.cancel') : t('library.selectMove')}
         </button>
       </div>
 
       {filtered.length === 0 ? (
         <div className="empty" style={{ padding: '32px 24px' }}>
-          <div className="empty-hint">No words match &ldquo;{search}&rdquo;</div>
+          <div className="empty-hint">{t('library.noMatch', { search })}</div>
         </div>
       ) : (
         <div className="library-grid">
@@ -171,13 +180,13 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
               ? formatOverdue(-msUntilDue(w, now))
               : showCountdown
                 ? formatCountdown(msUntilDue(w, now))
-                : STATUS_LABEL[status];
+                : t(STATUS_KEY[status]!);
             const selected = selectedIds.has(w.id);
             let source = '';
             try {
-              source = w.sourceUrl ? new URL(w.sourceUrl).hostname : 'manual';
+              source = w.sourceUrl ? new URL(w.sourceUrl).hostname : t('library.sourceManual');
             } catch {
-              source = 'manual';
+              source = t('library.sourceManual');
             }
             return (
               <div
@@ -203,8 +212,8 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                         <button
                           className="lib-card-speak"
                           onClick={(e) => { e.stopPropagation(); speak(w.term, w.langFrom); }}
-                          title="Pronounce"
-                          aria-label="Pronounce"
+                          title={t('library.pronounce')}
+                          aria-label={t('library.pronounce')}
                         >
                           <Icon name="volume" />
                         </button>
@@ -215,18 +224,18 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                         <button
                           className="lib-card-shelve"
                           onClick={() => setEditingWord(w)}
-                          title="Edit word, translation, or example"
+                          title={t('library.editTitle')}
                         >
                           <Icon name="edit" />
                         </button>
                         <button
                           className="lib-card-shelve"
                           onClick={() => (w.shelvedAt ? onUnshelve(w.id) : onShelve(w.id))}
-                          title={w.shelvedAt ? 'Bring back into review' : 'Set aside for now — skip it in review until you bring it back'}
+                          title={w.shelvedAt ? t('library.unshelveTitle') : t('library.shelveTitle')}
                         >
                           <Icon name="archive" />
                         </button>
-                        <button className="lib-card-del" onClick={() => onDelete(w.id)} title="Remove">
+                        <button className="lib-card-del" onClick={() => onDelete(w.id)} title={t('library.removeTitle')}>
                           <Icon name="trash" />
                         </button>
                       </div>
@@ -238,7 +247,7 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                       <span className="lib-card-source">{source}</span>
                       <span className="lib-card-algo">{ALGO_LABELS[w.srsState.algo]}</span>
                     </div>
-                    <span className={`lib-card-status ${status}`} title={showCountdown ? `Due in ${pillLabel}` : undefined}>{pillLabel}</span>
+                    <span className={`lib-card-status ${status}`} title={showCountdown ? t('library.dueIn', { pill: pillLabel }) : undefined}>{pillLabel}</span>
                   </div>
                 </div>
               </div>
@@ -249,16 +258,16 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
 
       {selectMode && (
         <div className="lib-select-bar">
-          <span className="lib-select-count">{selectedIds.size} selected</span>
+          <span className="lib-select-count">{t('library.selectedCount', { n: selectedIds.size })}</span>
           <div className="lib-select-actions">
             <button className="lib-select-move" disabled={!selectedIds.size} onClick={() => handleMove('sm2')}>
-              Move to SM-2
+              {t('library.moveToSm2')}
             </button>
             <button className="lib-select-move" disabled={!selectedIds.size} onClick={() => handleMove('leitner')}>
-              Move to Leitner
+              {t('library.moveToLeitner')}
             </button>
           </div>
-          <button className="lib-select-cancel" onClick={toggleSelectMode} title="Cancel">
+          <button className="lib-select-cancel" onClick={toggleSelectMode} title={t('library.cancel')}>
             <Icon name="close" size={13} />
           </button>
         </div>
@@ -268,14 +277,13 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
         <div className="scrim open" onClick={() => setConfirmClearOpen(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">Clear library?</div>
+            <div className="sheet-title">{t('library.clearTitleConfirm')}</div>
             <div className="sheet-sub">
-              This deletes all {words.length} word{words.length === 1 ? '' : 's'} shown here. Your XP, streak, and
-              review history are kept — only the word list goes.
+              {tp('library.clearSub', words.length)}
             </div>
             <div className="confirm-actions">
-              <button className="btn-secondary" onClick={() => setConfirmClearOpen(false)}>Cancel</button>
-              <button className="btn-danger" onClick={handleConfirmClear}>Delete all</button>
+              <button className="btn-secondary" onClick={() => setConfirmClearOpen(false)}>{t('library.cancel')}</button>
+              <button className="btn-danger" onClick={handleConfirmClear}>{t('library.deleteAll')}</button>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from './icons';
+import { useI18n } from '../lib/i18n';
 import type { Word } from '../lib/storage/types';
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 // example sentence. SRS progress is never touched here — that's the whole
 // point, this fixes a typo without resetting how well you know the word.
 export function EditWordModal({ word, onClose, onSave }: Props) {
+  const { t } = useI18n();
   const [term, setTerm] = useState('');
   const [translations, setTranslations] = useState('');
   const [context, setContext] = useState('');
@@ -31,7 +33,7 @@ export function EditWordModal({ word, onClose, onSave }: Props) {
 
   if (!word) return null;
 
-  const parsedTranslations = translations.split(',').map((t) => t.trim()).filter(Boolean);
+  const parsedTranslations = translations.split(',').map((s) => s.trim()).filter(Boolean);
   const canSave = term.trim().length > 0 && parsedTranslations.length > 0;
 
   function submit() {
@@ -43,26 +45,26 @@ export function EditWordModal({ word, onClose, onSave }: Props) {
     <div className="scrim open" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <div className="sheet-title">Edit word</div>
-        <div className="sheet-sub">Fixes here don&rsquo;t touch progress — same review schedule either way.</div>
+        <div className="sheet-title">{t('edit.title')}</div>
+        <div className="sheet-sub">{t('edit.subtitle')}</div>
 
         <div className="field">
-          <label className="field-label">Word</label>
+          <label className="field-label">{t('add.wordLabel')}</label>
           <input ref={inputRef} className="field-input" value={term} onChange={(e) => setTerm(e.target.value)} />
         </div>
         <div className="field">
-          <label className="field-label">Translations (comma-separated)</label>
+          <label className="field-label">{t('edit.translationsLabel')}</label>
           <input className="field-input" value={translations} onChange={(e) => setTranslations(e.target.value)} />
         </div>
         <div className="field">
-          <label className="field-label">Example sentence (optional)</label>
+          <label className="field-label">{t('add.exampleLabel')}</label>
           <input className="field-input" value={context} onChange={(e) => setContext(e.target.value)} />
         </div>
 
         <div className="confirm-actions">
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-secondary" onClick={onClose}>{t('library.cancel')}</button>
           <button className="btn-primary" style={{ width: 'auto', flex: 1 }} onClick={submit} disabled={!canSave}>
-            <Icon name="check" size={13} /> Save
+            <Icon name="check" size={13} /> {t('edit.save')}
           </button>
         </div>
       </div>

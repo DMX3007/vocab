@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icon } from './icons';
 import { fetchWordsFromGoogleSheet, type WordInput } from '../lib/import/google-sheet';
+import { useI18n } from '../lib/i18n';
 
 export type AddWordInput = WordInput;
 
@@ -18,6 +19,7 @@ type Mode = 'single' | 'bulk' | 'sheet';
 // auto-translate here — that's the tooltip's AUTO button; this modal is for
 // words typed or pasted in directly, translation included.
 export function AddWordModal({ open, onClose, onAdd }: Props) {
+  const { t, tp } = useI18n();
   const [mode, setMode] = useState<Mode>('single');
   const [term, setTerm] = useState('');
   const [translation, setTranslation] = useState('');
@@ -81,7 +83,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
     try {
       setSheetWords(await fetchWordsFromGoogleSheet(sheetUrl.trim()));
     } catch (err) {
-      setSheetError(err instanceof Error ? err.message : 'Something went wrong.');
+      setSheetError(err instanceof Error ? err.message : t('add.sheetError'));
     } finally {
       setSheetLoading(false);
     }
@@ -97,62 +99,62 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
     <div className={`scrim ${open ? 'open' : ''}`} onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <div className="sheet-title">Add to library</div>
-        <div className="sheet-sub">Save words you want to remember. We&rsquo;ll schedule reviews.</div>
+        <div className="sheet-title">{t('add.title')}</div>
+        <div className="sheet-sub">{t('add.subtitle')}</div>
 
         <div className="mode-switch">
           <button className={mode === 'single' ? 'on' : ''} onClick={() => setMode('single')}>
-            <Icon name="plus" size={12} /> Single
+            <Icon name="plus" size={12} /> {t('add.modeSingle')}
           </button>
           <button className={mode === 'bulk' ? 'on' : ''} onClick={() => setMode('bulk')}>
-            <Icon name="paste" size={12} /> Paste a list
+            <Icon name="paste" size={12} /> {t('add.modePaste')}
           </button>
           <button className={mode === 'sheet' ? 'on' : ''} onClick={() => setMode('sheet')}>
-            <Icon name="sheet" size={12} /> Google Sheet
+            <Icon name="sheet" size={12} /> {t('add.modeSheet')}
           </button>
         </div>
 
         {mode === 'single' ? (
           <>
             <div className="field">
-              <label className="field-label">Word</label>
+              <label className="field-label">{t('add.wordLabel')}</label>
               <input
                 ref={inputRef}
                 className="field-input"
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
-                placeholder="e.g. fortitude"
+                placeholder={t('add.wordPlaceholder')}
               />
             </div>
             <div className="field">
-              <label className="field-label">Translation</label>
+              <label className="field-label">{t('add.translationLabel')}</label>
               <input
                 className="field-input"
                 value={translation}
                 onChange={(e) => setTranslation(e.target.value)}
-                placeholder="e.g. стойкость"
+                placeholder={t('add.translationPlaceholder')}
               />
             </div>
             <div className="field">
-              <label className="field-label">Example sentence (optional)</label>
+              <label className="field-label">{t('add.exampleLabel')}</label>
               <input
                 className="field-input"
                 value={context}
                 onChange={(e) => setContext(e.target.value)}
-                placeholder="A sentence beats a single word"
+                placeholder={t('add.examplePlaceholder')}
               />
             </div>
             <button className="btn-primary" onClick={submitSingle} disabled={!term.trim() || !translation.trim()}>
-              <Icon name="plus" size={14} /> Add to library
+              <Icon name="plus" size={14} /> {t('add.submitSingle')}
             </button>
           </>
         ) : mode === 'bulk' ? (
           <>
             <div className="bulk-help">
-              One pair per line — separated by <span className="kbd">—</span>, <span className="kbd">:</span>, or tab.
+              {t('add.bulkHelp', { dash: '—', colon: ':' })}
             </div>
             <div className="field">
-              <label className="field-label">Paste your list</label>
+              <label className="field-label">{t('add.pasteYourList')}</label>
               <textarea
                 ref={areaRef}
                 className="field-area"
@@ -165,7 +167,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
             {parsedBulk.length > 0 && (
               <>
                 <div className="field-label" style={{ marginBottom: 6 }}>
-                  Preview {'·'} {parsedBulk.length} word{parsedBulk.length === 1 ? '' : 's'}
+                  {t('add.preview')} {'·'} {parsedBulk.length}
                 </div>
                 <div className="bulk-preview">
                   {parsedBulk.slice(0, 6).map((r, i) => (
@@ -176,7 +178,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
                   ))}
                   {parsedBulk.length > 6 && (
                     <div className="bulk-preview-row">
-                      <span className="pt">… and {parsedBulk.length - 6} more</span>
+                      <span className="pt">{t('add.andMore', { n: parsedBulk.length - 6 })}</span>
                     </div>
                   )}
                 </div>
@@ -184,17 +186,16 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
             )}
 
             <button className="btn-primary" onClick={submitBulk} disabled={!parsedBulk.length}>
-              <Icon name="download" size={14} /> Import {parsedBulk.length || ''} word{parsedBulk.length === 1 ? '' : 's'}
+              <Icon name="download" size={14} /> {tp('add.importBtn', parsedBulk.length)}
             </button>
           </>
         ) : (
           <>
             <div className="bulk-help">
-              Column A = word, column B = translation (optional column C = example). The sheet must be shared
-              as <em>Anyone with the link → Viewer</em>.
+              {t('add.sheetHelp', { anyone: t('add.sheetHelpAnyone') })}
             </div>
             <div className="field">
-              <label className="field-label">Sheet URL</label>
+              <label className="field-label">{t('add.sheetUrlLabel')}</label>
               <input
                 className="field-input"
                 value={sheetUrl}
@@ -213,7 +214,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
               disabled={!sheetUrl.trim() || sheetLoading}
               style={{ marginBottom: 12 }}
             >
-              {sheetLoading ? 'Fetching…' : (<><Icon name="sheet" size={13} /> Fetch words</>)}
+              {sheetLoading ? t('add.fetching') : (<><Icon name="sheet" size={13} /> {t('add.fetchWords')}</>)}
             </button>
 
             {sheetError && (
@@ -223,7 +224,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
             {sheetWords.length > 0 && (
               <>
                 <div className="field-label" style={{ marginBottom: 6 }}>
-                  Preview {'·'} {sheetWords.length} word{sheetWords.length === 1 ? '' : 's'}
+                  {t('add.preview')} {'·'} {sheetWords.length}
                 </div>
                 <div className="bulk-preview">
                   {sheetWords.slice(0, 6).map((r, i) => (
@@ -234,7 +235,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
                   ))}
                   {sheetWords.length > 6 && (
                     <div className="bulk-preview-row">
-                      <span className="pt">… and {sheetWords.length - 6} more</span>
+                      <span className="pt">{t('add.andMore', { n: sheetWords.length - 6 })}</span>
                     </div>
                   )}
                 </div>
@@ -242,7 +243,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
             )}
 
             <button className="btn-primary" onClick={submitSheet} disabled={!sheetWords.length}>
-              <Icon name="download" size={14} /> Import {sheetWords.length || ''} word{sheetWords.length === 1 ? '' : 's'}
+              <Icon name="download" size={14} /> {tp('add.importBtn', sheetWords.length)}
             </button>
           </>
         )}

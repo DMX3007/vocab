@@ -1,5 +1,6 @@
 import React from 'react';
 import { Icon } from './icons';
+import { useI18n } from '../lib/i18n';
 
 interface Props {
   streak: number;
@@ -16,22 +17,23 @@ interface Props {
 // getting late and today's goal is still short — see
 // overlay-policy.ts's shouldShowStreakReminder.
 export function StreakReminder({ streak, todayCount, dailyGoal, onReviewNow, onDismiss }: Props) {
+  const { t, tp } = useI18n();
   const remaining = Math.max(0, dailyGoal - todayCount);
   return (
     <div className="vf-streak-card">
-      <button className="vf-streak-close" onClick={onDismiss} aria-label="Dismiss">
+      <button className="vf-streak-close" onClick={onDismiss} aria-label={t('streak.dismiss')}>
         <Icon name="close" size={11} />
       </button>
       <div className="vf-streak-top">
         <Icon name="flame" size={28} className="vf-streak-flame" />
         <div>
-          <div className="vf-streak-title">{streak}-day streak at risk</div>
+          <div className="vf-streak-title">{t('streak.atRisk', { n: streak })}</div>
           <div className="vf-streak-sub">
-            {remaining} more review{remaining === 1 ? '' : 's'} to keep it today.
+            {tp('streak.remainingReviews', remaining)}
           </div>
         </div>
       </div>
-      <button className="vf-streak-btn" onClick={onReviewNow}>Review now {'→'}</button>
+      <button className="vf-streak-btn" onClick={onReviewNow}>{t('streak.reviewNow')}</button>
     </div>
   );
 }

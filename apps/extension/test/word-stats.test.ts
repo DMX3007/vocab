@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeWordStatsById,
-  algoProgressLabel,
+  algoProgress,
   estimateReviewsToMastery,
 } from '../src/lib/review/word-stats';
 import type { Word, ReviewLog } from '../src/lib/storage/types';
@@ -51,18 +51,21 @@ describe('computeWordStatsById', () => {
   });
 });
 
-describe('algoProgressLabel', () => {
-  it('Leitner: shows the 1-based box out of the ladder size', () => {
-    expect(algoProgressLabel(word({ srsState: { algo: 'leitner', stepIndex: 2 } }))).toBe('Box 3/5');
+describe('algoProgress', () => {
+  it('Leitner: the 1-based box out of the ladder size', () => {
+    expect(algoProgress(word({ srsState: { algo: 'leitner', stepIndex: 2 } }))).toEqual({ kind: 'box', step: 3, total: 5 });
   });
-  it('SM-2 learning: shows the step', () => {
-    expect(algoProgressLabel(word({ srsState: { algo: 'sm2', phase: 'learning', stepIndex: 1 } }))).toBe('Learning · step 2/9');
+  it('SM-2 learning: the step', () => {
+    expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'learning', stepIndex: 1 } })))
+      .toEqual({ kind: 'learning', step: 2, total: 9 });
   });
-  it('SM-2 relearning: shows the step', () => {
-    expect(algoProgressLabel(word({ srsState: { algo: 'sm2', phase: 'relearning', stepIndex: 0 } }))).toBe('Relearning · step 1/1');
+  it('SM-2 relearning: the step', () => {
+    expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'relearning', stepIndex: 0 } })))
+      .toEqual({ kind: 'relearning', step: 1, total: 1 });
   });
-  it('SM-2 review: shows the ease factor', () => {
-    expect(algoProgressLabel(word({ srsState: { algo: 'sm2', phase: 'review', easeFactor: 2.3 } }))).toBe('Review · ease 2.3');
+  it('SM-2 review: the ease factor, rounded to 1 decimal', () => {
+    expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'review', easeFactor: 2.3 } })))
+      .toEqual({ kind: 'review', ease: 2.3 });
   });
 });
 

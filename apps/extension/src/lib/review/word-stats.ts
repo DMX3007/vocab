@@ -39,15 +39,27 @@ export function computeWordStatsById(logs: ReviewLog[]): Map<string, WordReviewS
   return result;
 }
 
-/** A short label for where a word sits on its algorithm's ladder right now. */
-export function algoProgressLabel(word: Word): string {
+/** Where a word sits on its algorithm's ladder right now — kept as plain
+ *  data (not a formatted string) so it doesn't need to know about
+ *  translation; ReviewPane turns this into a label via the i18n dict. */
+export type LadderProgress =
+  | { kind: 'box'; step: number; total: number }
+  | { kind: 'learning'; step: number; total: number }
+  | { kind: 'relearning'; step: number; total: number }
+  | { kind: 'review'; ease: number };
+
+export function algoProgress(word: Word): LadderProgress {
   const { algo, phase, stepIndex, easeFactor } = word.srsState;
   if (algo === 'leitner') {
-    return `Box ${stepIndex + 1}/${DEFAULT_LEITNER_CONFIG.boxIntervalDays.length}`;
+    return { kind: 'box', step: stepIndex + 1, total: DEFAULT_LEITNER_CONFIG.boxIntervalDays.length };
   }
-  if (phase === 'learning') return `Learning · step ${stepIndex + 1}/${DEFAULT_CONFIG.learningStepsSec.length}`;
-  if (phase === 'relearning') return `Relearning · step ${stepIndex + 1}/${DEFAULT_CONFIG.relearningStepsMin.length}`;
-  return `Review · ease ${easeFactor.toFixed(1)}`;
+  if (phase === 'learning') {
+    return { kind: 'learning', step: stepIndex + 1, total: DEFAULT_CONFIG.learningStepsSec.length };
+  }
+  if (phase === 'relearning') {
+    return { kind: 'relearning', step: stepIndex + 1, total: DEFAULT_CONFIG.relearningStepsMin.length };
+  }
+  return { kind: 'review', ease: Number(easeFactor.toFixed(1)) };
 }
 
 /** How many more successful reviews, roughly, from here to isMastered(word).

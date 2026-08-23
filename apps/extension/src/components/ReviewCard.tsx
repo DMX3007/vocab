@@ -6,6 +6,7 @@ import { Icon } from './icons';
 import { speak } from '../lib/tts';
 import { shouldSuggestShelving } from '../lib/review/library';
 import { diffChars } from '../lib/review/diff';
+import { useI18n } from '../lib/i18n';
 
 interface Props {
   session: ReviewSession;
@@ -20,6 +21,7 @@ interface Props {
 // logic (which card, direction, grading, persistence); this only renders the
 // current card, takes an answer, shows the verdict, then advances.
 export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
+  const { t, tp } = useI18n();
   const [card, setCard] = useState<Card | null>(session.currentCard);
   const [answer, setAnswer] = useState('');
   const [verdict, setVerdict] = useState<GradeResult | null>(null);
@@ -64,7 +66,7 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
       setVerdict(result);
     } catch (err) {
       console.error(err, 'Error: while checking answer');
-      setError('Something went wrong checking that answer — try again.');
+      setError(t('card.checkError'));
     } finally {
       setChecking(false);
     }
@@ -112,8 +114,8 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   if (!card) {
     return (
       <div className="vf-card vf-card-empty">
-        <p>Nothing due right now. Come back later.</p>
-        <button className="vf-card-btn" onClick={onFinished}>Close</button>
+        <p>{t('card.nothingDue')}</p>
+        <button className="vf-card-btn" onClick={onFinished}>{t('card.close')}</button>
       </div>
     );
   }
@@ -133,7 +135,7 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   return (
     <div className={`vf-card ${verdictClass}`} onKeyDown={onKeyDown}>
       <div className="vf-card-top">
-        <span className="vf-card-streak">Streak {'\u00b7'} {done.index + 1} / {done.total}</span>
+        <span className="vf-card-streak">{t('card.streak', { a: done.index + 1, b: done.total })}</span>
         <span className="vf-card-dir">{card.direction === 'forward' ? 'EN → RU' : 'RU → EN'}</span>
       </div>
 
@@ -143,8 +145,8 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
           type="button"
           className="vf-speak-btn"
           onClick={() => speak(card.prompt, card.direction === 'forward' ? card.langFrom : card.langTo)}
-          title="Pronounce"
-          aria-label="Pronounce"
+          title={t('library.pronounce')}
+          aria-label={t('library.pronounce')}
         >
           <Icon name="volume" size={16} />
         </button>
@@ -154,14 +156,14 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
       <input
         ref={inputRef}
         className="vf-card-input"
-        placeholder={card.direction === 'forward' ? 'Type the translation...' : 'Type the original word...'}
+        placeholder={card.direction === 'forward' ? t('card.translationPlaceholder') : t('card.originalPlaceholder')}
         value={answer}
         disabled={!!verdict}
         onChange={(e) => setAnswer(e.target.value)}
       />
 
       {verdict && verdict.verdict !== 'correct' && (
-        <div className="vf-diff" title="Letters that didn't match what was typed">
+        <div className="vf-diff" title={t('card.diffTitle')}>
           {diffChars(answer, verdict.matched ?? card.expected[0] ?? '').map((d, i) => (
             <span key={i} className={`vf-diff-char ${d.correct ? 'ok' : 'bad'}`}>{d.char}</span>
           ))}
@@ -174,21 +176,21 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
             {verdict.verdict === 'correct'
               ? '+10 XP'
               : verdict.verdict === 'almost'
-                ? 'Almost!'
-                : 'Answer:'}
+                ? t('card.almost')
+                : t('card.answer')}
           </span>
           <span className="vf-card-answer">{card.expected.join(', ')}</span>
           <button
             type="button"
             className="vf-speak-btn"
             onClick={() => speak(card.expected[0]!, card.direction === 'forward' ? card.langTo : card.langFrom)}
-            title="Pronounce"
-            aria-label="Pronounce"
+            title={t('library.pronounce')}
+            aria-label={t('library.pronounce')}
           >
             <Icon name="volume" size={14} />
           </button>
           <button className="vf-card-btn" onClick={next}>
-            {session.remaining > 1 ? 'Next' : 'Finish'} {'\u2192'}
+            {session.remaining > 1 ? t('card.next') : t('card.finish')} {'\u2192'}
           </button>
         </div>
       ) : null}
@@ -202,20 +204,20 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
 
       {suggestShelve && (
         <div className="vf-shelve-suggest">
-          <span>Struggling with this one ({lastAnswered!.srsState.lapses} misses) {'\u2014'} set it aside for now?</span>
+          <span>{t('card.struggling', { misses: tp('review.missCount', lastAnswered!.srsState.lapses) })}</span>
           <div className="vf-shelve-suggest-actions">
             <button
               className="vf-shelve-suggest-btn"
               onClick={() => void shelveAndContinue()}
               disabled={shelving}
             >
-              {shelving ? 'Shelving\u2026' : 'Shelve'}
+              {shelving ? t('card.shelving') : t('card.shelve')}
             </button>
             <button
               className="vf-shelve-suggest-dismiss"
               onClick={() => setShelveSuggestionDismissed(true)}
             >
-              Not now
+              {t('card.notNow')}
             </button>
           </div>
         </div>
@@ -229,12 +231,12 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
               className="vf-card-btn-ghost"
               onClick={shuffle}
               disabled={!session.canShuffle}
-              title="Show a different word instead"
+              title={t('card.shuffleTitle')}
             >
-              <Icon name="shuffle" size={13} /> Shuffle
+              <Icon name="shuffle" size={13} /> {t('card.shuffle')}
             </button>
             <button className="vf-card-btn" onClick={check} disabled={!answer.trim() || checking}>
-              {checking ? 'Checking\u2026' : <>Check {'\u2192'}</>}
+              {checking ? t('card.checking') : <>{t('card.check')} {'\u2192'}</>}
             </button>
           </div>
         </>

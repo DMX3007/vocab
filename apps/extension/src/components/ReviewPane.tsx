@@ -5,8 +5,9 @@ import { SUPPORTED_LANGUAGES } from '../lib/languages';
 import { ALGO_OPTIONS, ALGO_LABELS } from '../lib/review/algo';
 import { sortForReview, type AlgoFilter } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
-import { computeWordStatsById, algoProgressLabel, estimateReviewsToMastery } from '../lib/review/word-stats';
+import { computeWordStatsById, algoProgress, estimateReviewsToMastery, type LadderProgress } from '../lib/review/word-stats';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
+import { useI18n } from '../lib/i18n';
 import type { AlgoId } from '@vocably/core';
 
 interface Props {
@@ -28,7 +29,7 @@ interface Props {
   onDueCountChange?: (count: number) => void;
 }
 
-const ALGO_FILTER_LABEL: Record<AlgoFilter, string> = { all: 'All algorithms', sm2: 'SM-2 only', leitner: 'Leitner only' };
+const ALGO_FILTER_KEY = { all: 'algoFilter.all', sm2: 'algoFilter.sm2', leitner: 'algoFilter.leitner' } as const;
 /** How many rows actually get rendered per section — keeps the DOM light
  *  with a big backlog. The due COUNT elsewhere (button, header, ribbon) is
  *  never capped by this: checking "is this due" is cheap for any number of
@@ -54,7 +55,17 @@ const ROW_DISPLAY_LIMIT = 20;
 // keep the DOM light with a big backlog — the counts stay accurate either
 // way. The real review session still pulls a fresh list from storage when
 // you actually start one.
+function formatLadder(p: LadderProgress, t: ReturnType<typeof useI18n>['t']): string {
+  switch (p.kind) {
+    case 'box': return t('ladder.box', { n: p.step, total: p.total });
+    case 'learning': return t('ladder.learning', { n: p.step, total: p.total });
+    case 'relearning': return t('ladder.relearning', { n: p.step, total: p.total });
+    case 'review': return t('ladder.review', { n: p.ease });
+  }
+}
+
 export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, onReviveShelved, ready, onDueCountChange }: Props) {
+  const { t, tp } = useI18n();
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
   const [now, setNow] = useState(() => Date.now());
   const statsById = useMemo(() => computeWordStatsById(logs), [logs]);
@@ -90,11 +101,11 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
     const stats = statsById.get(w.id);
     const accuracyText = stats
       ? `${stats.successRate}% (${stats.passed}/${stats.total})`
-      : 'no reviews yet';
-    const repsText = isMastered(w) ? 'mastered' : `~${estimateReviewsToMastery(w)} to go`;
+      : t('review.noReviewsYet');
+    const repsText = isMastered(w) ? t('review.mastered') : t('review.repsToGo', { n: estimateReviewsToMastery(w) });
     const detail = stats
-      ? `${stats.passed} of ${stats.total} correct (${stats.successRate}%), ${stats.failed} miss${stats.failed === 1 ? '' : 'es'}`
-      : 'no reviews logged yet';
+      ? `${t('review.rowDetail', { passed: stats.passed, total: stats.total, pct: stats.successRate! })}, ${tp('review.missCount', stats.failed)}`
+      : t('review.rowDetailNone');
     return (
       <div className="word-row" key={w.id}>
         <div className="word-text">
@@ -102,7 +113,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
           <div className="word-tr">{w.translations[0]}</div>
           <div className="word-stats-row" title={detail}>
             <span className="lib-card-algo">{ALGO_LABELS[w.srsState.algo]}</span>
-            <span className="word-stat-text">{algoProgressLabel(w)} · {accuracyText} · {repsText}</span>
+            <span className="word-stat-text">{formatLadder(algoProgress(w), t)} · {accuracyText} · {repsText}</span>
           </div>
         </div>
         <div className="row-meta">
@@ -116,7 +127,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
     <div>
       <div className="tray">
         <div className="tray-row full">
-          <span className="tray-label">Target language</span>
+          <span className="tray-label">{t('tray.targetLanguage')}</span>
           <select className="tray-value" value={targetLang} onChange={(e) => onLangChange(e.target.value)} disabled={!ready}>
             {SUPPORTED_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
@@ -124,7 +135,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
           </select>
         </div>
         <div className="tray-row full">
-          <span className="tray-label">New words use</span>
+          <span className="tray-label">{t('tray.newWordsUse')}</span>
           <select className="tray-value" value={algo} onChange={(e) => onAlgoChange(e.target.value as AlgoId)} disabled={!ready}>
             {ALGO_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -135,11 +146,11 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
 
       {dueCount > 0 && (
         <div className="review-filter-row">
-          <span className="tray-label">Review</span>
+          <span className="tray-label">{t('review.filterLabel')}</span>
           <select className="lib-sort" value={reviewFilter} onChange={(e) => setReviewFilter(e.target.value as AlgoFilter)} disabled={!ready}>
-            <option value="all">All algorithms</option>
-            <option value="sm2">SM-2 only</option>
-            <option value="leitner">Leitner only</option>
+            <option value="all">{t('algoFilter.all')}</option>
+            <option value="sm2">{t('algoFilter.sm2')}</option>
+            <option value="leitner">{t('algoFilter.leitner')}</option>
           </select>
         </div>
       )}
@@ -147,7 +158,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
       {due.length > 0 && (
         <div style={{ padding: '0 14px 12px' }}>
           <button className="btn-primary" onClick={() => onStartReview(reviewFilter)} disabled={!ready}>
-            <Icon name="sparkle" size={13} /> Review &ldquo;{due[0]!.term}&rdquo; {'→'}
+            <Icon name="sparkle" size={13} /> {t('review.startBtn', { term: due[0]!.term })}
           </button>
         </div>
       )}
@@ -155,49 +166,49 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
       {due.length === 0 ? (
         <div className="empty">
           <div className="empty-mark">{'✓'}</div>
-          <div className="empty-title">All caught up</div>
+          <div className="empty-title">{t('review.allCaughtUp')}</div>
           <div className="empty-hint">
             {dueCount > 0 && reviewFilter !== 'all'
-              ? `Nothing due in ${ALGO_FILTER_LABEL[reviewFilter]} right now — try All algorithms.`
-              : 'Nothing due right now. Come back later — or browse Library.'}
+              ? t('review.nothingDueFilter', { filter: t(ALGO_FILTER_KEY[reviewFilter]) })
+              : t('review.nothingDue')}
           </div>
           {shelvedWords.length > 0 && (
             <div className="revive-shelved">
               <div className="revive-shelved-text">
-                {shelvedWords.length} shelved word{shelvedWords.length === 1 ? '' : 's'} set aside earlier.
+                {tp('review.shelvedCount', shelvedWords.length)}
               </div>
               <button className="btn-secondary" onClick={onReviveShelved} disabled={!ready}>
-                <Icon name="archive" size={13} /> Bring back &ldquo;{shelvedWords[0]!.term}&rdquo;
+                <Icon name="archive" size={13} /> {t('review.reviveBringBack', { term: shelvedWords[0]!.term })}
               </button>
             </div>
           )}
         </div>
       ) : (
         <div>
-          <div className="section-divider">Due now {'·'} {due.length}</div>
+          <div className="section-divider">{t('review.sectionDueNow')} {'·'} {due.length}</div>
           {due.slice(0, ROW_DISPLAY_LIMIT).map((w) => renderRow(w, formatOverdue(-msUntilDue(w, new Date(now))), 'due-pill'))}
           {due.length > ROW_DISPLAY_LIMIT && (
             <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
-              +{due.length - ROW_DISPLAY_LIMIT} more due — start a review to work through the rest.
+              {t('review.moreDue', { n: due.length - ROW_DISPLAY_LIMIT })}
             </div>
           )}
         </div>
       )}
 
       <div>
-        <div className="section-divider">Up next {allUpcoming.length > 0 ? `· ${allUpcoming.length}` : ''}</div>
+        <div className="section-divider">{t('review.sectionUpNext')} {allUpcoming.length > 0 ? `· ${allUpcoming.length}` : ''}</div>
         {upcoming.length > 0 ? (
           <>
             {upcoming.map((w) => renderRow(w, formatCountdown(msUntilDue(w, new Date(now))), 'countdown-pill'))}
             {allUpcoming.length > ROW_DISPLAY_LIMIT && (
               <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
-                +{allUpcoming.length - ROW_DISPLAY_LIMIT} more upcoming
+                {t('review.moreUpcoming', { n: allUpcoming.length - ROW_DISPLAY_LIMIT })}
               </div>
             )}
           </>
         ) : (
           <div className="empty-hint" style={{ padding: '4px 18px 16px' }}>
-            Nothing scheduled soon — this fills in once a word's next review is a little ways off.
+            {t('review.nothingScheduledSoon')}
           </div>
         )}
       </div>

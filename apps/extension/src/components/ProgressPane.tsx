@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { computeProgressStats, ACHIEVEMENTS } from '../lib/review/progress';
 import { Icon } from './icons';
+import { useI18n } from '../lib/i18n';
+import type { TranslationKey } from '../lib/i18n';
 import type { Word, ReviewLog } from '../lib/storage/types';
 
 interface Props {
@@ -12,10 +14,19 @@ interface Props {
   onDailyGoalChange: (goal: number) => void;
 }
 
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const GOAL_PRESETS = [5, 10, 15, 20, 30, 50];
+const ACHIEVEMENT_KEY: Record<string, TranslationKey> = {
+  first: 'achievement.first',
+  ten: 'achievement.ten',
+  scholar: 'achievement.scholar',
+  fire: 'achievement.fire',
+  master: 'achievement.master',
+  poly: 'achievement.poly',
+};
 
 export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreezes, onDailyGoalChange }: Props) {
+  const { t, tp } = useI18n();
+  const dayLabels = t('progress.dayLabels').split(',');
   const stats = computeProgressStats(words, logs, new Date(), dailyGoal, new Set(frozenDates));
   const maxDay = Math.max(1, ...Object.values(stats.dailyReviews));
   const goalPct = Math.min(100, (stats.todayCount / stats.goal) * 100);
@@ -24,18 +35,18 @@ export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreeze
   // Animate the two fills in on mount, like the approved design.
   const [animGoal, setAnimGoal] = useState(0);
   useEffect(() => {
-    const t = setTimeout(() => setAnimGoal(goalPct), 100);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setAnimGoal(goalPct), 100);
+    return () => clearTimeout(timer);
   }, [goalPct]);
 
   return (
     <div>
       <div className="prog-hero" style={{ background: 'linear-gradient(135deg, oklch(0.30 0.12 35), oklch(0.20 0.08 25))' }}>
-        <div className="prog-title-eyebrow">Current streak</div>
+        <div className="prog-title-eyebrow">{t('progress.currentStreak')}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 6 }}>
           <div className="streak-num">{stats.streak}</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#ffffff90', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            days in a row
+            {t('progress.daysInARow')}
           </div>
           <div className="flame-wrap" style={{ marginLeft: 'auto', width: 48, height: 60 }}>
             <svg className="flame" viewBox="0 0 56 64" width="48" height="60">
@@ -51,18 +62,18 @@ export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreeze
           </div>
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #ffffff20', display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 10, color: '#ffffffa0' }}>
-          <span>Personal best {'·'} {stats.longestStreak} {stats.longestStreak === 1 ? 'day' : 'days'}</span>
-          <span title="Banked freezes auto-cover one missed day each, so an off day doesn't reset your streak">
+          <span>{tp('progress.personalBest', stats.longestStreak)}</span>
+          <span title={t('progress.freezeHint')}>
             <Icon name="snowflake" size={10} /> {streakFreezes}
           </span>
-          <span>Next milestone {'·'} {stats.nextMilestone}</span>
+          <span>{t('progress.nextMilestone', { n: stats.nextMilestone })}</span>
         </div>
       </div>
 
       <div className={`daily-card ${goalMet ? 'met' : ''}`}>
         <div className="daily-head">
           <div className="daily-title">
-            {goalMet ? <><Icon name="check" size={12} /> Goal complete</> : "Today's goal"}
+            {goalMet ? <><Icon name="check" size={12} /> {t('progress.goalComplete')}</> : t('progress.todaysGoal')}
           </div>
           <div className="daily-count">
             {stats.todayCount} / {' '}
@@ -76,7 +87,7 @@ export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreeze
                 <option key={g} value={g}>{g}</option>
               ))}
             </select>{' '}
-            <span className="muted">reviews</span>
+            <span className="muted">{t('progress.reviewsLabel')}</span>
           </div>
         </div>
         <div className="daily-track">
@@ -87,24 +98,24 @@ export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreeze
       <div className="stat-trio">
         <div className="stat-card leaf">
           <div className="n">{stats.mastered}</div>
-          <div className="l">Mastered</div>
+          <div className="l">{t('progress.mastered')}</div>
         </div>
         <div className="stat-card">
           <div className="n">{stats.totalReviews}</div>
-          <div className="l">Reviews</div>
+          <div className="l">{t('progress.reviews')}</div>
         </div>
         <div className="stat-card heat">
           <div className="n">{stats.accuracy}<span style={{ fontSize: 14 }}>%</span></div>
-          <div className="l">Accuracy</div>
+          <div className="l">{t('progress.accuracy')}</div>
         </div>
       </div>
 
       <div className="week">
         <div className="week-head">
-          <div className="week-title">This week</div>
+          <div className="week-title">{t('progress.thisWeek')}</div>
         </div>
         <div className="week-bars">
-          {DAY_LABELS.map((d, i) => {
+          {dayLabels.map((d, i) => {
             const v = stats.dailyReviews[i] ?? 0;
             const h = Math.max(6, (v / maxDay) * 100);
             const cls = i === stats.todayIdx ? 'today' : v > 0 ? 'has' : '';
@@ -126,7 +137,7 @@ export function ProgressPane({ words, logs, dailyGoal, frozenDates, streakFreeze
           return (
             <div className={`ach-card ${unlocked ? 'unlocked' : 'locked'}`} key={a.id}>
               <div className="ach-glyph">{a.glyph}</div>
-              <div className="ach-name">{a.name}</div>
+              <div className="ach-name">{t(ACHIEVEMENT_KEY[a.id]!)}</div>
             </div>
           );
         })}

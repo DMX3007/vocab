@@ -15,6 +15,7 @@ import { isBurstWord, type AlgoFilter } from '../src/lib/review/library';
 import TooltipIcon from '@/src/components/TooltipIcon';
 import SkippedChip from '@/src/components/SkippedChip';
 import { DEFAULT_TARGET_LANG } from '../src/lib/languages';
+import { I18nProvider } from '../src/lib/i18n';
 
 // Runs inside every page. Hosts BOTH the selection tooltip and the review
 // overlay in a Shadow DOM so the host page's CSS can't break them. The logic
@@ -62,7 +63,11 @@ export default defineContentScript({
       const slot = document.createElement('div');
       shadow.appendChild(slot);
       const root = createRoot(slot);
-      root.render(node);
+      // Every content-script surface gets its own I18nProvider — this tree
+      // is separate from the popup's (a content script can't share React
+      // context across the extension/page boundary), but both read the
+      // same persisted locale out of chrome.storage.local.
+      root.render(React.createElement(I18nProvider, { storage: browser.storage.local, children: node }));
       currentSurface = { host, root, component };
       suppressOuterListeners(host);
     }
