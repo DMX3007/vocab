@@ -796,3 +796,10 @@ input, select, textarea { font: inherit; color: inherit; }
 /* paused / snoozed status bar in the dashboard */
 .vf-pausebar { display: flex; align-items: center; justify-content: space-between; margin: 0 14px 10px; padding: 10px 12px; border-radius: 8px; background: var(--heat-soft); color: var(--heat); font-size: 12px; }
 .vf-resume { background: var(--heat); color: var(--paper); border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+
+/* per-site on/off status bar — mirrors .vf-pausebar; green while active on
+   this host, the same "heat" alert color as the pause bar once disabled */
+.vf-sitebar { display: flex; align-items: center; justify-content: space-between; margin: 0 14px 10px; padding: 10px 12px; border-radius: 8px; background: var(--leaf-soft); color: var(--leaf); font-size: 12px; }
+.vf-sitebar.off { background: var(--heat-soft); color: var(--heat); }
+.vf-site-toggle { background: var(--leaf); color: var(--paper); border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+.vf-sitebar.off .vf-site-toggle { background: var(--heat); }

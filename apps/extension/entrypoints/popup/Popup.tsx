@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
-import { resume, type OverlaySettings } from '../../src/lib/review/overlay-policy';
+import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
 import { applyStreakMaintenance } from '../../src/lib/review/progress';
 import { downloadJson } from '../../src/lib/export';
 import { ReviewPane } from '../../src/components/ReviewPane';
@@ -50,6 +50,7 @@ export function Popup() {
   const [planState, setPlanState] = useState<PlanState>('beta');
   const [themePref, setThemePref] = useState<ThemePref>(null);
   const [systemDark, setSystemDark] = useState(false);
+  const [currentHost, setCurrentHost] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
@@ -112,6 +113,29 @@ export function Popup() {
     if (themePref) document.documentElement.setAttribute('data-theme', themePref);
     else document.documentElement.removeAttribute('data-theme');
   }, [themePref]);
+
+  // The active tab's host, so the site on/off toggle below knows what it's
+  // toggling. null on anything that isn't a normal webpage (chrome://,
+  // extension pages, a blank new tab) — those can't carry a content script
+  // anyway, so there's nothing there to enable or disable.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+        setCurrentHost(activeTab?.url ? new URL(activeTab.url).hostname : null);
+      } catch {
+        setCurrentHost(null);
+      }
+    })();
+  }, []);
+
+  async function handleToggleSite() {
+    if (!currentHost) return;
+    await settingsStore.update((s) =>
+      isBlacklisted(s, currentHost) ? removeFromBlacklist(s, currentHost) : addToBlacklist(s, currentHost),
+    );
+    await refresh();
+  }
 
   const effectiveDark = themePref ? themePref === 'dark' : systemDark;
 
@@ -283,6 +307,7 @@ export function Popup() {
   const snoozedUntil = settings?.snoozedUntil ? new Date(settings.snoozedUntil) : null;
   const isPaused = !!settings?.pausedIndefinitely || (!!pausedUntil && pausedUntil > new Date());
   const isSnoozed = !!snoozedUntil && snoozedUntil > new Date();
+  const siteDisabled = !!currentHost && !!settings && isBlacklisted(settings, currentHost);
 
   const stats = computeProgressStats(
     words, logs, new Date(),
@@ -372,6 +397,15 @@ export function Popup() {
         <div className="vf-pausebar">
           <span>{isPaused ? t('pausebar.remindersPaused') : t('pausebar.snoozed')}</span>
           <button className="vf-resume" onClick={handleResume}>{t('pausebar.resumeNow')}</button>
+        </div>
+      )}
+
+      {currentHost && (
+        <div className={`vf-sitebar ${siteDisabled ? 'off' : ''}`}>
+          <span>{siteDisabled ? t('sitebar.disabledOn', { host: currentHost }) : t('sitebar.activeOn', { host: currentHost })}</span>
+          <button className="vf-site-toggle" onClick={() => void handleToggleSite()}>
+            {siteDisabled ? t('sitebar.enable') : t('sitebar.disable')}
+          </button>
         </div>
       )}
 
