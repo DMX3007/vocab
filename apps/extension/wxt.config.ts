@@ -18,5 +18,21 @@ export default defineConfig({
     // review — it is the price of the in-page tooltip + review overlay.
     permissions: ['storage', 'alarms', 'tabs'],
     host_permissions: ['<all_urls>'],
+    icons: {
+      16: 'icon/icon-16.png',
+      32: 'icon/icon-32.png',
+      48: 'icon/icon-48.png',
+      128: 'icon/icon-128.png',
+    },
+    action: {
+      // background.ts swaps this to the *-paused set (via setIcon) whenever
+      // isPausedOrSnoozed() is true, so this is just the default/active art.
+      default_icon: {
+        16: 'icon/icon-16.png',
+        32: 'icon/icon-32.png',
+        48: 'icon/icon-48.png',
+        128: 'icon/icon-128.png',
+      },
+    },
   },
 });

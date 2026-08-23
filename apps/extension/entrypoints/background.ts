@@ -1,7 +1,7 @@
 import { WordRepository } from '../src/lib/storage/word-repository';
 import { SettingsStore } from '../src/lib/review/settings-store';
 import { planTick } from '../src/lib/review/scheduler';
-import { shouldShowStreakReminder, markStreakReminderShown } from '../src/lib/review/overlay-policy';
+import { shouldShowStreakReminder, markStreakReminderShown, isPausedOrSnoozed, type OverlaySettings } from '../src/lib/review/overlay-policy';
 import { computeProgressStats } from '../src/lib/review/progress';
 import { translateWord } from '../src/lib/translate/mymemory';
 import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
@@ -28,6 +28,23 @@ export default defineBackground(() => {
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === ALARM) void onTick();
   });
+
+  // ── toolbar icon: reflects paused/snoozed state ───────────────
+  // Refreshed on worker wake, on every settings change (so pausing from
+  // the review card or the popup flips it immediately), and on the
+  // 1-minute alarm tick (so a *timed* pause/snooze reverts the icon on
+  // its own once it expires, without waiting for the next user action).
+  void settingsStore.load().then((s) => refreshIcon(s, new Date()));
+  settingsStore.subscribe((s) => refreshIcon(s, new Date()));
+
+  function refreshIcon(settings: OverlaySettings, now: Date): void {
+    const paused = isPausedOrSnoozed(settings, now);
+    browser.action.setIcon({
+      path: paused
+        ? { 16: 'icon/icon-16-paused.png', 32: 'icon/icon-32-paused.png', 48: 'icon/icon-48-paused.png', 128: 'icon/icon-128-paused.png' }
+        : { 16: 'icon/icon-16.png', 32: 'icon/icon-32.png', 48: 'icon/icon-48.png', 128: 'icon/icon-128.png' },
+    }).catch(() => { });
+  }
 
   // ── data messages from popup / content script ────────────────
   browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
@@ -129,6 +146,7 @@ export default defineBackground(() => {
     await ready;
     const now = new Date();
     const settings = await settingsStore.load();
+    refreshIcon(settings, now);
 
     const context = await prepareForTick(now, settings.targetLang)
     if (!context) return
