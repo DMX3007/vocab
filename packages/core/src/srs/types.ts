@@ -42,14 +42,33 @@ export interface SchedulerConfig {
   lapseIntervalFactor: number;
 }
 
+const MIN = 60;
+const HOUR = 3_600;
+const DAY = 86_400;
+
 export const DEFAULT_CONFIG: SchedulerConfig = {
-  // 5 quick reps ~25s apart (mandatory), then escalating pauses:
-  // 1m -> 2m -> 5m -> 10m, then graduate to day/month-scale review.
-  learningStepsSec: [25, 25, 25, 25, 25, 60, 120, 300, 600],
-  learningBurstSteps: 5,
+  // A 2-step mandatory burst (both at the 15-minute mark — see
+  // learningBurstSteps below), then an escalating same-day-to-week ladder:
+  // 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, graduating at 7d (from
+  // which point classic SM-2 ease-based growth takes over). Deliberately
+  // gentle: the old ladder graduated after 1 day and could reach 3 days
+  // after a single post-graduation pass, which read as the app rushing a
+  // freshly-learned word out of daily rotation.
+  learningStepsSec: [
+    15 * MIN, // 0: also the "just failed" retry delay
+    15 * MIN, // 1
+    30 * MIN, // 2
+    45 * MIN, // 3
+    2 * HOUR, // 4
+    6 * HOUR, // 5
+    1 * DAY, // 6
+    2 * DAY, // 7
+    3 * DAY, // 8
+  ],
+  learningBurstSteps: 2,
   relearningStepsMin: [10],
-  graduatingIntervalDays: 1,
-  easyIntervalDays: 4,
+  graduatingIntervalDays: 7,
+  easyIntervalDays: 10,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };
