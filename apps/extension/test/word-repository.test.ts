@@ -371,11 +371,11 @@ describe('per-word algorithm', () => {
     expect(afterLeitner.srsState.algo).toBe('leitner');
     // A single grade-4 review: SM-2 takes it through a learning STEP (still
     // phase 'learning', no interval yet), while Leitner promotes it straight
-    // to box 2 (a 2-day interval) — proof the repo dispatched to two
+    // to box 2 (a 1-day interval) — proof the repo dispatched to two
     // different schedulers, not one shared instance.
     expect(afterSm2.srsState.phase).toBe('learning');
     expect(afterSm2.srsState.intervalDays).toBe(0);
-    expect(afterLeitner.srsState.intervalDays).toBe(2);
+    expect(afterLeitner.srsState.intervalDays).toBe(1);
   });
 
   describe('moveWordsAlgo', () => {

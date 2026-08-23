@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, DEFAULT_LEITNER_CONFIG } from '@vocably/core';
+import { PACE_CONFIGS, DEFAULT_LEITNER_CONFIG, type SchedulerConfig } from '@vocably/core';
 import type { ReviewLog, Word } from '../storage/types';
 import { isMastered, MASTERED_INTERVAL_DAYS } from './progress';
 
@@ -48,16 +48,23 @@ export type LadderProgress =
   | { kind: 'relearning'; step: number; total: number }
   | { kind: 'review'; ease: number };
 
+/** Words saved before `pace` existed have no such field at runtime despite
+ *  the type — same defaulting as word-repository.ts's schedulerFor. */
+function configFor(word: Word): SchedulerConfig {
+  return PACE_CONFIGS[word.srsState.pace ?? 'aggressive'];
+}
+
 export function algoProgress(word: Word): LadderProgress {
   const { algo, phase, stepIndex, easeFactor } = word.srsState;
   if (algo === 'leitner') {
     return { kind: 'box', step: stepIndex + 1, total: DEFAULT_LEITNER_CONFIG.boxIntervalDays.length };
   }
+  const config = configFor(word);
   if (phase === 'learning') {
-    return { kind: 'learning', step: stepIndex + 1, total: DEFAULT_CONFIG.learningStepsSec.length };
+    return { kind: 'learning', step: stepIndex + 1, total: config.learningStepsSec.length };
   }
   if (phase === 'relearning') {
-    return { kind: 'relearning', step: stepIndex + 1, total: DEFAULT_CONFIG.relearningStepsMin.length };
+    return { kind: 'relearning', step: stepIndex + 1, total: config.relearningStepsMin.length };
   }
   return { kind: 'review', ease: Number(easeFactor.toFixed(1)) };
 }
@@ -74,6 +81,7 @@ export function estimateReviewsToMastery(word: Word): number {
     return DEFAULT_LEITNER_CONFIG.boxIntervalDays.length - 1 - stepIndex;
   }
 
+  const config = configFor(word);
   const reviewRepsFrom = (startIntervalDays: number, ease: number): number => {
     const safeEase = Math.max(ease, 1.01);
     const start = Math.max(startIntervalDays, 1);
@@ -86,9 +94,9 @@ export function estimateReviewsToMastery(word: Word): number {
   // Still learning/relearning: the remaining drill steps, then the review
   // reps it'd take from the graduating interval onward.
   const stepsRemaining = phase === 'learning'
-    ? DEFAULT_CONFIG.learningStepsSec.length - stepIndex
-    : DEFAULT_CONFIG.relearningStepsMin.length - stepIndex;
-  return stepsRemaining + reviewRepsFrom(DEFAULT_CONFIG.graduatingIntervalDays, easeFactor);
+    ? config.learningStepsSec.length - stepIndex
+    : config.relearningStepsMin.length - stepIndex;
+  return stepsRemaining + reviewRepsFrom(config.graduatingIntervalDays, easeFactor);
 }
 
 export { NO_HISTORY as EMPTY_WORD_STATS };

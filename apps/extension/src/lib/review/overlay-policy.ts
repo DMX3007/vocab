@@ -1,7 +1,7 @@
 import { canInterrupt, type InterruptionSettings } from '../interruption';
 import { DEFAULT_TARGET_LANG } from '../languages';
 import { localDateKey } from './progress';
-import type { AlgoId } from '@vocably/core';
+import type { AlgoId, Pace } from '@vocably/core';
 
 // Decides whether the review overlay may pop on the active tab right now.
 // Pure and synchronous: the caller gathers the page context and the stored
@@ -33,6 +33,9 @@ export interface OverlaySettings {
   targetLang: string;
   /** the scheduler NEW words are saved with; existing words keep whatever they were saved/moved onto */
   defaultAlgo: AlgoId;
+  /** how hard NEW sm2 words get drilled before graduating; existing words
+   *  keep whatever pace they were saved/moved onto (see word-repository.ts) */
+  defaultPace: Pace;
   /** reviews per day the Progress tab's goal bar targets; user-editable */
   dailyGoal: number;
   /** banked "cover one missed day" credits, Duolingo-style — see applyStreakMaintenance */
@@ -60,6 +63,7 @@ export function defaultSettings(): OverlaySettings {
     shownInLastHour: 0,
     targetLang: DEFAULT_TARGET_LANG,
     defaultAlgo: 'sm2',
+    defaultPace: 'aggressive',
     dailyGoal: 10,
     streakFreezes: 1,
     frozenDates: [],

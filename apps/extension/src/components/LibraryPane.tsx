@@ -9,14 +9,14 @@ import {
   type AlgoFilter,
 } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
-import { ALGO_LABELS } from '../lib/review/algo';
+import { algoChoiceOptions, algoChoiceOf, parseAlgoChoice, algoBadgeLabel, type AlgoChoice } from '../lib/review/algo';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import { speak } from '../lib/tts';
 import { EditWordModal } from './EditWordModal';
 import { useI18n } from '../lib/i18n';
 import type { TranslationKey } from '../lib/i18n';
 import type { Word } from '../lib/storage/types';
-import type { AlgoId } from '@vocably/core';
+import type { AlgoId, Pace } from '@vocably/core';
 
 interface Props {
   words: Word[];
@@ -25,7 +25,7 @@ interface Props {
   search: string;
   setSearch: (search: string) => void;
   onDelete: (id: string) => void;
-  onMoveAlgo: (ids: string[], algo: AlgoId) => void;
+  onMoveAlgo: (ids: string[], algo: AlgoId, pace: Pace) => void;
   onShelve: (id: string) => void;
   onUnshelve: (id: string) => void;
   onEdit: (id: string, changes: { term: string; translations: string[]; contextSentence: string }) => void;
@@ -51,6 +51,7 @@ const STATUS_KEY: Record<string, TranslationKey> = {
 export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete, onMoveAlgo, onShelve, onUnshelve, onEdit, onExport, onClearLibrary, onSelectModeChange }: Props) {
   const { t, tp } = useI18n();
   const [algoFilter, setAlgoFilter] = useState<AlgoFilter>('all');
+  const [moveChoice, setMoveChoice] = useState<AlgoChoice>('sm2-aggressive');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -91,9 +92,10 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
     });
   }
 
-  function handleMove(algo: AlgoId) {
+  function handleMove() {
     if (!selectedIds.size) return;
-    onMoveAlgo([...selectedIds], algo);
+    const { algo, pace } = parseAlgoChoice(moveChoice);
+    onMoveAlgo([...selectedIds], algo, pace);
     setSelectMode(false);
     setSelectedIds(new Set());
     onSelectModeChange?.(false);
@@ -245,7 +247,7 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                   <div className="lib-card-foot">
                     <div className="lib-card-foot-main">
                       <span className="lib-card-source">{source}</span>
-                      <span className="lib-card-algo">{ALGO_LABELS[w.srsState.algo]}</span>
+                      <span className="lib-card-algo">{algoBadgeLabel(w.srsState.algo, w.srsState.pace ?? 'aggressive', t)}</span>
                     </div>
                     <span className={`lib-card-status ${status}`} title={showCountdown ? t('library.dueIn', { pill: pillLabel }) : undefined}>{pillLabel}</span>
                   </div>
@@ -260,11 +262,17 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
         <div className="lib-select-bar">
           <span className="lib-select-count">{t('library.selectedCount', { n: selectedIds.size })}</span>
           <div className="lib-select-actions">
-            <button className="lib-select-move" disabled={!selectedIds.size} onClick={() => handleMove('sm2')}>
-              {t('library.moveToSm2')}
-            </button>
-            <button className="lib-select-move" disabled={!selectedIds.size} onClick={() => handleMove('leitner')}>
-              {t('library.moveToLeitner')}
+            <select
+              className="lib-sort"
+              value={moveChoice}
+              onChange={(e) => setMoveChoice(e.target.value as AlgoChoice)}
+            >
+              {algoChoiceOptions(t).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <button className="lib-select-move" disabled={!selectedIds.size} onClick={handleMove}>
+              {t('library.move')}
             </button>
           </div>
           <button className="lib-select-cancel" onClick={toggleSelectMode} title={t('library.cancel')}>

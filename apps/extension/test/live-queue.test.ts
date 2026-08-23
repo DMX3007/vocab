@@ -14,7 +14,7 @@ function word(id: string, dueAt: Date): Word {
     contextSentence: '',
     sourceUrl: '',
     srsState: {
-      algo: 'sm2', phase: 'review', stepIndex: 0,
+      algo: 'sm2', pace: 'aggressive', phase: 'review', stepIndex: 0,
       dueAt, intervalDays: 1, easeFactor: 2.5, repetitions: 1, lapses: 0,
     },
     createdAt: NOW,

@@ -15,7 +15,7 @@ function word(overrides: Omit<Partial<Word>, 'srsState'> & { srsState?: Partial<
     contextSentence: '',
     sourceUrl: '',
     srsState: {
-      algo: 'sm2', phase: 'review', stepIndex: 0,
+      algo: 'sm2', pace: 'aggressive', phase: 'review', stepIndex: 0,
       dueAt: new Date(NOW.getTime() + 86_400_000), // due tomorrow by default
       intervalDays: 0, easeFactor: 2.5, repetitions: 1, lapses: 0,
       ...srsState,
@@ -45,9 +45,9 @@ describe('wordStatus', () => {
     expect(wordStatus(word({ srsState: { intervalDays: 0 } }), NOW)).toBe('fresh');
   });
   it('Leitner is mastered by reaching the last box, not by a day count', () => {
-    const w = word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 16 } });
+    const w = word({ srsState: { algo: 'leitner', stepIndex: 5, intervalDays: 16 } });
     expect(wordStatus(w, NOW)).toBe('mastered');
-    const notYet = word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } });
+    const notYet = word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 8 } });
     expect(wordStatus(notYet, NOW)).toBe('learning');
   });
   it('shelved wins over every other status, even an overdue word', () => {

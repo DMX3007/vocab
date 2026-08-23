@@ -11,7 +11,7 @@ describe('toDurationUnit', () => {
 });
 
 describe('getAlgoInfo', () => {
-  it('sm2: the experienced chain (post-burst indexing) grows past its last entry', () => {
+  it('sm2: defaults to the aggressive pace when none is given', () => {
     const info = getAlgoInfo('sm2');
     expect(info.growsPastChain).toBe(true);
     expect(formatChain(info.chainSeconds)).toBe(
@@ -19,10 +19,22 @@ describe('getAlgoInfo', () => {
     );
   });
 
+  it('sm2: describes whichever pace is passed, not a fixed config', () => {
+    expect(formatChain(getAlgoInfo('sm2', 'gentle').chainSeconds)).toBe('25s → 10m → 2h → 1d → 2d');
+    expect(formatChain(getAlgoInfo('sm2', 'standard').chainSeconds)).toBe(
+      '25s x2 → 1m → 5m → 20m → 1h → 4h → 1d → 2d → 4d',
+    );
+    expect(formatChain(getAlgoInfo('sm2', 'aggressive').chainSeconds)).toBe(
+      '25s x5 → 15m → 30m → 45m → 2h → 6h → 1d → 2d → 3d → 7d',
+    );
+  });
+
   it('leitner: a fixed box ladder with no growth past the last box', () => {
     const info = getAlgoInfo('leitner');
     expect(info.growsPastChain).toBe(false);
-    expect(formatChain(info.chainSeconds)).toBe('1d → 2d → 4d → 8d → 16d');
+    // the leading "1d x2" is the same-day-ish first box (see
+    // DEFAULT_LEITNER_CONFIG) plus its duplicate fail-retry value
+    expect(formatChain(info.chainSeconds)).toBe('1d x2 → 2d → 4d → 8d → 16d');
   });
 });
 

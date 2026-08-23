@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, DEFAULT_LEITNER_CONFIG, type AlgoId } from '@vocably/core';
+import { PACE_CONFIGS, DEFAULT_LEITNER_CONFIG, type AlgoId, type Pace } from '@vocably/core';
 
 // Pulls the interval chain straight from the live scheduler config, so this
 // never drifts out of sync with whatever the ladder actually does — the
@@ -16,7 +16,9 @@ export interface AlgoInfo {
   growsPastChain: boolean;
 }
 
-export function getAlgoInfo(algo: AlgoId): AlgoInfo {
+/** `pace` only matters for sm2 — leitner ignores it (a single fixed ladder
+ *  is the whole point), so callers describing a leitner word can omit it. */
+export function getAlgoInfo(algo: AlgoId, pace: Pace = 'aggressive'): AlgoInfo {
   if (algo === 'leitner') {
     return {
       algo,
@@ -24,13 +26,14 @@ export function getAlgoInfo(algo: AlgoId): AlgoInfo {
       growsPastChain: false,
     };
   }
-  const steps = DEFAULT_CONFIG.learningStepsSec;
+  const config = PACE_CONFIGS[pace];
+  const steps = config.learningStepsSec;
   return {
     algo,
     // steps[0] is only ever used as the post-lapse retry delay (see
     // sm2.ts's scheduleLearning) — a pass at step i waits steps[i+1], so
     // the sequence actually experienced on a clean run is steps[1..].
-    chainSeconds: [...steps.slice(1), DEFAULT_CONFIG.graduatingIntervalDays * 86_400],
+    chainSeconds: [...steps.slice(1), config.graduatingIntervalDays * 86_400],
     growsPastChain: true,
   };
 }

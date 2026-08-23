@@ -61,8 +61,8 @@ export default defineBackground(() => {
     await ready;
     switch (message.type) {
       case 'SAVE_WORD': {
-        const { defaultAlgo } = await settingsStore.load();
-        return repo.saveWord(message.payload.input, new Date(), defaultAlgo);
+        const { defaultAlgo, defaultPace } = await settingsStore.load();
+        return repo.saveWord(message.payload.input, new Date(), defaultAlgo, defaultPace);
       }
       case 'GET_ALL_WORDS':
         return repo.getAllWords(message.payload.langTo);
@@ -83,7 +83,9 @@ export default defineBackground(() => {
       case 'GET_ALL_LOGS':
         return repo.getAllReviewLogs();
       case 'MOVE_WORDS_ALGO':
-        return repo.moveWordsAlgo(message.payload.wordIds, message.payload.algo, new Date(message.payload.now));
+        return repo.moveWordsAlgo(
+          message.payload.wordIds, message.payload.algo, new Date(message.payload.now), message.payload.pace,
+        );
       case 'SHELVE_WORD':
         return repo.shelveWord(message.payload.wordId, new Date(message.payload.now));
       case 'UNSHELVE_WORD':

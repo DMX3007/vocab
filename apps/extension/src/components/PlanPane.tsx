@@ -4,18 +4,20 @@ import { useI18n } from '../lib/i18n';
 import type { Word } from '../lib/storage/types';
 import { FREE_WORD_CAP } from '../lib/plan';
 import { getAlgoInfo, formatChain } from '../lib/review/algo-info';
-import type { AlgoId } from '@vocably/core';
+import { PACE_KEY } from '../lib/review/algo';
+import type { AlgoId, Pace } from '@vocably/core';
 
 export type PlanState = 'beta' | 'free' | 'premium';
 
 interface Props {
   words: Word[];
   planState: PlanState;
-  /** the algorithm new words are currently saved with (ReviewPane's
-   *  selector) — the info card below always describes this one, not a
-   *  fixed algorithm, since a word saved under Leitner works nothing
-   *  like one under SM-2. */
+  /** the algorithm+pace new words are currently saved with (ReviewPane's
+   *  selector) — the info card below always describes this exact
+   *  combination, not a fixed one, since a word saved under Leitner (or
+   *  under a different pace) works nothing like this one. */
   defaultAlgo: AlgoId;
+  defaultPace: Pace;
   /** Opens the external checkout page (Ko-fi) — payment never happens
    *  inside the extension itself. */
   onBuy: () => void;
@@ -31,26 +33,36 @@ interface Props {
 // Plan tab — three real states. planState only ever changes via a genuine
 // license check (onActivateLicense) or explicit deactivation; nothing in
 // here can self-assign Premium.
-export function PlanPane({ words, planState, defaultAlgo, onBuy, onActivateLicense, onDeactivate }: Props) {
-  if (planState === 'premium') return <PremiumActiveView defaultAlgo={defaultAlgo} onDeactivate={onDeactivate} />;
-  if (planState === 'free') {
-    return <UpgradeView words={words} defaultAlgo={defaultAlgo} onBuy={onBuy} onActivateLicense={onActivateLicense} />;
+export function PlanPane({ words, planState, defaultAlgo, defaultPace, onBuy, onActivateLicense, onDeactivate }: Props) {
+  if (planState === 'premium') {
+    return <PremiumActiveView defaultAlgo={defaultAlgo} defaultPace={defaultPace} onDeactivate={onDeactivate} />;
   }
-  return <BetaView defaultAlgo={defaultAlgo} />;
+  if (planState === 'free') {
+    return (
+      <UpgradeView
+        words={words} defaultAlgo={defaultAlgo} defaultPace={defaultPace}
+        onBuy={onBuy} onActivateLicense={onActivateLicense}
+      />
+    );
+  }
+  return <BetaView defaultAlgo={defaultAlgo} defaultPace={defaultPace} />;
 }
 
 /** Everything the app actually knows about the currently-selected
- *  algorithm, pulled live from the scheduler config (see algo-info.ts) so
- *  this can never go stale the way a hand-typed description would. */
-function AlgorithmInfoCard({ algo }: { algo: AlgoId }) {
+ *  algorithm+pace, pulled live from the scheduler config (see
+ *  algo-info.ts) so this can never go stale the way a hand-typed
+ *  description would. `pace` is ignored for leitner (see algo-info.ts). */
+function AlgorithmInfoCard({ algo, pace }: { algo: AlgoId; pace: Pace }) {
   const { t } = useI18n();
-  const info = getAlgoInfo(algo);
+  const info = getAlgoInfo(algo, pace);
   const chain = formatChain(info.chainSeconds);
 
   return (
     <div className="info-card">
       <h4>{t('algoInfo.heading')}</h4>
-      <div className="name">{algo === 'leitner' ? t('algoInfo.leitnerName') : t('algoInfo.sm2Name')}</div>
+      <div className="name">
+        {algo === 'leitner' ? t('algoInfo.leitnerName') : `${t('algoInfo.sm2Name')} · ${t(PACE_KEY[pace])}`}
+      </div>
       <p>{algo === 'leitner' ? t('algoInfo.leitnerCore') : t('algoInfo.sm2Core')}</p>
 
       <div className="algo-chain-label">{t('algoInfo.chainLabel')}</div>
@@ -77,7 +89,7 @@ function AlgorithmInfoCard({ algo }: { algo: AlgoId }) {
   );
 }
 
-function BetaView({ defaultAlgo }: { defaultAlgo: AlgoId }) {
+function BetaView({ defaultAlgo, defaultPace }: { defaultAlgo: AlgoId; defaultPace: Pace }) {
   const { t } = useI18n();
   return (
     <div className="plan-pane">
@@ -89,7 +101,7 @@ function BetaView({ defaultAlgo }: { defaultAlgo: AlgoId }) {
         </div>
       </div>
 
-      <AlgorithmInfoCard algo={defaultAlgo} />
+      <AlgorithmInfoCard algo={defaultAlgo} pace={defaultPace} />
 
       <div className="tips">
         <h4>{t('plan.tipsTitle')}</h4>
@@ -104,11 +116,13 @@ function BetaView({ defaultAlgo }: { defaultAlgo: AlgoId }) {
 function UpgradeView({
   words,
   defaultAlgo,
+  defaultPace,
   onBuy,
   onActivateLicense,
 }: {
   words: Word[];
   defaultAlgo: AlgoId;
+  defaultPace: Pace;
   onBuy: () => void;
   onActivateLicense: (key: string) => Promise<{ ok: boolean; message: string }>;
 }) {
@@ -206,12 +220,20 @@ function UpgradeView({
         )}
       </div>
 
-      <AlgorithmInfoCard algo={defaultAlgo} />
+      <AlgorithmInfoCard algo={defaultAlgo} pace={defaultPace} />
     </div>
   );
 }
 
-function PremiumActiveView({ defaultAlgo, onDeactivate }: { defaultAlgo: AlgoId; onDeactivate: () => void }) {
+function PremiumActiveView({
+  defaultAlgo,
+  defaultPace,
+  onDeactivate,
+}: {
+  defaultAlgo: AlgoId;
+  defaultPace: Pace;
+  onDeactivate: () => void;
+}) {
   const { t } = useI18n();
   const [confirmOff, setConfirmOff] = useState(false);
   return (
@@ -243,7 +265,7 @@ function PremiumActiveView({ defaultAlgo, onDeactivate }: { defaultAlgo: AlgoId;
         </div>
       )}
 
-      <AlgorithmInfoCard algo={defaultAlgo} />
+      <AlgorithmInfoCard algo={defaultAlgo} pace={defaultPace} />
     </div>
   );
 }

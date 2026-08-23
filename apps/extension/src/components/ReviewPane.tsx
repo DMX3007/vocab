@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Icon } from './icons';
 import type { Word, ReviewLog } from '../lib/storage/types';
 import { SUPPORTED_LANGUAGES } from '../lib/languages';
-import { ALGO_OPTIONS, ALGO_LABELS } from '../lib/review/algo';
+import { algoChoiceOptions, algoChoiceOf, parseAlgoChoice, algoBadgeLabel, type AlgoChoice } from '../lib/review/algo';
 import { sortForReview, type AlgoFilter } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
 import { computeWordStatsById, algoProgress, estimateReviewsToMastery, type LadderProgress } from '../lib/review/word-stats';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import { useI18n } from '../lib/i18n';
-import type { AlgoId } from '@vocably/core';
+import type { AlgoId, Pace } from '@vocably/core';
 
 interface Props {
   words: Word[];
@@ -17,7 +17,8 @@ interface Props {
   targetLang: string;
   onLangChange: (lang: string) => void;
   algo: AlgoId;
-  onAlgoChange: (algo: AlgoId) => void;
+  pace: Pace;
+  onAlgoChange: (algo: AlgoId, pace: Pace) => void;
   onStartReview: (algoFilter: AlgoFilter) => void;
   /** Unshelves the single oldest-shelved word and starts a review on it —
    *  offered only once nothing else is due (see the empty state below). */
@@ -64,7 +65,7 @@ function formatLadder(p: LadderProgress, t: ReturnType<typeof useI18n>['t']): st
   }
 }
 
-export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, onAlgoChange, onStartReview, onReviveShelved, ready, onDueCountChange }: Props) {
+export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, pace, onAlgoChange, onStartReview, onReviveShelved, ready, onDueCountChange }: Props) {
   const { t, tp } = useI18n();
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
   const [now, setNow] = useState(() => Date.now());
@@ -112,7 +113,7 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
           <div className="word-en">{w.term}</div>
           <div className="word-tr">{w.translations[0]}</div>
           <div className="word-stats-row" title={detail}>
-            <span className="lib-card-algo">{ALGO_LABELS[w.srsState.algo]}</span>
+            <span className="lib-card-algo">{algoBadgeLabel(w.srsState.algo, w.srsState.pace ?? 'aggressive', t)}</span>
             <span className="word-stat-text">{formatLadder(algoProgress(w), t)} · {accuracyText} · {repsText}</span>
           </div>
         </div>
@@ -136,8 +137,16 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
         </div>
         <div className="tray-row full">
           <span className="tray-label">{t('tray.newWordsUse')}</span>
-          <select className="tray-value" value={algo} onChange={(e) => onAlgoChange(e.target.value as AlgoId)} disabled={!ready}>
-            {ALGO_OPTIONS.map((o) => (
+          <select
+            className="tray-value"
+            value={algoChoiceOf(algo, pace)}
+            onChange={(e) => {
+              const { algo: nextAlgo, pace: nextPace } = parseAlgoChoice(e.target.value as AlgoChoice);
+              onAlgoChange(nextAlgo, nextPace);
+            }}
+            disabled={!ready}
+          >
+            {algoChoiceOptions(t).map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>

@@ -16,6 +16,7 @@ const wireWord: WireWord = {
   sourceUrl: 'u',
   srsState: {
     algo: 'sm2',
+    pace: 'aggressive',
     phase: 'learning',
     stepIndex: 0,
     dueAt: '2026-06-10T12:00:00.000Z',

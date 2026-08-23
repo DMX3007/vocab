@@ -17,7 +17,7 @@ import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
 import { FREE_WORD_CAP } from '../../src/lib/plan';
 import { useI18n } from '../../src/lib/i18n';
-import type { AlgoId } from '@vocably/core';
+import type { AlgoId, Pace } from '@vocably/core';
 import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
@@ -203,13 +203,13 @@ export function Popup() {
     await refresh();
   }
 
-  async function handleDefaultAlgoChange(defaultAlgo: AlgoId) {
-    await settingsStore.update((s) => ({ ...s, defaultAlgo }));
+  async function handleDefaultAlgoChange(defaultAlgo: AlgoId, defaultPace: Pace) {
+    await settingsStore.update((s) => ({ ...s, defaultAlgo, defaultPace }));
     await refresh();
   }
 
-  async function handleMoveAlgo(wordIds: string[], algo: AlgoId) {
-    await wordClient.moveWordsAlgo(wordIds, algo, new Date());
+  async function handleMoveAlgo(wordIds: string[], algo: AlgoId, pace: Pace) {
+    await wordClient.moveWordsAlgo(wordIds, algo, new Date(), pace);
     showToast(tp('toast.movedWords', wordIds.length, { algo: algo === 'sm2' ? 'SM-2' : 'Leitner' }));
     await refresh();
   }
@@ -418,6 +418,7 @@ export function Popup() {
             targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
             onLangChange={handleLangChange}
             algo={settings?.defaultAlgo ?? 'sm2'}
+            pace={settings?.defaultPace ?? 'aggressive'}
             onAlgoChange={handleDefaultAlgoChange}
             onStartReview={handleStartReview}
             onReviveShelved={handleReviveShelved}
@@ -457,6 +458,7 @@ export function Popup() {
             words={words}
             planState={planState}
             defaultAlgo={settings?.defaultAlgo ?? 'sm2'}
+            defaultPace={settings?.defaultPace ?? 'aggressive'}
             onBuy={handleBuy}
             onActivateLicense={handleActivateLicense}
             onDeactivate={() => void handleDeactivateLicense()}

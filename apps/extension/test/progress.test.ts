@@ -16,6 +16,7 @@ function word(overrides: Partial<Word> = {}): Word {
     sourceUrl: '',
     srsState: {
       algo: 'sm2',
+      pace: 'aggressive',
       phase: 'review',
       stepIndex: 0,
       dueAt: NOW,
@@ -77,8 +78,8 @@ describe('computeProgressStats', () => {
 
   it('mastered counts Leitner words that reached the last box, regardless of interval days', () => {
     const words = [
-      word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 16 } as Word['srsState'] }), // last box, mastered
-      word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } as Word['srsState'] }), // box 4, not yet
+      word({ srsState: { algo: 'leitner', stepIndex: 5, intervalDays: 16 } as Word['srsState'] }), // last box, mastered
+      word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 8 } as Word['srsState'] }), // box below last, not yet
     ];
     expect(computeProgressStats(words, [], NOW).mastered).toBe(1);
   });
@@ -212,8 +213,8 @@ describe('isMastered', () => {
     expect(isMastered(word({ srsState: { intervalDays: 20 } as Word['srsState'] }))).toBe(false);
   });
   it('Leitner: mastered once it reaches the last box, even though its 16-day interval never hits 21', () => {
-    expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 16 } as Word['srsState'] }))).toBe(true);
-    expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 3, intervalDays: 8 } as Word['srsState'] }))).toBe(false);
+    expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 5, intervalDays: 16 } as Word['srsState'] }))).toBe(true);
+    expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 8 } as Word['srsState'] }))).toBe(false);
   });
 });
 

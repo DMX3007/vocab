@@ -19,7 +19,7 @@ function word(overrides: Omit<Partial<Word>, 'srsState'> & { srsState?: Partial<
     contextSentence: '',
     sourceUrl: '',
     srsState: {
-      algo: 'sm2', phase: 'review', stepIndex: 0,
+      algo: 'sm2', pace: 'aggressive', phase: 'review', stepIndex: 0,
       dueAt: NOW, intervalDays: 1, easeFactor: 2.5, repetitions: 1, lapses: 0,
       ...srsState,
     },
@@ -53,7 +53,7 @@ describe('computeWordStatsById', () => {
 
 describe('algoProgress', () => {
   it('Leitner: the 1-based box out of the ladder size', () => {
-    expect(algoProgress(word({ srsState: { algo: 'leitner', stepIndex: 2 } }))).toEqual({ kind: 'box', step: 3, total: 5 });
+    expect(algoProgress(word({ srsState: { algo: 'leitner', stepIndex: 2 } }))).toEqual({ kind: 'box', step: 3, total: 6 });
   });
   it('SM-2 learning: the step', () => {
     expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'learning', stepIndex: 1 } })))
@@ -67,15 +67,23 @@ describe('algoProgress', () => {
     expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'review', easeFactor: 2.3 } })))
       .toEqual({ kind: 'review', ease: 2.3 });
   });
+  it("SM-2 learning: the 'total' reads the word's OWN pace, not a fixed config", () => {
+    expect(algoProgress(word({ srsState: { algo: 'sm2', pace: 'gentle', phase: 'learning', stepIndex: 0 } })))
+      .toEqual({ kind: 'learning', step: 1, total: 5 });
+    expect(algoProgress(word({ srsState: { algo: 'sm2', pace: 'standard', phase: 'learning', stepIndex: 0 } })))
+      .toEqual({ kind: 'learning', step: 1, total: 10 });
+    expect(algoProgress(word({ srsState: { algo: 'sm2', pace: 'aggressive', phase: 'learning', stepIndex: 0 } })))
+      .toEqual({ kind: 'learning', step: 1, total: 14 });
+  });
 });
 
 describe('estimateReviewsToMastery', () => {
   it('Leitner: exact boxes remaining to the last box', () => {
-    expect(estimateReviewsToMastery(word({ srsState: { algo: 'leitner', stepIndex: 0 } }))).toBe(4);
-    expect(estimateReviewsToMastery(word({ srsState: { algo: 'leitner', stepIndex: 3 } }))).toBe(1);
+    expect(estimateReviewsToMastery(word({ srsState: { algo: 'leitner', stepIndex: 0 } }))).toBe(5);
+    expect(estimateReviewsToMastery(word({ srsState: { algo: 'leitner', stepIndex: 3 } }))).toBe(2);
   });
   it('Leitner: 0 once it has reached the last box (already mastered)', () => {
-    expect(estimateReviewsToMastery(word({ srsState: { algo: 'leitner', stepIndex: 4 } }))).toBe(0);
+    expect(estimateReviewsToMastery(word({ srsState: { algo: 'leitner', stepIndex: 5 } }))).toBe(0);
   });
 
   it('SM-2 review: 0 once the interval has already reached the mastery threshold', () => {
