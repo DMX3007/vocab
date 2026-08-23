@@ -21,7 +21,15 @@ export interface LeitnerConfig {
 }
 
 export const DEFAULT_LEITNER_CONFIG: LeitnerConfig = {
-  boxIntervalDays: [1, 2, 4, 8, 16],
+  // Index 0 is never experienced on a clean pass — see enterBox/schedule
+  // below, a correct answer always promotes at least one box past the
+  // current one, so a brand-new word's first success lands on index 1,
+  // not index 0. The leading 1 here exists so that first success is still
+  // "1 day," not the "2 days" it would be if index 0 were skipped straight
+  // over (as it was before this field had a duplicate leading value) —
+  // a brand-new word deserves an actual same-day-ish check-in, not an
+  // immediate 2-day gap of trust it hasn't earned yet.
+  boxIntervalDays: [1, 1, 2, 4, 8, 16],
 };
 
 export function createLeitner(config: LeitnerConfig): SrsAlgorithm {
