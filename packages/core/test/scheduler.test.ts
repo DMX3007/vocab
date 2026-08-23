@@ -7,6 +7,7 @@ import {
 } from '../src/index';
 
 const NOW = new Date('2026-06-10T12:00:00Z');
+const sec = (n: number) => n * 1_000;
 const min = (n: number) => n * 60_000;
 const hours = (n: number) => n * 3_600_000;
 const days = (n: number) => n * 86_400_000;
@@ -25,13 +26,13 @@ describe('initial state', () => {
 });
 
 describe('learning phase (mandatory burst, then escalating pauses)', () => {
-  it('correct answer advances one step; the first wait is 15 minutes', () => {
+  it('correct answer advances one step; the first wait is 25 seconds', () => {
     const s0 = initialState('sm2', NOW);
-    // default ladder: 2-step mandatory burst (both 15m), then 30m/45m/2h/6h/1d/2d/3d
+    // default ladder: 5-step mandatory burst (25s each), then 15m/30m/45m/2h/6h/1d/2d/3d
     const s1 = sm2.schedule(s0, 4, NOW);
     expect(s1.phase).toBe('learning');
     expect(s1.stepIndex).toBe(1);
-    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + min(15));
+    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
   it('grade 5 ("easy") during the mandatory burst does NOT skip ahead', () => {
@@ -39,7 +40,7 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     const s1 = sm2.schedule(s0, 5, NOW); // still inside the burst (step 0 < burstSteps)
     expect(s1.phase).toBe('learning'); // no early graduation
     expect(s1.stepIndex).toBe(1);
-    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + min(15));
+    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
   it('grade 5 ("easy") past the mandatory burst graduates immediately with the easy interval', () => {
@@ -52,7 +53,7 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.easyIntervalDays);
   });
 
-  it('the ladder escalates 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, then graduates at 7d', () => {
+  it('the ladder runs 25s x5, then 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, then graduates at 7d', () => {
     let s: SrsState = initialState('sm2', NOW);
 
     const offsets: number[] = [];
@@ -61,8 +62,9 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
       offsets.push(s.dueAt.getTime() - NOW.getTime());
     }
     expect(offsets).toEqual([
+      sec(25), sec(25), sec(25), sec(25), sec(25),
       min(15), min(30), min(45), hours(2), hours(6), days(1), days(2), days(3), days(7),
-    ]); // the last (9th) pass graduates
+    ]); // the last (14th) pass graduates
     expect(s.phase).toBe('review');
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
     expect(s.repetitions).toBe(1);
@@ -86,7 +88,7 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     s = sm2.schedule(s, 1, NOW); // fail
     expect(s.phase).toBe('learning');
     expect(s.stepIndex).toBe(0);
-    expect(s.dueAt.getTime()).toBe(NOW.getTime() + min(15));
+    expect(s.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
   it('a miss during learning counts as a lapse, even on the very first attempt', () => {

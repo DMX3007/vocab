@@ -57,7 +57,7 @@ describe('algoProgress', () => {
   });
   it('SM-2 learning: the step', () => {
     expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'learning', stepIndex: 1 } })))
-      .toEqual({ kind: 'learning', step: 2, total: 9 });
+      .toEqual({ kind: 'learning', step: 2, total: 14 });
   });
   it('SM-2 relearning: the step', () => {
     expect(algoProgress(word({ srsState: { algo: 'sm2', phase: 'relearning', stepIndex: 0 } })))
