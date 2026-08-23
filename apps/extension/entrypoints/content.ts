@@ -33,7 +33,7 @@ let currentSurface: Surface | null = null;
 
 export default defineContentScript({
   matches: ['<all_urls>'],
-  main() {
+  main(ctx) {
     const LANG_FROM = 'en';
     // The active target language; loaded from settings and kept live via
     // subscribe() so a change made in the popup (or another tab) applies
@@ -241,12 +241,23 @@ export default defineContentScript({
         if (!due.some(isBurstWord)) return;
 
         await showOverlay(settings.targetLang);
+      } catch (err) {
+        // The extension was reloaded/updated while this tab's content script
+        // was still running (common on long-lived tabs, e.g. a doc viewer
+        // left open across a dev rebuild). Every browser.* call now rejects
+        // with this same message — ctx.setInterval below stops the polling
+        // once WXT notices, but swallow this one so it doesn't spam the
+        // console in the meantime.
+        if (!(err instanceof Error && err.message.includes('Extension context invalidated'))) throw err;
       } finally {
         burstPollInFlight = false;
       }
     }
 
-    setInterval(() => { void pollForBurstDrill(); }, BURST_POLL_MS);
+    // ctx.setInterval (not the raw global) so WXT clears it automatically
+    // once this content script's context is invalidated by an extension
+    // reload/update, instead of polling forever into a dead context.
+    ctx.setInterval(() => { void pollForBurstDrill(); }, BURST_POLL_MS);
 
     // ── messages from the background ───────────────────────────
     browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
