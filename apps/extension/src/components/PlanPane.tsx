@@ -3,12 +3,19 @@ import { Icon } from './icons';
 import { useI18n } from '../lib/i18n';
 import type { Word } from '../lib/storage/types';
 import { FREE_WORD_CAP } from '../lib/plan';
+import { getAlgoInfo, formatChain } from '../lib/review/algo-info';
+import type { AlgoId } from '@vocably/core';
 
 export type PlanState = 'beta' | 'free' | 'premium';
 
 interface Props {
   words: Word[];
   planState: PlanState;
+  /** the algorithm new words are currently saved with (ReviewPane's
+   *  selector) — the info card below always describes this one, not a
+   *  fixed algorithm, since a word saved under Leitner works nothing
+   *  like one under SM-2. */
+  defaultAlgo: AlgoId;
   /** Opens the external checkout page (Ko-fi) — payment never happens
    *  inside the extension itself. */
   onBuy: () => void;
@@ -24,13 +31,53 @@ interface Props {
 // Plan tab — three real states. planState only ever changes via a genuine
 // license check (onActivateLicense) or explicit deactivation; nothing in
 // here can self-assign Premium.
-export function PlanPane({ words, planState, onBuy, onActivateLicense, onDeactivate }: Props) {
-  if (planState === 'premium') return <PremiumActiveView onDeactivate={onDeactivate} />;
-  if (planState === 'free') return <UpgradeView words={words} onBuy={onBuy} onActivateLicense={onActivateLicense} />;
-  return <BetaView />;
+export function PlanPane({ words, planState, defaultAlgo, onBuy, onActivateLicense, onDeactivate }: Props) {
+  if (planState === 'premium') return <PremiumActiveView defaultAlgo={defaultAlgo} onDeactivate={onDeactivate} />;
+  if (planState === 'free') {
+    return <UpgradeView words={words} defaultAlgo={defaultAlgo} onBuy={onBuy} onActivateLicense={onActivateLicense} />;
+  }
+  return <BetaView defaultAlgo={defaultAlgo} />;
 }
 
-function BetaView() {
+/** Everything the app actually knows about the currently-selected
+ *  algorithm, pulled live from the scheduler config (see algo-info.ts) so
+ *  this can never go stale the way a hand-typed description would. */
+function AlgorithmInfoCard({ algo }: { algo: AlgoId }) {
+  const { t } = useI18n();
+  const info = getAlgoInfo(algo);
+  const chain = formatChain(info.chainSeconds);
+
+  return (
+    <div className="info-card">
+      <h4>{t('algoInfo.heading')}</h4>
+      <div className="name">{algo === 'leitner' ? t('algoInfo.leitnerName') : t('algoInfo.sm2Name')}</div>
+      <p>{algo === 'leitner' ? t('algoInfo.leitnerCore') : t('algoInfo.sm2Core')}</p>
+
+      <div className="algo-chain-label">{t('algoInfo.chainLabel')}</div>
+      <div className="algo-chain">
+        {chain}
+        {info.growsPastChain && <span className="algo-chain-grows"> → {t('algoInfo.chainGrows')}</span>}
+      </div>
+
+      <ul className="algo-details">
+        {algo === 'leitner' ? (
+          <>
+            <li>{t('algoInfo.leitnerDetail1')}</li>
+            <li>{t('algoInfo.leitnerDetail2')}</li>
+          </>
+        ) : (
+          <>
+            <li>{t('algoInfo.sm2Detail1')}</li>
+            <li>{t('algoInfo.sm2Detail2')}</li>
+            <li>{t('algoInfo.sm2Detail3')}</li>
+          </>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+function BetaView({ defaultAlgo }: { defaultAlgo: AlgoId }) {
   const { t } = useI18n();
   return (
     <div className="plan-pane">
@@ -42,11 +89,7 @@ function BetaView() {
         </div>
       </div>
 
-      <div className="info-card">
-        <h4>{t('plan.currentAlgorithm')}</h4>
-        <div className="name">{t('plan.sm2Name')}</div>
-        <p>{t('plan.sm2Desc')}</p>
-      </div>
+      <AlgorithmInfoCard algo={defaultAlgo} />
 
       <div className="tips">
         <h4>{t('plan.tipsTitle')}</h4>
@@ -60,10 +103,12 @@ function BetaView() {
 
 function UpgradeView({
   words,
+  defaultAlgo,
   onBuy,
   onActivateLicense,
 }: {
   words: Word[];
+  defaultAlgo: AlgoId;
   onBuy: () => void;
   onActivateLicense: (key: string) => Promise<{ ok: boolean; message: string }>;
 }) {
@@ -160,11 +205,13 @@ function UpgradeView({
           </div>
         )}
       </div>
+
+      <AlgorithmInfoCard algo={defaultAlgo} />
     </div>
   );
 }
 
-function PremiumActiveView({ onDeactivate }: { onDeactivate: () => void }) {
+function PremiumActiveView({ defaultAlgo, onDeactivate }: { defaultAlgo: AlgoId; onDeactivate: () => void }) {
   const { t } = useI18n();
   const [confirmOff, setConfirmOff] = useState(false);
   return (
@@ -195,6 +242,8 @@ function PremiumActiveView({ onDeactivate }: { onDeactivate: () => void }) {
           </div>
         </div>
       )}
+
+      <AlgorithmInfoCard algo={defaultAlgo} />
     </div>
   );
 }

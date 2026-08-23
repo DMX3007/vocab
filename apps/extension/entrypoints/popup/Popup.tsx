@@ -456,6 +456,7 @@ export function Popup() {
           <PlanPane
             words={words}
             planState={planState}
+            defaultAlgo={settings?.defaultAlgo ?? 'sm2'}
             onBuy={handleBuy}
             onActivateLicense={handleActivateLicense}
             onDeactivate={() => void handleDeactivateLicense()}

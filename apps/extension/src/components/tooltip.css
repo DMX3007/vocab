@@ -353,6 +353,20 @@
   position: relative;
 }
 
+.vf-ctx-spoiler {
+  background: #1c1a17;
+  color: transparent;
+  border-radius: 3px;
+  cursor: help;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vf-ctx-spoiler.revealed {
+  background: none;
+  color: inherit;
+  cursor: text;
+}
+
 .vf-card-input {
   width: 100%;
   padding: 12px 14px;

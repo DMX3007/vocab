@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ReviewSession, ReviewCard as Card } from '../lib/review/session';
 import type { GradeResult } from '@vocably/core';
 import type { Word } from '../lib/storage/types';
@@ -6,6 +6,7 @@ import { Icon } from './icons';
 import { speak } from '../lib/tts';
 import { shouldSuggestShelving } from '../lib/review/library';
 import { diffChars } from '../lib/review/diff';
+import { maskSpoilers } from '../lib/review/spoiler-mask';
 import { useI18n } from '../lib/i18n';
 
 interface Props {
@@ -132,6 +133,14 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   const suggestShelve = !!verdict && verdict.verdict !== 'correct' && !shelveSuggestionDismissed
     && !!lastAnswered && shouldSuggestShelving(lastAnswered);
 
+  // The context sentence is captured verbatim from the page it was saved
+  // on, so it very often contains the answer word itself — blank those
+  // occurrences out until the word's been answered (or given up on).
+  const ctxParts = useMemo(
+    () => maskSpoilers(card.contextSentence, card.expected),
+    [card.contextSentence, card.expected],
+  );
+
   return (
     <div className={`vf-card ${verdictClass}`} onKeyDown={onKeyDown}>
       <div className="vf-card-top">
@@ -151,7 +160,19 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
           <Icon name="volume" size={16} />
         </button>
       </div>
-      {card.contextSentence && <div className="vf-card-ctx">{card.contextSentence}</div>}
+      {card.contextSentence && (
+        <div className="vf-card-ctx">
+          {ctxParts.map((part, i) =>
+            part.spoiler ? (
+              <span key={i} className={`vf-ctx-spoiler ${verdict ? 'revealed' : ''}`} title={verdict ? undefined : t('card.spoilerHint')}>
+                {part.text}
+              </span>
+            ) : (
+              <React.Fragment key={i}>{part.text}</React.Fragment>
+            ),
+          )}
+        </div>
+      )}
 
       <input
         ref={inputRef}
