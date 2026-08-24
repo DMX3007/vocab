@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
+import { DraftStore } from '../../src/lib/storage/draft-store';
 import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
 import { applyStreakMaintenance } from '../../src/lib/review/progress';
 import { downloadJson } from '../../src/lib/export';
@@ -21,6 +22,14 @@ import type { AlgoId, Pace } from '@vocably/core';
 import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
+const draftStore = new DraftStore(browser.storage.local);
+// Popped out via handlePopout below, into a real (non-auto-closing) browser
+// window — see AddWordModal's onPopout for why. openAdd=1 jumps straight to
+// the Library tab with the Add Word sheet already up, matching what the
+// user was doing in the toolbar popup before they popped out.
+const urlParams = new URLSearchParams(window.location.search);
+const isStandalone = urlParams.get('standalone') === '1';
+const shouldOpenAddOnLoad = urlParams.get('openAdd') === '1';
 const PLAN_STATE_KEY = 'vocably_plan_state';
 const LICENSE_KEY_STORAGE = 'vocably_license_key';
 // Point this at your real Ko-fi page before shipping — see the licensing
@@ -40,8 +49,8 @@ export function Popup() {
   const [logs, setLogs] = useState<ReviewLog[]>([]);
   const [dueCount, setDueCount] = useState(0);
   const [settings, setSettings] = useState<OverlaySettings | null>(null);
-  const [tab, setTab] = useState<TabId>('review');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [tab, setTab] = useState<TabId>(shouldOpenAddOnLoad ? 'library' : 'review');
+  const [modalOpen, setModalOpen] = useState(shouldOpenAddOnLoad);
   const [helpOpen, setHelpOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -135,6 +144,16 @@ export function Popup() {
       isBlacklisted(s, currentHost) ? removeFromBlacklist(s, currentHost) : addToBlacklist(s, currentHost),
     );
     await refresh();
+  }
+
+  /** Re-opens this same UI as a real browser window instead of the toolbar
+   *  action popup, then closes the action popup. A real window doesn't
+   *  auto-close on blur, so it survives switching the OS input language
+   *  mid-word (unlike the action popup — see AddWordModal's onPopout). */
+  function handlePopout() {
+    const url = browser.runtime.getURL('/popup.html') + '?openAdd=1&standalone=1';
+    void browser.windows.create({ url, type: 'popup', width: 420, height: 640 });
+    window.close();
   }
 
   const effectiveDark = themePref ? themePref === 'dark' : systemDark;
@@ -473,7 +492,13 @@ export function Popup() {
         </button>
       )}
 
-      <AddWordModal open={modalOpen} onClose={() => setModalOpen(false)} onAdd={handleAddWords} />
+      <AddWordModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onAdd={handleAddWords}
+        draftStore={draftStore}
+        onPopout={isStandalone ? undefined : handlePopout}
+      />
       <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );

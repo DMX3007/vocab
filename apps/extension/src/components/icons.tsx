@@ -62,6 +62,11 @@ const PATHS: Record<string, React.ReactNode> = {
     <line x1="10" y1="10" x2="14" y2="14" />
     <line x1="2.7" y1="2.7" x2="6" y2="6" />
   </>,
+  popout: <>
+    {P('M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3')}
+    <polyline points="9,2.5 13.5,2.5 13.5,7" />
+    <line x1="13.5" y1="2.5" x2="7.5" y2="8.5" />
+  </>,
 };
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {

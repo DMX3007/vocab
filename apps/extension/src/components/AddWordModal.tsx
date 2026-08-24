@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icon } from './icons';
 import { fetchWordsFromGoogleSheet, type WordInput } from '../lib/import/google-sheet';
+import { DraftStore } from '../lib/storage/draft-store';
 import { useI18n } from '../lib/i18n';
 
 export type AddWordInput = WordInput;
@@ -9,6 +10,12 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onAdd: (inputs: AddWordInput[]) => void;
+  /** Where the in-progress draft is persisted — see draft-store.ts. */
+  draftStore: DraftStore;
+  /** Pops this same form out into a persistent browser window. Omitted
+   *  when we're already running inside one, so there's nothing to pop out
+   *  of further. See draft-store.ts for why this exists. */
+  onPopout?: () => void;
 }
 
 type Mode = 'single' | 'bulk' | 'sheet';
@@ -18,7 +25,7 @@ type Mode = 'single' | 'bulk' | 'sheet';
 // line, or a Google Sheet import (public CSV export, no OAuth). No
 // auto-translate here — that's the tooltip's AUTO button; this modal is for
 // words typed or pasted in directly, translation included.
-export function AddWordModal({ open, onClose, onAdd }: Props) {
+export function AddWordModal({ open, onClose, onAdd, draftStore, onPopout }: Props) {
   const { t, tp } = useI18n();
   const [mode, setMode] = useState<Mode>('single');
   const [term, setTerm] = useState('');
@@ -34,7 +41,20 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => (mode === 'single' ? inputRef.current : areaRef.current)?.focus(), 200);
+      void (async () => {
+        const draft = await draftStore.load();
+        let focusMode: Mode = mode;
+        if (draft) {
+          setMode(draft.mode);
+          setTerm(draft.term);
+          setTranslation(draft.translation);
+          setContext(draft.context);
+          setBulkText(draft.bulkText);
+          setSheetUrl(draft.sheetUrl);
+          focusMode = draft.mode;
+        }
+        setTimeout(() => (focusMode === 'single' ? inputRef.current : areaRef.current)?.focus(), 200);
+      })();
     } else {
       setTimeout(() => {
         setTerm('');
@@ -51,6 +71,18 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Safety net for a popup that closes mid-type (see draft-store.ts):
+  // debounced so normal typing doesn't hammer storage, but short enough
+  // that a sudden focus-loss close still has something recent to restore.
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => {
+      void draftStore.save({ mode, term, translation, context, bulkText, sheetUrl });
+    }, 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, term, translation, context, bulkText, sheetUrl]);
+
   const parsedBulk = useMemo(() => {
     return bulkText
       .split('\n')
@@ -66,12 +98,14 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
   function submitSingle() {
     if (!term.trim() || !translation.trim()) return;
     onAdd([{ term: term.trim(), translation: translation.trim(), contextSentence: context.trim() }]);
+    void draftStore.clear();
     onClose();
   }
 
   function submitBulk() {
     if (!parsedBulk.length) return;
     onAdd(parsedBulk.map((r) => ({ term: r.term, translation: r.translation })));
+    void draftStore.clear();
     onClose();
   }
 
@@ -92,6 +126,7 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
   function submitSheet() {
     if (!sheetWords.length) return;
     onAdd(sheetWords);
+    void draftStore.clear();
     onClose();
   }
 
@@ -99,8 +134,28 @@ export function AddWordModal({ open, onClose, onAdd }: Props) {
     <div className={`scrim ${open ? 'open' : ''}`} onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <div className="sheet-title">{t('add.title')}</div>
-        <div className="sheet-sub">{t('add.subtitle')}</div>
+        <div className="sheet-header-row">
+          <div>
+            <div className="sheet-title">{t('add.title')}</div>
+            <div className="sheet-sub">{t('add.subtitle')}</div>
+          </div>
+          {onPopout && (
+            <button
+              type="button"
+              className="icon-btn"
+              title={t('add.popoutTitle')}
+              aria-label={t('add.popoutTitle')}
+              onClick={() => {
+                // Flush the draft before handing off — the debounced autosave
+                // above may not have fired yet, and the toolbar popup this
+                // closes right behind us won't get another chance to.
+                void draftStore.save({ mode, term, translation, context, bulkText, sheetUrl }).then(onPopout);
+              }}
+            >
+              <Icon name="popout" size={15} />
+            </button>
+          )}
+        </div>
 
         <div className="mode-switch">
           <button className={mode === 'single' ? 'on' : ''} onClick={() => setMode('single')}>

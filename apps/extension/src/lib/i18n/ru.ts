@@ -172,6 +172,7 @@ export const strings: Record<TranslationKey, string> = {
   // ── Add word modal ───────────────────────────────────────────
   'add.title': 'Добавить в библиотеку',
   'add.subtitle': 'Сохраняйте слова, которые хотите запомнить. Мы составим расписание повторений.',
+  'add.popoutTitle': 'Открыть в отдельном окне (не закроется при переключении раскладки клавиатуры)',
   'add.modeSingle': 'Одно слово',
   'add.modePaste': 'Вставить список',
   'add.modeSheet': 'Google Таблица',

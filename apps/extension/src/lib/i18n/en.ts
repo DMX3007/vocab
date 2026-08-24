@@ -176,6 +176,7 @@ export const strings = {
   // ── Add word modal ───────────────────────────────────────────
   'add.title': 'Add to library',
   'add.subtitle': 'Save words you want to remember. We’ll schedule reviews.',
+  'add.popoutTitle': 'Open in a separate window (stays open while you switch keyboard languages)',
   'add.modeSingle': 'Single',
   'add.modePaste': 'Paste a list',
   'add.modeSheet': 'Google Sheet',
