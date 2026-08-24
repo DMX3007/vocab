@@ -2,11 +2,11 @@ import { WordRepository } from '../src/lib/storage/word-repository';
 import { SettingsStore } from '../src/lib/review/settings-store';
 import { planTick } from '../src/lib/review/scheduler';
 import { shouldShowStreakReminder, markStreakReminderShown, isPausedOrSnoozed, type OverlaySettings } from '../src/lib/review/overlay-policy';
-import { computeProgressStats } from '../src/lib/review/progress';
+import { computeProgressStats, computeUnlockedAchievementIds } from '../src/lib/review/progress';
 import { translateWord } from '../src/lib/translate/mymemory';
 import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
 import { validateLicense } from '../src/lib/licensing/license-client';
-import type { Message } from '../src/lib/messaging/protocol';
+import type { Message, AchievementUnlockedMessage } from '../src/lib/messaging/protocol';
 
 // The service worker owns the database AND drives the review alarm.
 // On each alarm it asks the active tab for its page context, decides via
@@ -62,7 +62,9 @@ export default defineBackground(() => {
     switch (message.type) {
       case 'SAVE_WORD': {
         const { defaultAlgo, defaultPace } = await settingsStore.load();
-        return repo.saveWord(message.payload.input, new Date(), defaultAlgo, defaultPace);
+        const word = await repo.saveWord(message.payload.input, new Date(), defaultAlgo, defaultPace);
+        void checkAchievements();
+        return word;
       }
       case 'GET_ALL_WORDS':
         return repo.getAllWords(message.payload.langTo);
@@ -70,11 +72,14 @@ export default defineBackground(() => {
         return repo.getDueWords(new Date(message.payload.now), message.payload.langTo);
       case 'COUNT_WORDS':
         return repo.countWords(message.payload.langTo);
-      case 'RECORD_REVIEW':
-        return repo.recordReview(
+      case 'RECORD_REVIEW': {
+        const word = await repo.recordReview(
           message.payload.wordId, message.payload.grade,
           message.payload.mode, new Date(message.payload.now),
         );
+        void checkAchievements();
+        return word;
+      }
       case 'GET_REVIEW_LOGS':
         return repo.getReviewLogs(message.payload.wordId);
       case 'DELETE_WORD':
@@ -192,6 +197,43 @@ export default defineBackground(() => {
       todayCount: stats.todayCount,
       dailyGoal: stats.goal,
     }).catch(() => { });
+  }
+
+  /** Runs after SAVE_WORD and RECORD_REVIEW — the two operations that can
+   *  ever cross an achievement threshold, and (crucially) the two handlers
+   *  every trigger path shares: the popup's Add Word modal, the in-page
+   *  tooltip, and the on-page review overlay all funnel through these same
+   *  background message handlers regardless of which surface the user is
+   *  actually looking at. That makes this the one place unlock detection
+   *  can live and still see every action — a check that lived in the popup
+   *  (as it used to) would only ever fire when the popup happened to be
+   *  open, missing the on-page overlay/tooltip flows entirely.
+   *
+   *  Fire-and-forget from the caller (not awaited) so it never delays the
+   *  SAVE_WORD/RECORD_REVIEW response the UI is waiting on. */
+  async function checkAchievements(): Promise<void> {
+    const settings = await settingsStore.load();
+    const [words, logs] = await Promise.all([
+      repo.getAllWords(settings.targetLang),
+      repo.getAllReviewLogs(),
+    ]);
+    const stats = computeProgressStats(words, logs, new Date(), settings.dailyGoal, new Set(settings.frozenDates), settings.dailyAddGoal);
+    const unlockedIds = computeUnlockedAchievementIds(words, stats);
+    const seen = new Set(settings.seenAchievements);
+    const newlyUnlocked = unlockedIds.filter((id) => !seen.has(id));
+    if (newlyUnlocked.length === 0) return;
+
+    await settingsStore.save({ ...settings, seenAchievements: unlockedIds });
+
+    const msg: AchievementUnlockedMessage = { type: 'ACHIEVEMENT_UNLOCKED', ids: newlyUnlocked };
+    // The popup, if it's currently open.
+    browser.runtime.sendMessage(msg).catch(() => { });
+    // Wherever the user is actually looking, for an on-page toast — the
+    // active tab regardless of whether IT was the one that triggered this
+    // (the popup itself isn't a tab, so this is the only way to reach the
+    // page when the action came from there).
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) browser.tabs.sendMessage(tab.id, msg).catch(() => { });
   }
 
   async function askPageContext(tabId: number): Promise<{ userIsTyping: boolean; isFullscreen: boolean } | null> {

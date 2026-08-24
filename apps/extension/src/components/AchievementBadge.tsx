@@ -31,7 +31,12 @@ export function AchievementBadge({ iconKey, glyph, locked, size = 34 }: Props) {
   return (
     <img
       className={className}
-      src={`/achievements/${iconKey}.png`}
+      // browser.runtime.getURL, not a bare root-relative path: this renders
+      // both inside the popup document (chrome-extension://...) AND inside a
+      // content script's shadow DOM injected into an arbitrary webpage — a
+      // plain "/achievements/x.png" there would resolve against the HOST
+      // PAGE's origin instead of the extension's, and 404.
+      src={browser.runtime.getURL('/') + `achievements/${iconKey}.png`}
       alt=""
       width={size}
       height={size}

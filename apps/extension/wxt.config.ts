@@ -34,5 +34,14 @@ export default defineConfig({
         128: 'icon/icon-128.png',
       },
     },
+    // AchievementBadge's <img> can render inside a content script's shadow
+    // DOM (the on-page unlock toast), which counts as "the web page" for
+    // resource-loading purposes — without this, chrome-extension://.../
+    // achievements/*.png 404s there with no error beyond a blocked network
+    // request, even though the exact same file loads fine from the popup
+    // (same-origin, not subject to this restriction).
+    web_accessible_resources: [
+      { resources: ['achievements/*'], matches: ['<all_urls>'] },
+    ],
   },
 });

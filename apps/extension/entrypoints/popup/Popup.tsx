@@ -3,8 +3,9 @@ import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
 import { DraftStore } from '../../src/lib/storage/draft-store';
 import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
-import { applyStreakMaintenance, computeProgressStats, computeAchievementTracks, computeUnlockedAchievementIds } from '../../src/lib/review/progress';
+import { applyStreakMaintenance, computeProgressStats, resolveUnlockedAchievement } from '../../src/lib/review/progress';
 import { ACHIEVEMENT_TIER_KEY, ACHIEVEMENT_TRACK_KEY } from '../../src/lib/review/achievement-copy';
+import type { AchievementUnlockedMessage } from '../../src/lib/messaging/protocol';
 import { downloadJson } from '../../src/lib/export';
 import { ReviewPane } from '../../src/components/ReviewPane';
 import { LibraryPane } from '../../src/components/LibraryPane';
@@ -60,7 +61,6 @@ export function Popup() {
   const [themePref, setThemePref] = useState<ThemePref>(null);
   const [systemDark, setSystemDark] = useState(false);
   const [currentHost, setCurrentHost] = useState<string | null>(null);
-  const [pendingUnlocks, setPendingUnlocks] = useState<{ ids: string[]; tracks: ReturnType<typeof computeAchievementTracks> } | null>(null);
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
@@ -73,63 +73,46 @@ export function Popup() {
     // new one on a fresh milestone — see progress.ts. Runs on every popup
     // open since there's no reliable "midnight" hook otherwise.
     const maintenance = applyStreakMaintenance(allLogs, s, new Date());
-    let nextSettings = maintenance.settings;
-    let settingsChanged = maintenance.changed;
-
-    // Same idea, for achievements: diff what's unlocked right now against
-    // what the last toast already covered, so a *new* unlock (and only a
-    // new one) gets celebrated exactly once, however many popup opens or
-    // refreshes happen in between.
-    const now = new Date();
-    const stats = computeProgressStats(all, allLogs, now, nextSettings.dailyGoal, new Set(nextSettings.frozenDates), nextSettings.dailyAddGoal);
-    const unlockedIds = computeUnlockedAchievementIds(all, stats);
-    const seen = new Set(nextSettings.seenAchievements);
-    const newlyUnlocked = unlockedIds.filter((id) => !seen.has(id));
-    if (newlyUnlocked.length > 0) {
-      nextSettings = { ...nextSettings, seenAchievements: unlockedIds };
-      settingsChanged = true;
-      // Deferred to state + a separate effect (below) rather than shown
-      // right here: this callback is memoized with an empty dep array, so
-      // it always closes over the FIRST render's t/tp — fine for pure data
-      // fetching, but it'd freeze the toast in whatever locale was active
-      // on mount even after switching languages. The effect always runs
-      // with the current render's t/tp instead.
-      setPendingUnlocks({ ids: newlyUnlocked, tracks: computeAchievementTracks(all, stats) });
-    }
-
-    if (settingsChanged) await settingsStore.save(nextSettings);
+    if (maintenance.changed) await settingsStore.save(maintenance.settings);
     setWords(all);
     setDueCount(due.length);
     setLogs(allLogs);
-    setSettings(nextSettings);
+    setSettings(maintenance.settings);
   }, []);
 
-  // Fires the unlock toast queued by refresh() above, always with this
-  // render's (i.e. the current locale's) t/tp.
+  // Achievement unlocks are detected centrally in background.ts — the one
+  // place every trigger path (this popup's Add Word modal, the in-page
+  // tooltip, the on-page review overlay) funnels through — which broadcasts
+  // here so the popup's toast stays in sync with whatever just happened,
+  // even when it happened on a page this popup isn't showing. Re-registers
+  // on locale change (not an empty dep array) so the listener always closes
+  // over the current t/tp rather than freezing whatever was active on mount.
   useEffect(() => {
-    if (!pendingUnlocks) return;
-    const { ids, tracks } = pendingUnlocks;
-    if (ids.length === 1) {
-      const id = ids[0]!;
-      if (id === 'first-word') {
-        showToast(t('achievement.oneOff.firstWord'));
-      } else {
-        const hit = tracks
-          .map((track) => ({ track, tier: track.tiers.find((tr) => `${track.id}-${tr.tier}` === id) }))
-          .find((x) => x.tier);
-        if (hit?.tier) {
-          showToast(t('achievement.unlockedToastOne', {
-            tier: t(ACHIEVEMENT_TIER_KEY[hit.tier.tier]),
-            track: t(ACHIEVEMENT_TRACK_KEY[hit.track.id]!.name),
-          }));
-        }
+    function onMessage(msg: unknown) {
+      const message = msg as AchievementUnlockedMessage;
+      if (message?.type !== 'ACHIEVEMENT_UNLOCKED') return;
+      announceUnlocked(message.ids);
+      void refresh();
+    }
+    function announceUnlocked(ids: string[]) {
+      if (ids.length === 1) {
+        const resolved = resolveUnlockedAchievement(ids[0]!);
+        if (!resolved) return;
+        showToast(
+          resolved.isOneOff
+            ? t('achievement.oneOff.firstWord')
+            : t('achievement.unlockedToastOne', {
+                tier: t(ACHIEVEMENT_TIER_KEY[resolved.tier!]),
+                track: t(ACHIEVEMENT_TRACK_KEY[resolved.trackId!]!.name),
+              }),
+        );
+        return;
       }
-    } else {
       showToast(tp('achievement.unlockedToastMany', ids.length));
     }
-    setPendingUnlocks(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingUnlocks]);
+    browser.runtime.onMessage.addListener(onMessage);
+    return () => browser.runtime.onMessage.removeListener(onMessage);
+  }, [t, tp, refresh]);
 
   async function handleDailyGoalChange(dailyGoal: number) {
     await settingsStore.update((s) => ({ ...s, dailyGoal }));

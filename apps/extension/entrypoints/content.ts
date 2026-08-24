@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Tooltip } from '../src/components/Tooltip';
 import { ReviewOverlay } from '../src/components/ReviewOverlay';
 import { StreakReminder } from '../src/components/StreakReminder';
+import { AchievementToast } from '../src/components/AchievementToast';
 import tooltipCss from '../src/components/tooltip.css?inline';
 import { analyzeSelection } from '../src/lib/selection';
 import { wordClient } from '../src/lib/messaging/client';
@@ -213,6 +214,44 @@ export default defineContentScript({
       );
     }
 
+    // ── achievement unlock toast ───────────────────────────────
+    // Deliberately NOT routed through mount()/currentSurface above: that
+    // machinery is exclusive (mounting a new surface replaces whatever's
+    // showing), which would mean an achievement unlocked mid-review wipes
+    // out the very ReviewOverlay the user just triggered it from. This gets
+    // its own independent host so it appears on top of, not instead of,
+    // whatever else is on screen.
+    let achievementToastSurface: { host: HTMLDivElement; root: Root } | null = null;
+
+    function unmountAchievementToast() {
+      achievementToastSurface?.root.unmount();
+      achievementToastSurface?.host.remove();
+      achievementToastSurface = null;
+    }
+
+    function showAchievementToast(ids: string[]) {
+      unmountAchievementToast();
+      const host = document.createElement('div');
+      // Same non-blocking full-viewport trick as the 'streak' placement in
+      // mount() above: the host spans the viewport (so the card's own fixed
+      // corner position works), but pointer-events stay off everywhere
+      // except the card itself (see .vf-ach-toast in tooltip.css).
+      host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
+      document.body.appendChild(host);
+      const shadow = host.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = tooltipCss;
+      shadow.appendChild(style);
+      const slot = document.createElement('div');
+      shadow.appendChild(slot);
+      const root = createRoot(slot);
+      root.render(React.createElement(I18nProvider, {
+        storage: browser.storage.local,
+        children: React.createElement(AchievementToast, { ids, onDismiss: unmountAchievementToast }),
+      }));
+      achievementToastSurface = { host, root };
+    }
+
     // ── burst drilling: auto-reappear fast for a word already mid-drill ──
     // The normal alarm/throttle path (background.ts) checks once a minute
     // and paces itself to avoid nagging — right for a slow ambient due
@@ -275,6 +314,10 @@ export default defineContentScript({
       }
       if (message?.type === 'SHOW_STREAK_REMINDER') {
         showStreakReminder(message.streak, message.todayCount, message.dailyGoal);
+        sendResponse(true);
+      }
+      if (message?.type === 'ACHIEVEMENT_UNLOCKED') {
+        showAchievementToast(message.ids);
         sendResponse(true);
       }
       return true;  // WXT 0.19 types require every path to return true

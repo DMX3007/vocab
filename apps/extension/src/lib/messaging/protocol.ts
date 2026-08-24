@@ -59,10 +59,21 @@ export type Message = {
   [K in keyof RequestMap]: { type: K, payload: RequestMap[K] }
 }[keyof RequestMap]
 
+/** Sent by background.ts after any action that could cross an achievement
+ *  threshold (SAVE_WORD, RECORD_REVIEW) — every trigger path (the popup's
+ *  Add Word modal, the in-page tooltip, the on-page review overlay) funnels
+ *  through those two handlers, so this is computed exactly once regardless
+ *  of where the action happened. Broadcast two ways: browser.runtime.sendMessage
+ *  reaches the popup if it's open, browser.tabs.sendMessage(activeTabId, ...)
+ *  reaches that tab's content script for an on-page toast — see
+ *  Popup.tsx's message listener and content.ts's showAchievementToast. */
+export type AchievementUnlockedMessage = { type: 'ACHIEVEMENT_UNLOCKED'; ids: string[] };
+
 export type ContentCommand =
   | { type: "SHOW_OVERLAY"; langTo: string; algoFilter?: AlgoFilter }
   | { type: "GET_PAGE_CONTEXT" }
   | { type: "SHOW_STREAK_REMINDER"; streak: number; todayCount: number; dailyGoal: number }
+  | AchievementUnlockedMessage
 
 /** Dates don't survive structured-clone messaging cleanly across all paths,
  *  so we serialize them as ISO strings and revive them on the receiving end. */

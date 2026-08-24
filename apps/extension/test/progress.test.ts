@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeProgressStats, isMastered, applyStreakMaintenance,
   computeAchievementTracks, computeNextUpAchievement, computeUnlockedAchievementIds,
+  resolveUnlockedAchievement, ACHIEVEMENT_TRACKS,
   ONE_OFF_ACHIEVEMENTS, ACHIEVEMENT_TIERS, type AchievementTrackProgress,
 } from '../src/lib/review/progress';
 import { defaultSettings } from '../src/lib/review/overlay-policy';
@@ -325,5 +326,25 @@ describe('computeUnlockedAchievementIds', () => {
     expect(ids).toContain('vocabulary-bronze');
     expect(ids).toContain('vocabulary-silver');
     expect(ids).not.toContain('vocabulary-gold');
+  });
+});
+
+describe('resolveUnlockedAchievement', () => {
+  it('resolves the first-word one-off id', () => {
+    expect(resolveUnlockedAchievement('first-word')).toEqual({
+      iconKey: 'first-word', glyph: ONE_OFF_ACHIEVEMENTS[0]!.glyph, isOneOff: true,
+    });
+  });
+
+  it('resolves a {trackId}-{tier} id back to its track and tier', () => {
+    const scholar = ACHIEVEMENT_TRACKS.find((t) => t.id === 'scholar')!;
+    expect(resolveUnlockedAchievement('scholar-gold')).toEqual({
+      iconKey: 'scholar-gold', glyph: scholar.glyph, isOneOff: false, trackId: 'scholar', tier: 'gold',
+    });
+  });
+
+  it('returns null for an id that matches nothing', () => {
+    expect(resolveUnlockedAchievement('not-a-real-id')).toBeNull();
+    expect(resolveUnlockedAchievement('scholar-platinum-extra')).toBeNull();
   });
 });

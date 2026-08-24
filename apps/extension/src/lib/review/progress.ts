@@ -435,3 +435,30 @@ export function computeUnlockedAchievementIds(words: Word[], stats: ProgressStat
   }
   return ids;
 }
+
+export interface ResolvedAchievement {
+  /** Filename stem for AchievementBadge — {track.id}-{tier}, or the bare id for a one-off. */
+  iconKey: string;
+  glyph: string;
+  isOneOff: boolean;
+  trackId?: string;
+  tier?: AchievementTier;
+}
+
+/** Looks an achievement id (from computeUnlockedAchievementIds) back up to
+ *  what a notification needs to display it — just the id string travels
+ *  over messaging (background -> popup / background -> content script),
+ *  so both ends resolve the same static id here rather than needing the
+ *  full words/stats/tracks recomputed or serialized. */
+export function resolveUnlockedAchievement(id: string): ResolvedAchievement | null {
+  const oneOff = ONE_OFF_ACHIEVEMENTS.find((a) => a.id === id);
+  if (oneOff) return { iconKey: id, glyph: oneOff.glyph, isOneOff: true };
+  for (const track of ACHIEVEMENT_TRACKS) {
+    for (const tier of ACHIEVEMENT_TIERS) {
+      if (`${track.id}-${tier}` === id) {
+        return { iconKey: id, glyph: track.glyph, isOneOff: false, trackId: track.id, tier };
+      }
+    }
+  }
+  return null;
+}
