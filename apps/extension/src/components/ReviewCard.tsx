@@ -109,7 +109,9 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') verdict ? next() : check();
+    if (e.key !== 'Enter') return;
+    if (verdict) { next(); return; }
+    if (answer.trim() && !checking) void check();
   }
 
   if (!card) {
@@ -179,7 +181,13 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
         className="vf-card-input"
         placeholder={card.direction === 'forward' ? t('card.translationPlaceholder') : t('card.originalPlaceholder')}
         value={answer}
-        disabled={!!verdict}
+        readOnly={!!verdict}
+        // readOnly, not disabled: a disabled input blurs itself the instant
+        // it's set (moving focus out of the card entirely, which the host
+        // page's own keydown listeners are deliberately isolated from — see
+        // suppressOuterListeners in content.ts), so the very next Enter
+        // press to advance the card would go nowhere. readOnly blocks
+        // edits without giving up focus.
         onChange={(e) => setAnswer(e.target.value)}
       />
 

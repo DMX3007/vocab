@@ -385,7 +385,8 @@
   color: #9a9183;
 }
 
-.vf-card-input:disabled {
+.vf-card-input:disabled,
+.vf-card-input:read-only {
   opacity: 0.8;
 }
 
