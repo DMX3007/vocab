@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
 import { DraftStore } from '../../src/lib/storage/draft-store';
+import { OverlayLockStore } from '../../src/lib/review/overlay-lock';
 import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
 import { applyStreakMaintenance, computeProgressStats, resolveUnlockedAchievement } from '../../src/lib/review/progress';
 import { ACHIEVEMENT_TIER_KEY, ACHIEVEMENT_TRACK_KEY } from '../../src/lib/review/achievement-copy';
@@ -24,6 +25,7 @@ import '../../src/components/popup.css';
 
 const settingsStore = new SettingsStore(browser.storage.local);
 const draftStore = new DraftStore(browser.storage.local);
+const overlayLockStore = new OverlayLockStore(browser.storage.local);
 // Popped out via handlePopout below, into a real (non-auto-closing) browser
 // window — see AddWordModal's onPopout for why. openAdd=1 jumps straight to
 // the Library tab with the Add Word sheet already up, matching what the
@@ -61,6 +63,8 @@ export function Popup() {
   const [themePref, setThemePref] = useState<ThemePref>(null);
   const [systemDark, setSystemDark] = useState(false);
   const [currentHost, setCurrentHost] = useState<string | null>(null);
+  const [currentTabId, setCurrentTabId] = useState<number | null>(null);
+  const [elsewhereReview, setElsewhereReview] = useState<{ tabId: number; host: string | null } | null>(null);
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
@@ -172,11 +176,62 @@ export function Popup() {
       try {
         const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
         setCurrentHost(activeTab?.url ? new URL(activeTab.url).hostname : null);
+        setCurrentTabId(activeTab?.id ?? null);
       } catch {
         setCurrentHost(null);
+        setCurrentTabId(null);
       }
     })();
   }, []);
+
+  // "Review card open elsewhere" — reads the same lock background.ts (and
+  // handleStartReview below) use to arbitrate which tab gets to show the
+  // overlay (see overlay-lock.ts), so this can never disagree with what's
+  // actually on screen. currentTabId gates both effects below so neither
+  // runs against a still-unresolved "which tab is this popup even attached
+  // to" — comparing against null would show a
+  // false-positive banner for the tab that's actually holding the lock.
+  const checkElsewhereReview = useCallback(async (tabId: number) => {
+    const lock = await overlayLockStore.get();
+    if (!lock || lock.tabId === tabId) {
+      setElsewhereReview(null);
+      return;
+    }
+    try {
+      const lockedTab = await browser.tabs.get(lock.tabId);
+      setElsewhereReview({ tabId: lock.tabId, host: lockedTab.url ? new URL(lockedTab.url).hostname : null });
+    } catch {
+      setElsewhereReview(null); // that tab's gone — a stale lock the background will clean up on its own
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentTabId === null) return;
+    void checkElsewhereReview(currentTabId);
+  }, [currentTabId, checkElsewhereReview]);
+
+  // Live updates while the popup stays open — e.g. the user answers/closes
+  // the card in the other tab while browsing Library here.
+  useEffect(() => {
+    if (currentTabId === null) return;
+    function onChanged(changes: Record<string, { newValue?: unknown }>, area: string) {
+      if (area === 'local' && 'vocably_overlay_lock' in changes) void checkElsewhereReview(currentTabId!);
+    }
+    browser.storage.onChanged.addListener(onChanged);
+    return () => browser.storage.onChanged.removeListener(onChanged);
+  }, [currentTabId, checkElsewhereReview]);
+
+  async function handleGoToReviewTab() {
+    if (!elsewhereReview) return;
+    try {
+      const target = await browser.tabs.get(elsewhereReview.tabId);
+      await browser.tabs.update(elsewhereReview.tabId, { active: true });
+      if (target.windowId != null) await browser.windows.update(target.windowId, { focused: true });
+      window.close();
+    } catch {
+      setElsewhereReview(null); // the tab's gone by the time we tried to jump to it
+    }
+  }
 
   async function handleToggleSite() {
     if (!currentHost) return;
@@ -250,6 +305,13 @@ export function Popup() {
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('no active tab');
+      // Claims the same lock the alarm tick / burst-drill polling use (see
+      // overlay-lock.ts) — without this, a manually-started review wouldn't
+      // register at all: another tab's ambient poll could still pop the
+      // same due word mid-session, and the "review open elsewhere" banner
+      // would never know this session exists. A deliberate click here
+      // always wins over whatever ambient trigger might be mid-flight.
+      await overlayLockStore.set(tab.id);
       await browser.tabs.sendMessage(tab.id, { type: 'SHOW_OVERLAY', langTo: targetLang, algoFilter });
       window.close();
     } catch {
@@ -464,6 +526,19 @@ export function Popup() {
           <span>{siteDisabled ? t('sitebar.disabledOn', { host: currentHost }) : t('sitebar.activeOn', { host: currentHost })}</span>
           <button className="vf-site-toggle" onClick={() => void handleToggleSite()}>
             {siteDisabled ? t('sitebar.enable') : t('sitebar.disable')}
+          </button>
+        </div>
+      )}
+
+      {elsewhereReview && (
+        <div className="vf-elsewhere-bar">
+          <span>
+            {elsewhereReview.host
+              ? t('reviewElsewhere.onHost', { host: elsewhereReview.host })
+              : t('reviewElsewhere.generic')}
+          </span>
+          <button className="vf-elsewhere-go" onClick={() => void handleGoToReviewTab()}>
+            {t('reviewElsewhere.goThere')}
           </button>
         </div>
       )}

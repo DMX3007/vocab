@@ -1,5 +1,6 @@
 import { WordRepository } from '../src/lib/storage/word-repository';
 import { SettingsStore } from '../src/lib/review/settings-store';
+import { OverlayLockStore } from '../src/lib/review/overlay-lock';
 import { planTick } from '../src/lib/review/scheduler';
 import { shouldShowStreakReminder, markStreakReminderShown, isPausedOrSnoozed, type OverlaySettings } from '../src/lib/review/overlay-policy';
 import { computeProgressStats, computeUnlockedAchievementIds } from '../src/lib/review/progress';
@@ -17,34 +18,28 @@ import type { Message, AchievementUnlockedMessage, BackgroundCommand, RequestSho
 
 const ALARM = 'vocably-review';
 const TICK_MINUTES = 1; // check often; the throttle/cap keep it polite
-
-// ── review-overlay lock ──────────────────────────────────────────
-// Two independent triggers can each decide to show the review overlay: the
-// 1-minute alarm tick below, and burst-drill polling running locally in
-// EVERY open tab (content.ts — it deliberately bypasses the normal
-// throttle so a card mid-drill can reappear in ~25s). Without coordination,
-// the alarm can slam a fresh overlay on top of an already-open burst card
-// (the visible "blink" this exists to fix), and two different tabs — even
-// two different browser WINDOWS, each with its own visible front tab — can
-// each independently pop the same due word at once. Persisted in
-// browser.storage.local (not a module variable) since the service worker
-// can be killed and woken between an acquire and its release.
-const OVERLAY_LOCK_KEY = 'vocably_overlay_lock';
-// Bounds staleness if a release message never arrives (the tab navigated
-// hard, crashed, or the extension reloaded mid-session) — well past any
-// real review session, short enough not to matter in practice.
-const OVERLAY_LOCK_TTL_MS = 5 * 60_000;
-
-interface OverlayLock {
-  tabId: number;
-  acquiredAt: string;
-}
+// Caps an unreasonably large due count so the 4-character badge doesn't
+// visually overflow the toolbar icon.
+const BADGE_COUNT_CAP = 99;
+const BADGE_COLOR = '#C15A34'; // matches --heat in popup.css/tooltip.css
 
 export default defineBackground(() => {
   console.log('[Vocably] service worker alive');
   const repo = new WordRepository();
   const ready = repo.open();
   const settingsStore = new SettingsStore(browser.storage.local);
+  // Two independent triggers can each decide to show the review overlay:
+  // the 1-minute alarm tick below, and burst-drill polling running locally
+  // in EVERY open tab (content.ts — it deliberately bypasses the normal
+  // throttle so a card mid-drill can reappear in ~25s). Without
+  // coordination, the alarm can slam a fresh overlay on top of an already-
+  // open burst card (the visible "blink" this exists to fix), and two
+  // different tabs — even two different browser WINDOWS, each with its own
+  // visible front tab — can each independently pop the same due word at
+  // once. Also read (never written) by Popup.tsx for the "review open
+  // elsewhere" banner — same lock, so the banner can't disagree with what's
+  // actually showing.
+  const overlayLock = new OverlayLockStore(browser.storage.local);
 
   browser.alarms.create(ALARM, { periodInMinutes: TICK_MINUTES });
   browser.alarms.onAlarm.addListener((alarm) => {
@@ -56,8 +51,8 @@ export default defineBackground(() => {
   // the review card or the popup flips it immediately), and on the
   // 1-minute alarm tick (so a *timed* pause/snooze reverts the icon on
   // its own once it expires, without waiting for the next user action).
-  void settingsStore.load().then((s) => refreshIcon(s, new Date()));
-  settingsStore.subscribe((s) => refreshIcon(s, new Date()));
+  void settingsStore.load().then((s) => { refreshIcon(s, new Date()); void refreshBadge(s); });
+  settingsStore.subscribe((s) => { refreshIcon(s, new Date()); void refreshBadge(s); });
 
   function refreshIcon(settings: OverlaySettings, now: Date): void {
     const paused = isPausedOrSnoozed(settings, now);
@@ -68,24 +63,17 @@ export default defineBackground(() => {
     }).catch(() => { });
   }
 
-  // ── review-overlay lock: who's allowed to show it right now ───
-  async function getOverlayLock(): Promise<OverlayLock | null> {
-    const result = await browser.storage.local.get(OVERLAY_LOCK_KEY);
-    const lock = result[OVERLAY_LOCK_KEY] as OverlayLock | undefined;
-    if (!lock) return null;
-    if (Date.now() - new Date(lock.acquiredAt).getTime() > OVERLAY_LOCK_TTL_MS) return null; // stale — treat as free
-    return lock;
-  }
-
-  async function setOverlayLock(tabId: number): Promise<void> {
-    const lock: OverlayLock = { tabId, acquiredAt: new Date().toISOString() };
-    await browser.storage.local.set({ [OVERLAY_LOCK_KEY]: lock });
-  }
-
-  async function clearOverlayLockIfHeldBy(tabId: number): Promise<void> {
-    const result = await browser.storage.local.get(OVERLAY_LOCK_KEY);
-    const lock = result[OVERLAY_LOCK_KEY] as OverlayLock | undefined;
-    if (lock?.tabId === tabId) await browser.storage.local.remove(OVERLAY_LOCK_KEY);
+  // ── toolbar badge: how many words are due right now ───────────
+  // Scoped to the current target language, matching every other "due"
+  // count in the app (the popup's ribbon, the ambient alarm tick below) —
+  // switching target language changes what counts as due, so this refires
+  // from settingsStore.subscribe() same as the icon does.
+  async function refreshBadge(settings: OverlaySettings): Promise<void> {
+    await ready;
+    const dueCount = (await repo.getDueWords(new Date(), settings.targetLang)).length;
+    const text = dueCount === 0 ? '' : dueCount > BADGE_COUNT_CAP ? `${BADGE_COUNT_CAP}+` : String(dueCount);
+    await browser.action.setBadgeText({ text }).catch(() => { });
+    if (dueCount > 0) await browser.action.setBadgeBackgroundColor({ color: BADGE_COLOR }).catch(() => { });
   }
 
   /** The one place that decides "yes, show it here" — both the alarm tick
@@ -97,12 +85,12 @@ export default defineBackground(() => {
    *  so a background-window tab noticing a due word never pops it somewhere
    *  the user isn't looking. */
   async function requestShowOverlay(requestingTabId: number | undefined, langTo: string): Promise<RequestShowOverlayResponse> {
-    if (await getOverlayLock()) return { granted: false }; // already showing somewhere
+    if (await overlayLock.get()) return { granted: false }; // already showing somewhere
 
     const [activeTab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (!activeTab?.id) return { granted: false };
 
-    await setOverlayLock(activeTab.id);
+    await overlayLock.set(activeTab.id);
     if (activeTab.id === requestingTabId) return { granted: true };
 
     browser.tabs.sendMessage(activeTab.id, { type: 'SHOW_OVERLAY', langTo }).catch(() => { });
@@ -116,7 +104,7 @@ export default defineBackground(() => {
     if (cmd?.type === 'REQUEST_SHOW_OVERLAY') {
       void requestShowOverlay(sender.tab?.id, cmd.langTo).then(sendResponse);
     } else if (cmd?.type === 'RELEASE_OVERLAY_LOCK') {
-      if (sender.tab?.id != null) void clearOverlayLockIfHeldBy(sender.tab.id);
+      if (sender.tab?.id != null) void overlayLock.clearIfHeldBy(sender.tab.id);
       sendResponse(true);
     }
     // Always true (not just when handled): the data-message listener below
@@ -125,8 +113,8 @@ export default defineBackground(() => {
   });
 
   // A tab closing mid-review (or crashing) would otherwise leave the lock
-  // held until OVERLAY_LOCK_TTL_MS expires — release it immediately instead.
-  browser.tabs.onRemoved.addListener((tabId) => { void clearOverlayLockIfHeldBy(tabId); });
+  // held until its TTL expires (see overlay-lock.ts) — release it immediately instead.
+  browser.tabs.onRemoved.addListener((tabId) => { void overlayLock.clearIfHeldBy(tabId); });
 
   // ── data messages from popup / content script ────────────────
   // Every listener registered here fires for EVERY message regardless of
@@ -152,9 +140,10 @@ export default defineBackground(() => {
     await ready;
     switch (message.type) {
       case 'SAVE_WORD': {
-        const { defaultAlgo, defaultPace } = await settingsStore.load();
-        const word = await repo.saveWord(message.payload.input, new Date(), defaultAlgo, defaultPace);
+        const settings = await settingsStore.load();
+        const word = await repo.saveWord(message.payload.input, new Date(), settings.defaultAlgo, settings.defaultPace);
         void checkAchievements();
+        void refreshBadge(settings);
         return word;
       }
       case 'GET_ALL_WORDS':
@@ -169,6 +158,7 @@ export default defineBackground(() => {
           message.payload.mode, new Date(message.payload.now),
         );
         void checkAchievements();
+        void settingsStore.load().then(refreshBadge);
         return word;
       }
       case 'GET_REVIEW_LOGS':
@@ -249,6 +239,7 @@ export default defineBackground(() => {
     const now = new Date();
     const settings = await settingsStore.load();
     refreshIcon(settings, now);
+    void refreshBadge(settings);
 
     const context = await prepareForTick(now, settings.targetLang)
     if (!context) return
@@ -260,8 +251,8 @@ export default defineBackground(() => {
       // Same lock burst-drill polling uses (requestShowOverlay above) — a
       // card already open (however it got there) means this tick backs off
       // instead of resetting it.
-      if (!(await getOverlayLock())) {
-        await setOverlayLock(tabId);
+      if (!(await overlayLock.get())) {
+        await overlayLock.set(tabId);
         browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: settings.targetLang }).catch(() => { });
       }
       return;
@@ -333,7 +324,7 @@ export default defineBackground(() => {
     // active tab regardless of whether IT was the one that triggered this
     // (the popup itself isn't a tab, so this is the only way to reach the
     // page when the action came from there).
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id) browser.tabs.sendMessage(tab.id, msg).catch(() => { });
   }
 

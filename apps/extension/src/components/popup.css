@@ -875,3 +875,8 @@ img.ach-badge { object-fit: contain; }
 .vf-sitebar.off { background: var(--heat-soft); color: var(--heat); }
 .vf-site-toggle { background: var(--leaf); color: var(--paper); border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; }
 .vf-sitebar.off .vf-site-toggle { background: var(--heat); }
+
+/* "review card open elsewhere" — same shape as .vf-pausebar/.vf-sitebar,
+   gold-toned: informational, not an alert. */
+.vf-elsewhere-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 14px 10px; padding: 10px 12px; border-radius: 8px; background: color-mix(in oklch, var(--gold) 15%, var(--paper-2)); color: color-mix(in oklch, var(--gold) 65%, var(--ink-2)); font-size: 12px; }
+.vf-elsewhere-go { background: var(--gold); color: var(--ink); border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; }
