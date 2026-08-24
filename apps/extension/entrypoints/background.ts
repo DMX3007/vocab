@@ -6,7 +6,7 @@ import { computeProgressStats, computeUnlockedAchievementIds } from '../src/lib/
 import { translateWord } from '../src/lib/translate/mymemory';
 import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
 import { validateLicense } from '../src/lib/licensing/license-client';
-import type { Message, AchievementUnlockedMessage } from '../src/lib/messaging/protocol';
+import type { Message, AchievementUnlockedMessage, BackgroundCommand, RequestShowOverlayResponse } from '../src/lib/messaging/protocol';
 
 // The service worker owns the database AND drives the review alarm.
 // On each alarm it asks the active tab for its page context, decides via
@@ -17,6 +17,28 @@ import type { Message, AchievementUnlockedMessage } from '../src/lib/messaging/p
 
 const ALARM = 'vocably-review';
 const TICK_MINUTES = 1; // check often; the throttle/cap keep it polite
+
+// ── review-overlay lock ──────────────────────────────────────────
+// Two independent triggers can each decide to show the review overlay: the
+// 1-minute alarm tick below, and burst-drill polling running locally in
+// EVERY open tab (content.ts — it deliberately bypasses the normal
+// throttle so a card mid-drill can reappear in ~25s). Without coordination,
+// the alarm can slam a fresh overlay on top of an already-open burst card
+// (the visible "blink" this exists to fix), and two different tabs — even
+// two different browser WINDOWS, each with its own visible front tab — can
+// each independently pop the same due word at once. Persisted in
+// browser.storage.local (not a module variable) since the service worker
+// can be killed and woken between an acquire and its release.
+const OVERLAY_LOCK_KEY = 'vocably_overlay_lock';
+// Bounds staleness if a release message never arrives (the tab navigated
+// hard, crashed, or the extension reloaded mid-session) — well past any
+// real review session, short enough not to matter in practice.
+const OVERLAY_LOCK_TTL_MS = 5 * 60_000;
+
+interface OverlayLock {
+  tabId: number;
+  acquiredAt: string;
+}
 
 export default defineBackground(() => {
   console.log('[Vocably] service worker alive');
@@ -46,13 +68,82 @@ export default defineBackground(() => {
     }).catch(() => { });
   }
 
+  // ── review-overlay lock: who's allowed to show it right now ───
+  async function getOverlayLock(): Promise<OverlayLock | null> {
+    const result = await browser.storage.local.get(OVERLAY_LOCK_KEY);
+    const lock = result[OVERLAY_LOCK_KEY] as OverlayLock | undefined;
+    if (!lock) return null;
+    if (Date.now() - new Date(lock.acquiredAt).getTime() > OVERLAY_LOCK_TTL_MS) return null; // stale — treat as free
+    return lock;
+  }
+
+  async function setOverlayLock(tabId: number): Promise<void> {
+    const lock: OverlayLock = { tabId, acquiredAt: new Date().toISOString() };
+    await browser.storage.local.set({ [OVERLAY_LOCK_KEY]: lock });
+  }
+
+  async function clearOverlayLockIfHeldBy(tabId: number): Promise<void> {
+    const result = await browser.storage.local.get(OVERLAY_LOCK_KEY);
+    const lock = result[OVERLAY_LOCK_KEY] as OverlayLock | undefined;
+    if (lock?.tabId === tabId) await browser.storage.local.remove(OVERLAY_LOCK_KEY);
+  }
+
+  /** The one place that decides "yes, show it here" — both the alarm tick
+   *  and every tab's burst-drill poll go through this, so only ONE tab
+   *  ever ends up with the overlay open. Always resolves to whichever tab
+   *  the user is ACTUALLY looking at (lastFocusedWindow, not just some
+   *  window's front tab) — if that's a different tab than the one asking,
+   *  this redirects the SHOW_OVERLAY there instead of granting the asker,
+   *  so a background-window tab noticing a due word never pops it somewhere
+   *  the user isn't looking. */
+  async function requestShowOverlay(requestingTabId: number | undefined, langTo: string): Promise<RequestShowOverlayResponse> {
+    if (await getOverlayLock()) return { granted: false }; // already showing somewhere
+
+    const [activeTab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!activeTab?.id) return { granted: false };
+
+    await setOverlayLock(activeTab.id);
+    if (activeTab.id === requestingTabId) return { granted: true };
+
+    browser.tabs.sendMessage(activeTab.id, { type: 'SHOW_OVERLAY', langTo }).catch(() => { });
+    return { granted: false };
+  }
+
+  // Content scripts only (never the popup — it isn't a tab, see
+  // BackgroundCommand's doc comment) ask for overlay permission here.
+  browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
+    const cmd = message as BackgroundCommand;
+    if (cmd?.type === 'REQUEST_SHOW_OVERLAY') {
+      void requestShowOverlay(sender.tab?.id, cmd.langTo).then(sendResponse);
+    } else if (cmd?.type === 'RELEASE_OVERLAY_LOCK') {
+      if (sender.tab?.id != null) void clearOverlayLockIfHeldBy(sender.tab.id);
+      sendResponse(true);
+    }
+    // Always true (not just when handled): the data-message listener below
+    // fires for this same message too and needs to run regardless.
+    return true;
+  });
+
+  // A tab closing mid-review (or crashing) would otherwise leave the lock
+  // held until OVERLAY_LOCK_TTL_MS expires — release it immediately instead.
+  browser.tabs.onRemoved.addListener((tabId) => { void clearOverlayLockIfHeldBy(tabId); });
+
   // ── data messages from popup / content script ────────────────
+  // Every listener registered here fires for EVERY message regardless of
+  // shape, so this has to explicitly ignore BackgroundCommand messages
+  // (handled by the listener above) rather than assume anything it
+  // receives is a Message — otherwise both listeners would race to call
+  // sendResponse for the same REQUEST_SHOW_OVERLAY, and handle()'s
+  // "Unknown message" rejection might win over the real answer.
+  const BACKGROUND_COMMAND_TYPES = new Set<BackgroundCommand['type']>(['REQUEST_SHOW_OVERLAY', 'RELEASE_OVERLAY_LOCK']);
   browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     const msg = message as Message
-    handle(msg).then(sendResponse).catch((err) => {
-      console.error('[Vocably] message error', msg.type, err);
-      sendResponse({ __error: String(err) });
-    });
+    if (!BACKGROUND_COMMAND_TYPES.has(msg?.type as BackgroundCommand['type'])) {
+      handle(msg).then(sendResponse).catch((err) => {
+        console.error('[Vocably] message error', msg.type, err);
+        sendResponse({ __error: String(err) });
+      });
+    }
     return true;
   });
 
@@ -136,7 +227,11 @@ export default defineBackground(() => {
     const dueCount = (await repo.getDueWords(now, langTo)).length;
     if (dueCount === 0) return;
 
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    // lastFocusedWindow, not currentWindow — a service worker has no window
+    // of its own, so "current" is ill-defined; lastFocusedWindow is the
+    // well-defined "wherever the user's actually looking" query, matching
+    // requestShowOverlay's own definition of "active tab" below.
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (!tab?.id || !tab.url) return;
     const tabId = tab.id
 
@@ -162,7 +257,13 @@ export default defineBackground(() => {
     const result = planTick(settings, { host, dueCount, ...pageCtx }, now);
     if (result.show) {
       if (result.settings) await settingsStore.save(result.settings);
-      browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: settings.targetLang }).catch(() => { });
+      // Same lock burst-drill polling uses (requestShowOverlay above) — a
+      // card already open (however it got there) means this tick backs off
+      // instead of resetting it.
+      if (!(await getOverlayLock())) {
+        await setOverlayLock(tabId);
+        browser.tabs.sendMessage(tabId, { type: 'SHOW_OVERLAY', langTo: settings.targetLang }).catch(() => { });
+      }
       return;
     }
 

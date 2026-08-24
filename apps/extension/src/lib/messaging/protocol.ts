@@ -75,6 +75,18 @@ export type ContentCommand =
   | { type: "SHOW_STREAK_REMINDER"; streak: number; todayCount: number; dailyGoal: number }
   | AchievementUnlockedMessage
 
+/** Content-script -> background, for coordinating who's allowed to show the
+ *  review overlay right now — see background.ts's overlay lock. A separate
+ *  channel from Message/RequestMap above (which the popup also uses):
+ *  the handler needs sender.tab.id to know which tab is asking, which the
+ *  generic request/response dispatch doesn't thread through, and popup
+ *  requests wouldn't have one anyway (the popup isn't a tab). */
+export type BackgroundCommand =
+  | { type: "REQUEST_SHOW_OVERLAY"; langTo: string }
+  | { type: "RELEASE_OVERLAY_LOCK" }
+
+export type RequestShowOverlayResponse = { granted: boolean }
+
 /** Dates don't survive structured-clone messaging cleanly across all paths,
  *  so we serialize them as ISO strings and revive them on the receiving end. */
 export type Wire<T> =

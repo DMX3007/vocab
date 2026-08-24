@@ -86,6 +86,13 @@ export default defineContentScript({
     }
 
     function unmount() {
+      // Every dismiss path (X, snooze, pause, disable-site, finishing the
+      // session) ends up here regardless of how it got triggered, so this
+      // is the one place to release the cross-tab overlay lock — see
+      // background.ts's requestShowOverlay/getOverlayLock.
+      if (currentSurface?.component.kind === 'overlay') {
+        browser.runtime.sendMessage({ type: 'RELEASE_OVERLAY_LOCK' }).catch(() => { });
+      }
       currentSurface?.root.unmount();
       currentSurface?.host.remove();
       currentSurface = null;
@@ -279,7 +286,16 @@ export default defineContentScript({
         const due = await wordClient.getDueWords(new Date(), settings.targetLang);
         if (!due.some(isBurstWord)) return;
 
-        await showOverlay(settings.targetLang);
+        // This poll runs independently in EVERY visible tab (any tab whose
+        // OWN window is frontmost, which can be more than one tab at once
+        // across multiple browser windows) — without asking first, two tabs
+        // could each decide to show the same due word at the same time.
+        // background.ts's lock makes sure only the tab the user's actually
+        // looking at gets it; if a different (background-window) tab asked,
+        // the background redirects SHOW_OVERLAY there itself instead of
+        // granting this one.
+        const response = await browser.runtime.sendMessage({ type: 'REQUEST_SHOW_OVERLAY', langTo: settings.targetLang }) as { granted: boolean };
+        if (response.granted) await showOverlay(settings.targetLang);
       } catch (err) {
         // The extension was reloaded/updated while this tab's content script
         // was still running (common on long-lived tabs, e.g. a doc viewer
@@ -306,10 +322,17 @@ export default defineContentScript({
         return true;
       }
       if (message?.type === 'SHOW_OVERLAY') {
-        void showOverlay(message.langTo, message.algoFilter);
-        // Acknowledge immediately — showOverlay's own await(s) shouldn't hold
-        // up the sender (the popup awaits this to know a content script is
-        // here before closing itself).
+        // A card already open in THIS tab (started by burst-drill polling,
+        // or a previous SHOW_OVERLAY) — mounting a fresh one would reset an
+        // in-progress, possibly-answered-but-not-yet-submitted session out
+        // from under the user. The cross-tab lock (background.ts) already
+        // keeps other TABS from sending this in the first place, but that
+        // doesn't cover every path here (e.g. the popup's own "start
+        // review" click messages this tab directly), so guard locally too.
+        if (currentSurface?.component.kind !== 'overlay') void showOverlay(message.langTo, message.algoFilter);
+        // Acknowledge immediately either way — showOverlay's own await(s)
+        // shouldn't hold up the sender (the popup awaits this to know a
+        // content script is here before closing itself).
         sendResponse(true);
       }
       if (message?.type === 'SHOW_STREAK_REMINDER') {
