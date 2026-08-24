@@ -231,9 +231,10 @@ export function ProgressPane({ words, logs, dailyGoal, dailyAddGoal, frozenDates
         <div className="next-up-card done">{t('achievement.allUnlocked')}</div>
       )}
 
-      <div className="ach-oneoff-row">
+      <div className={`ach-oneoff-row ${firstWordUnlocked ? 'unlocked' : ''}`}>
         <AchievementBadge iconKey="first-word" glyph={firstWord.glyph} locked={!firstWordUnlocked} size={28} />
         <span className={`ach-oneoff-name ${firstWordUnlocked ? 'unlocked' : ''}`}>{t('achievement.oneOff.firstWord')}</span>
+        {firstWordUnlocked && <Icon name="check" size={14} className="ach-oneoff-check" />}
       </div>
 
       <div className="ach-section-title">{t('achievement.sectionReview')}</div>
