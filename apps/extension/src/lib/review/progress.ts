@@ -17,6 +17,7 @@ export const MASTERED_INTERVAL_DAYS = 21;
 /** Used only as a fallback when a caller doesn't pass its own goal —
  *  overlay-policy.ts's defaultSettings() owns the real default. */
 const FALLBACK_DAILY_GOAL = 10;
+const FALLBACK_DAILY_ADD_GOAL = 3;
 
 /** Algo-aware "mastered": Leitner's box ladder tops out at 16 days, which
  *  never crosses MASTERED_INTERVAL_DAYS — so for Leitner, "mastered" means
@@ -55,6 +56,13 @@ export interface ProgressStats {
   longestStreak: number;
   /** smallest streak milestone still ahead */
   nextMilestone: number;
+  /** consecutive days with at least one word captured via the in-page
+   *  tooltip (sourceUrl set) — separate from the review streak above, since
+   *  reviewing and reading/collecting are different habits. */
+  readingStreak: number;
+  /** words (any source) created on today's local date */
+  todayAddedCount: number;
+  addGoal: number;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -90,6 +98,37 @@ function computeStreak(logs: ReviewLog[], now: Date, frozenDates: ReadonlySet<st
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+/** Same shape as computeStreak, but keyed off words captured via the
+ *  in-page tooltip (sourceUrl set) rather than review logs — a separate
+ *  habit (reading/collecting) from reviewing, so it gets its own streak
+ *  with no freeze mechanic of its own. */
+function computeReadingStreak(words: Word[], now: Date): number {
+  const daysWithCapture = new Set(
+    words.filter((w) => w.sourceUrl).map((w) => localDateKey(w.createdAt)),
+  );
+  const isActiveDay = (d: Date) => daysWithCapture.has(localDateKey(d));
+  const cursor = new Date(now);
+  if (!isActiveDay(cursor)) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (isActiveDay(cursor)) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+/** Distinct domains words have been captured from — only counts
+ *  in-page (sourceUrl-bearing) words; a malformed/legacy URL is skipped
+ *  rather than thrown on. */
+function countDistinctDomains(words: Word[]): number {
+  const domains = new Set<string>();
+  for (const w of words) {
+    if (!w.sourceUrl) continue;
+    try { domains.add(new URL(w.sourceUrl).hostname); } catch { /* ignore malformed sourceUrl */ }
+  }
+  return domains.size;
 }
 
 /** Longest-ever run of consecutive review-days, scanning the full history once. */
@@ -138,6 +177,7 @@ export function computeProgressStats(
   now: Date,
   dailyGoal: number = FALLBACK_DAILY_GOAL,
   frozenDates: ReadonlySet<string> = EMPTY_SET,
+  dailyAddGoal: number = FALLBACK_DAILY_ADD_GOAL,
 ): ProgressStats {
   const totalReviews = logs.length;
   const correctReviews = logs.filter((l) => l.grade >= PASS_GRADE).length;
@@ -154,6 +194,7 @@ export function computeProgressStats(
 
   const mastered = words.filter(isMastered).length;
   const streak = computeStreak(logs, now, frozenDates);
+  const todayAddedCount = words.filter((w) => localDateKey(w.createdAt) === localDateKey(now)).length;
 
   return {
     totalReviews,
@@ -171,6 +212,9 @@ export function computeProgressStats(
     mastered,
     longestStreak: Math.max(streak, computeLongestStreak(logs, frozenDates)),
     nextMilestone: computeNextMilestone(streak),
+    readingStreak: computeReadingStreak(words, now),
+    todayAddedCount,
+    addGoal: dailyAddGoal,
   };
 }
 
@@ -236,18 +280,158 @@ export function applyStreakMaintenance(
   return { settings: next, changed };
 }
 
-export interface Achievement {
+// ── Achievements ──────────────────────────────────────────────────
+// Two shapes: a handful of tiered TRACKS (Bronze/Silver/Gold/Platinum on a
+// growing metric — reviews done, words collected, etc.) that keep offering
+// a next target indefinitely, plus one one-shot achievement ("First word")
+// for the very first moment of using the extension at all, which a tier
+// system would otherwise make wait for an arbitrary threshold.
+//
+// Icons: each unlocked/locked tier looks for a PNG at
+// /achievements/{trackId}-{tier}.png (or /achievements/first-word.png for
+// the one-off) — see AchievementBadge.tsx, which falls back to `glyph`
+// below until that file exists. Dropping a PNG into
+// apps/extension/public/achievements/ is the entire integration; nothing
+// else needs to change.
+
+export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+export const ACHIEVEMENT_TIERS: readonly AchievementTier[] = ['bronze', 'silver', 'gold', 'platinum'];
+
+export interface AchievementTrack {
+  id: string;
+  /** Fallback glyph, used until a real icon lands — see AchievementBadge.tsx. */
+  glyph: string;
+  thresholds: Record<AchievementTier, number>;
+  metric: (words: Word[], stats: ProgressStats) => number;
+}
+
+export const ACHIEVEMENT_TRACKS: readonly AchievementTrack[] = [
+  {
+    id: 'consistency',
+    glyph: '✦',
+    thresholds: { bronze: 3, silver: 14, gold: 60, platinum: 100 },
+    metric: (_words, stats) => stats.streak,
+  },
+  {
+    id: 'scholar',
+    glyph: 'ℵ',
+    thresholds: { bronze: 50, silver: 250, gold: 1000, platinum: 5000 },
+    metric: (_words, stats) => stats.totalReviews,
+  },
+  {
+    id: 'mastery',
+    glyph: '★',
+    thresholds: { bronze: 5, silver: 25, gold: 100, platinum: 300 },
+    metric: (_words, stats) => stats.mastered,
+  },
+  {
+    id: 'vocabulary',
+    glyph: '∞',
+    thresholds: { bronze: 10, silver: 50, gold: 200, platinum: 1000 },
+    metric: (words) => words.length,
+  },
+  {
+    id: 'reading',
+    glyph: '❧',
+    thresholds: { bronze: 10, silver: 50, gold: 200, platinum: 500 },
+    // Only words captured via the in-page tooltip (a real sourceUrl) count —
+    // deliberately excludes the Add Word modal's manual/paste/sheet paths,
+    // so this specifically rewards reading, not just typing words in.
+    metric: (words) => words.filter((w) => !!w.sourceUrl).length,
+  },
+  {
+    id: 'explorer',
+    glyph: '⁂',
+    thresholds: { bronze: 5, silver: 15, gold: 30, platinum: 75 },
+    metric: (words) => countDistinctDomains(words),
+  },
+  {
+    id: 'readingStreak',
+    glyph: '☙',
+    thresholds: { bronze: 3, silver: 7, gold: 30, platinum: 100 },
+    metric: (_words, stats) => stats.readingStreak,
+  },
+];
+
+export interface OneOffAchievement {
   id: string;
   glyph: string;
-  name: string;
   unlocked: (words: Word[], stats: ProgressStats) => boolean;
 }
 
-export const ACHIEVEMENTS: ReadonlyArray<Achievement> = [
-  { id: 'first', glyph: '\u{1D4E5}', name: 'First word', unlocked: (words) => words.length >= 1 },
-  { id: 'ten', glyph: 'X', name: 'Collector', unlocked: (words) => words.length >= 10 },
-  { id: 'scholar', glyph: 'ℵ', name: 'Scholar', unlocked: (_words, stats) => stats.totalReviews >= 50 },
-  { id: 'fire', glyph: '✦', name: 'On fire', unlocked: (_words, stats) => stats.streak >= 7 },
-  { id: 'master', glyph: '★', name: 'Master', unlocked: (words) => words.some((w) => w.srsState.intervalDays >= 30) },
-  { id: 'poly', glyph: '∞', name: 'Polyglot', unlocked: (words) => words.length >= 50 },
+export const ONE_OFF_ACHIEVEMENTS: readonly OneOffAchievement[] = [
+  { id: 'first-word', glyph: '\u{1D4E5}', unlocked: (words) => words.length >= 1 },
 ];
+
+export interface AchievementTierProgress {
+  tier: AchievementTier;
+  threshold: number;
+  unlocked: boolean;
+}
+
+export interface AchievementTrackProgress {
+  id: string;
+  glyph: string;
+  value: number;
+  tiers: readonly AchievementTierProgress[];
+  /** Highest unlocked tier, or null if not even Bronze yet. */
+  currentTier: AchievementTier | null;
+  /** The next locked tier and how close it is, or null once every tier is unlocked. */
+  nextTier: { tier: AchievementTier; threshold: number; remaining: number; progressPct: number } | null;
+}
+
+export function computeAchievementTracks(words: Word[], stats: ProgressStats): AchievementTrackProgress[] {
+  return ACHIEVEMENT_TRACKS.map((track) => {
+    const value = track.metric(words, stats);
+    let currentTier: AchievementTier | null = null;
+    const tiers: AchievementTierProgress[] = ACHIEVEMENT_TIERS.map((tier) => {
+      const threshold = track.thresholds[tier];
+      const unlocked = value >= threshold;
+      if (unlocked) currentTier = tier;
+      return { tier, threshold, unlocked };
+    });
+    const next = tiers.find((tr) => !tr.unlocked) ?? null;
+    const nextTier = next
+      ? {
+          tier: next.tier,
+          threshold: next.threshold,
+          remaining: Math.max(0, next.threshold - value),
+          progressPct: Math.min(100, Math.round((value / next.threshold) * 100)),
+        }
+      : null;
+    return { id: track.id, glyph: track.glyph, value, tiers, currentTier, nextTier };
+  });
+}
+
+/** The single locked tier (across every track) closest to unlocking — the
+ *  Progress tab's "next up" callout, so there's always one concrete,
+ *  visible next target instead of a grid the user has to scan themselves. */
+export function computeNextUpAchievement(
+  tracks: readonly AchievementTrackProgress[],
+): { trackId: string; tier: AchievementTier; remaining: number; progressPct: number } | null {
+  let best: { trackId: string; tier: AchievementTier; remaining: number; progressPct: number } | null = null;
+  for (const track of tracks) {
+    if (!track.nextTier) continue;
+    if (!best || track.nextTier.progressPct > best.progressPct) {
+      best = { trackId: track.id, tier: track.nextTier.tier, remaining: track.nextTier.remaining, progressPct: track.nextTier.progressPct };
+    }
+  }
+  return best;
+}
+
+/** Every achievement id currently unlocked — `{trackId}-{tier}` for tiers,
+ *  the bare id for one-offs. Popup.tsx diffs this against the persisted
+ *  seenAchievements list to know which ones are newly unlocked since the
+ *  last time it checked, for the unlock toast. */
+export function computeUnlockedAchievementIds(words: Word[], stats: ProgressStats): string[] {
+  const ids: string[] = [];
+  for (const oneOff of ONE_OFF_ACHIEVEMENTS) {
+    if (oneOff.unlocked(words, stats)) ids.push(oneOff.id);
+  }
+  for (const track of computeAchievementTracks(words, stats)) {
+    for (const tier of track.tiers) {
+      if (tier.unlocked) ids.push(`${track.id}-${tier.tier}`);
+    }
+  }
+  return ids;
+}

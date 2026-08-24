@@ -38,6 +38,8 @@ export interface OverlaySettings {
   defaultPace: Pace;
   /** reviews per day the Progress tab's goal bar targets; user-editable */
   dailyGoal: number;
+  /** new words per day the Progress tab's second goal bar targets; user-editable */
+  dailyAddGoal: number;
   /** banked "cover one missed day" credits, Duolingo-style — see applyStreakMaintenance */
   streakFreezes: number;
   /** date-keys (progress.ts's localDateKey) of days a freeze covered, so a
@@ -49,6 +51,11 @@ export interface OverlaySettings {
   /** date-key of the last time the streak-at-risk reminder was shown, so it
    *  fires at most once per day */
   lastStreakReminderDate: string | null;
+  /** achievement ids (progress.ts's track-tier or one-off ids) already shown
+   *  in an "unlocked!" toast — see Popup.tsx's refresh(). Diffing the live
+   *  unlocked set against this is what tells a *new* unlock apart from one
+   *  the user's already seen. */
+  seenAchievements: string[];
 }
 
 export function defaultSettings(): OverlaySettings {
@@ -65,10 +72,12 @@ export function defaultSettings(): OverlaySettings {
     defaultAlgo: 'sm2',
     defaultPace: 'aggressive',
     dailyGoal: 10,
+    dailyAddGoal: 3,
     streakFreezes: 1,
     frozenDates: [],
     lastMilestoneAwarded: 0,
     lastStreakReminderDate: null,
+    seenAchievements: [],
   };
 }
 

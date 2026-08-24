@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeProgressStats, isMastered, ACHIEVEMENTS, applyStreakMaintenance } from '../src/lib/review/progress';
+import {
+  computeProgressStats, isMastered, applyStreakMaintenance,
+  computeAchievementTracks, computeNextUpAchievement, computeUnlockedAchievementIds,
+  ONE_OFF_ACHIEVEMENTS, ACHIEVEMENT_TIERS, type AchievementTrackProgress,
+} from '../src/lib/review/progress';
 import { defaultSettings } from '../src/lib/review/overlay-policy';
 import type { Word, ReviewLog } from '../src/lib/storage/types';
 
@@ -218,26 +222,108 @@ describe('isMastered', () => {
   });
 });
 
-describe('ACHIEVEMENTS', () => {
-  it('First word unlocks with one word, stays locked with zero', () => {
-    const first = ACHIEVEMENTS.find((a) => a.id === 'first')!;
-    const stats = computeProgressStats([], [], NOW);
-    expect(first.unlocked([], stats)).toBe(false);
-    expect(first.unlocked([word()], stats)).toBe(true);
+describe('readingStreak / todayAddedCount / addGoal', () => {
+  it('readingStreak counts consecutive days with an in-page (sourceUrl) capture', () => {
+    const words = [
+      word({ sourceUrl: 'https://a.com', createdAt: NOW }),
+      word({ sourceUrl: 'https://a.com', createdAt: new Date(NOW.getTime() - 86_400_000) }),
+      word({ sourceUrl: '', createdAt: new Date(NOW.getTime() - 2 * 86_400_000) }), // manual add — doesn't count
+    ];
+    expect(computeProgressStats(words, [], NOW).readingStreak).toBe(2);
   });
 
-  it('On fire unlocks once the streak reaches 7', () => {
-    const onFire = ACHIEVEMENTS.find((a) => a.id === 'fire')!;
-    const logs = Array.from({ length: 7 }, (_, i) => log('w1', 5, i));
+  it('readingStreak is 0 with no in-page captures at all', () => {
+    expect(computeProgressStats([word({ sourceUrl: '' })], [], NOW).readingStreak).toBe(0);
+  });
+
+  it('todayAddedCount counts words of any source created today, not just reading captures', () => {
+    const words = [
+      word({ createdAt: NOW, sourceUrl: '' }),
+      word({ createdAt: NOW, sourceUrl: 'https://a.com' }),
+      word({ createdAt: new Date(NOW.getTime() - 86_400_000) }),
+    ];
+    expect(computeProgressStats(words, [], NOW).todayAddedCount).toBe(2);
+  });
+
+  it('addGoal falls back to 3, or uses the passed value', () => {
+    expect(computeProgressStats([], [], NOW).addGoal).toBe(3);
+    expect(computeProgressStats([], [], NOW, 10, undefined, 5).addGoal).toBe(5);
+  });
+});
+
+describe('computeAchievementTracks', () => {
+  it('tiers up the consistency track with the review streak', () => {
+    const logs = Array.from({ length: 14 }, (_, i) => log('w1', 5, i));
     const stats = computeProgressStats([], logs, NOW);
-    expect(stats.streak).toBe(7);
-    expect(onFire.unlocked([], stats)).toBe(true);
+    const consistency = computeAchievementTracks([], stats).find((t) => t.id === 'consistency')!;
+    expect(consistency.currentTier).toBe('silver'); // streak 14 clears silver (14), not yet gold (60)
+    expect(consistency.nextTier).toEqual({ tier: 'gold', threshold: 60, remaining: 46, progressPct: Math.round((14 / 60) * 100) });
   });
 
-  it('Master unlocks once any word interval reaches 30 days', () => {
-    const master = ACHIEVEMENTS.find((a) => a.id === 'master')!;
+  it('currentTier is null and nextTier is bronze below every threshold', () => {
     const stats = computeProgressStats([], [], NOW);
-    expect(master.unlocked([word({ srsState: { intervalDays: 29 } as Word['srsState'] })], stats)).toBe(false);
-    expect(master.unlocked([word({ srsState: { intervalDays: 30 } as Word['srsState'] })], stats)).toBe(true);
+    const vocabulary = computeAchievementTracks([word()], stats).find((t) => t.id === 'vocabulary')!; // 1 word, bronze at 10
+    expect(vocabulary.currentTier).toBeNull();
+    expect(vocabulary.nextTier).toEqual({ tier: 'bronze', threshold: 10, remaining: 9, progressPct: 10 });
+  });
+
+  it('the reading track only counts words captured via the in-page tooltip (sourceUrl set)', () => {
+    const words = [
+      ...Array.from({ length: 5 }, () => word({ sourceUrl: 'https://a.com' })),
+      ...Array.from({ length: 20 }, () => word({ sourceUrl: '' })), // manual/bulk — doesn't count
+    ];
+    const stats = computeProgressStats(words, [], NOW);
+    expect(computeAchievementTracks(words, stats).find((t) => t.id === 'reading')!.value).toBe(5);
+  });
+
+  it('the explorer track counts distinct domains, ignoring sourceUrl-less words', () => {
+    const words = [
+      word({ sourceUrl: 'https://a.com/x' }),
+      word({ sourceUrl: 'https://a.com/y' }), // same domain as above — doesn't add a second
+      word({ sourceUrl: 'https://b.com' }),
+      word({ sourceUrl: '' }),
+    ];
+    const stats = computeProgressStats(words, [], NOW);
+    expect(computeAchievementTracks(words, stats).find((t) => t.id === 'explorer')!.value).toBe(2);
+  });
+});
+
+describe('computeNextUpAchievement', () => {
+  it('picks the locked tier across all tracks closest to unlocking', () => {
+    const words = Array.from({ length: 9 }, () => word()); // vocabulary: 9/10 bronze = 90%, everything else 0%
+    const stats = computeProgressStats(words, [], NOW);
+    expect(computeNextUpAchievement(computeAchievementTracks(words, stats)))
+      .toEqual({ trackId: 'vocabulary', tier: 'bronze', remaining: 1, progressPct: 90 });
+  });
+
+  it('returns null once every tier of every track is unlocked', () => {
+    const maxed: AchievementTrackProgress = {
+      id: 'x', glyph: '', value: 999,
+      tiers: ACHIEVEMENT_TIERS.map((tier) => ({ tier, threshold: 1, unlocked: true })),
+      currentTier: 'platinum', nextTier: null,
+    };
+    expect(computeNextUpAchievement([maxed])).toBeNull();
+  });
+
+  it('returns null with no tracks at all', () => {
+    expect(computeNextUpAchievement([])).toBeNull();
+  });
+});
+
+describe('computeUnlockedAchievementIds', () => {
+  it('includes the first-word one-off once a word exists, not before', () => {
+    const stats = computeProgressStats([], [], NOW);
+    expect(computeUnlockedAchievementIds([], stats)).not.toContain('first-word');
+    expect(computeUnlockedAchievementIds([word()], stats)).toContain('first-word');
+    expect(ONE_OFF_ACHIEVEMENTS.map((a) => a.id)).toContain('first-word');
+  });
+
+  it('includes every unlocked tier as {trackId}-{tier}, and stops at the next locked one', () => {
+    const words = Array.from({ length: 60 }, () => word()); // vocabulary: bronze(10) + silver(50) clear, gold(200) doesn't
+    const stats = computeProgressStats(words, [], NOW);
+    const ids = computeUnlockedAchievementIds(words, stats);
+    expect(ids).toContain('vocabulary-bronze');
+    expect(ids).toContain('vocabulary-silver');
+    expect(ids).not.toContain('vocabulary-gold');
   });
 });

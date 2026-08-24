@@ -3,7 +3,8 @@ import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
 import { DraftStore } from '../../src/lib/storage/draft-store';
 import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
-import { applyStreakMaintenance } from '../../src/lib/review/progress';
+import { applyStreakMaintenance, computeProgressStats, computeAchievementTracks, computeUnlockedAchievementIds } from '../../src/lib/review/progress';
+import { ACHIEVEMENT_TIER_KEY, ACHIEVEMENT_TRACK_KEY } from '../../src/lib/review/achievement-copy';
 import { downloadJson } from '../../src/lib/export';
 import { ReviewPane } from '../../src/components/ReviewPane';
 import { LibraryPane } from '../../src/components/LibraryPane';
@@ -12,7 +13,6 @@ import { PlanPane, type PlanState } from '../../src/components/PlanPane';
 import { AddWordModal, type AddWordInput } from '../../src/components/AddWordModal';
 import { HelpSheet } from '../../src/components/HelpSheet';
 import { Icon } from '../../src/components/icons';
-import { computeProgressStats } from '../../src/lib/review/progress';
 import type { LibrarySort, AlgoFilter } from '../../src/lib/review/library';
 import type { Word, ReviewLog } from '../../src/lib/storage/types';
 import { DEFAULT_TARGET_LANG } from '../../src/lib/languages';
@@ -60,6 +60,7 @@ export function Popup() {
   const [themePref, setThemePref] = useState<ThemePref>(null);
   const [systemDark, setSystemDark] = useState(false);
   const [currentHost, setCurrentHost] = useState<string | null>(null);
+  const [pendingUnlocks, setPendingUnlocks] = useState<{ ids: string[]; tracks: ReturnType<typeof computeAchievementTracks> } | null>(null);
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
@@ -72,15 +73,71 @@ export function Popup() {
     // new one on a fresh milestone — see progress.ts. Runs on every popup
     // open since there's no reliable "midnight" hook otherwise.
     const maintenance = applyStreakMaintenance(allLogs, s, new Date());
-    if (maintenance.changed) await settingsStore.save(maintenance.settings);
+    let nextSettings = maintenance.settings;
+    let settingsChanged = maintenance.changed;
+
+    // Same idea, for achievements: diff what's unlocked right now against
+    // what the last toast already covered, so a *new* unlock (and only a
+    // new one) gets celebrated exactly once, however many popup opens or
+    // refreshes happen in between.
+    const now = new Date();
+    const stats = computeProgressStats(all, allLogs, now, nextSettings.dailyGoal, new Set(nextSettings.frozenDates), nextSettings.dailyAddGoal);
+    const unlockedIds = computeUnlockedAchievementIds(all, stats);
+    const seen = new Set(nextSettings.seenAchievements);
+    const newlyUnlocked = unlockedIds.filter((id) => !seen.has(id));
+    if (newlyUnlocked.length > 0) {
+      nextSettings = { ...nextSettings, seenAchievements: unlockedIds };
+      settingsChanged = true;
+      // Deferred to state + a separate effect (below) rather than shown
+      // right here: this callback is memoized with an empty dep array, so
+      // it always closes over the FIRST render's t/tp — fine for pure data
+      // fetching, but it'd freeze the toast in whatever locale was active
+      // on mount even after switching languages. The effect always runs
+      // with the current render's t/tp instead.
+      setPendingUnlocks({ ids: newlyUnlocked, tracks: computeAchievementTracks(all, stats) });
+    }
+
+    if (settingsChanged) await settingsStore.save(nextSettings);
     setWords(all);
     setDueCount(due.length);
     setLogs(allLogs);
-    setSettings(maintenance.settings);
+    setSettings(nextSettings);
   }, []);
+
+  // Fires the unlock toast queued by refresh() above, always with this
+  // render's (i.e. the current locale's) t/tp.
+  useEffect(() => {
+    if (!pendingUnlocks) return;
+    const { ids, tracks } = pendingUnlocks;
+    if (ids.length === 1) {
+      const id = ids[0]!;
+      if (id === 'first-word') {
+        showToast(t('achievement.oneOff.firstWord'));
+      } else {
+        const hit = tracks
+          .map((track) => ({ track, tier: track.tiers.find((tr) => `${track.id}-${tr.tier}` === id) }))
+          .find((x) => x.tier);
+        if (hit?.tier) {
+          showToast(t('achievement.unlockedToastOne', {
+            tier: t(ACHIEVEMENT_TIER_KEY[hit.tier.tier]),
+            track: t(ACHIEVEMENT_TRACK_KEY[hit.track.id]!.name),
+          }));
+        }
+      }
+    } else {
+      showToast(tp('achievement.unlockedToastMany', ids.length));
+    }
+    setPendingUnlocks(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingUnlocks]);
 
   async function handleDailyGoalChange(dailyGoal: number) {
     await settingsStore.update((s) => ({ ...s, dailyGoal }));
+    await refresh();
+  }
+
+  async function handleDailyAddGoalChange(dailyAddGoal: number) {
+    await settingsStore.update((s) => ({ ...s, dailyAddGoal }));
     await refresh();
   }
 
@@ -450,9 +507,11 @@ export function Popup() {
             words={words}
             logs={logs}
             dailyGoal={settings?.dailyGoal ?? 10}
+            dailyAddGoal={settings?.dailyAddGoal ?? 3}
             frozenDates={settings?.frozenDates ?? []}
             streakFreezes={settings?.streakFreezes ?? 0}
             onDailyGoalChange={handleDailyGoalChange}
+            onDailyAddGoalChange={handleDailyAddGoalChange}
           />
         )}
         {tab === 'library' && (
