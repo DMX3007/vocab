@@ -6,7 +6,7 @@ import {
   type SchedulerConfig,
   type SrsAlgorithm,
   type SrsState,
-} from './types';
+} from './types.js';
 
 // ── What grades mean ─────────────────────────────────────────────
 // 0..2 — the user failed the card

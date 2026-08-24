@@ -1,4 +1,4 @@
-import { addDays, type Grade, type SrsAlgorithm, type SrsState } from './types';
+import { addDays, type Grade, type SrsAlgorithm, type SrsState } from './types.js';
 
 // ── Leitner box system ────────────────────────────────────────────
 // A simpler alternative to SM-2: a fixed ladder of boxes, each with its

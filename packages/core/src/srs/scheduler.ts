@@ -1,6 +1,6 @@
-import { createSm2 } from './sm2';
-import { createLeitner, DEFAULT_LEITNER_CONFIG } from './leitner';
-import type { AlgoId, SchedulerConfig, SrsAlgorithm } from './types';
+import { createSm2 } from './sm2.js';
+import { createLeitner, DEFAULT_LEITNER_CONFIG } from './leitner.js';
+import type { AlgoId, SchedulerConfig, SrsAlgorithm } from './types.js';
 
 // `config` only shapes SM-2 — Leitner has its own (fixed) box ladder and
 // ignores it. Kept as one optional param rather than a per-algo union so

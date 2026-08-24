@@ -1,4 +1,4 @@
-import type { Grade } from '../srs/types';
+import type { Grade } from '../srs/types.js';
 
 // ── Product decisions, all in one place ──────────────────────────
 // Answered within 7 seconds = recalled instantly (best grade).
