@@ -45,7 +45,12 @@ export interface SchedulerConfig {
   relearningStepsMin: number[];
   /** first review interval after graduating learning, days */
   graduatingIntervalDays: number;
-  /** interval when graduating with grade 5 ("easy") past the mandatory burst, days */
+  /** interval when graduating with grade 5 ("easy") past the mandatory
+   *  burst, days. Deliberately LESS than graduatingIntervalDays: clearing
+   *  only the burst (a handful of ~25s-spaced reps, all in the same
+   *  sitting) proves far less than walking the full escalating ladder
+   *  (which spans real hours/days), so it should never out-earn full
+   *  completion — see sm2.ts's scheduleLearning. */
   easyIntervalDays: number;
   /** floor for the ease factor */
   minEase: number;
@@ -82,7 +87,7 @@ export const GENTLE_CONFIG: SchedulerConfig = {
   learningBurstSteps: 1,
   relearningStepsMin: [10],
   graduatingIntervalDays: 2,
-  easyIntervalDays: 3,
+  easyIntervalDays: 1,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };
@@ -104,7 +109,7 @@ export const STANDARD_CONFIG: SchedulerConfig = {
   learningBurstSteps: 2,
   relearningStepsMin: [10],
   graduatingIntervalDays: 4,
-  easyIntervalDays: 6,
+  easyIntervalDays: 2,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };
@@ -134,7 +139,7 @@ export const AGGRESSIVE_CONFIG: SchedulerConfig = {
   learningBurstSteps: 5,
   relearningStepsMin: [10],
   graduatingIntervalDays: 7,
-  easyIntervalDays: 10,
+  easyIntervalDays: 3,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };

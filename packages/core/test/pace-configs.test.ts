@@ -87,4 +87,10 @@ describe('PACE_CONFIGS', () => {
     expect(GENTLE_CONFIG.graduatingIntervalDays).toBeLessThan(STANDARD_CONFIG.graduatingIntervalDays);
     expect(STANDARD_CONFIG.graduatingIntervalDays).toBeLessThan(AGGRESSIVE_CONFIG.graduatingIntervalDays);
   });
+
+  it('never lets the early easy-skip out-earn walking the full ladder, in any pace', () => {
+    for (const config of [GENTLE_CONFIG, STANDARD_CONFIG, AGGRESSIVE_CONFIG]) {
+      expect(config.easyIntervalDays).toBeLessThan(config.graduatingIntervalDays);
+    }
+  });
 });

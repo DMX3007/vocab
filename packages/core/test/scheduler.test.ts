@@ -53,6 +53,14 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.easyIntervalDays);
   });
 
+  it('the early easy-skip never grants more than walking the full ladder would', () => {
+    // Clearing the burst is a couple minutes of same-sitting reps; walking
+    // the full ladder proves retention across real hours/days. The first
+    // should never out-earn the second, or a rushed word ends up trusted
+    // further out than a patiently-drilled one.
+    expect(DEFAULT_CONFIG.easyIntervalDays).toBeLessThan(DEFAULT_CONFIG.graduatingIntervalDays);
+  });
+
   it('the ladder runs 25s x5, then 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, then graduates at 7d', () => {
     let s: SrsState = initialState('sm2', NOW);
 
