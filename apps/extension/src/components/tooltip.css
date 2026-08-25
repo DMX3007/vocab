@@ -212,8 +212,15 @@
 }
 
 @keyframes vf-ach-toast-in {
-  from { transform: translateY(12px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .vf-ach-toast-close {
@@ -246,10 +253,27 @@
 
 /* AchievementBadge (src/components/AchievementBadge.tsx) is shared with the
    popup — popup.css styles it there, this is the shadow-DOM equivalent. */
-.ach-badge { display: grid; place-items: center; border-radius: 50%; flex-shrink: 0; }
-span.ach-badge { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; font-style: italic; background: #ece5d7; color: var(--ink); }
-img.ach-badge { object-fit: contain; }
-.ach-badge.locked { filter: grayscale(1); opacity: 0.45; }
+.ach-badge {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+span.ach-badge {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-style: italic;
+  background: #ece5d7;
+  color: var(--ink);
+}
+
+img.ach-badge {
+  object-fit: contain;
+}
+
+.ach-badge.locked {
+  filter: grayscale(1);
+}
 
 /* ── full-page review overlay ──────────────────────────────── */
 .vf-ov-backdrop {
@@ -338,9 +362,17 @@ img.ach-badge { object-fit: contain; }
   box-sizing: border-box;
 }
 
-.vf-card.vf-ok { background: linear-gradient(135deg, #e3f0e0, #d7ecd4); }
-.vf-card.vf-almost { background: linear-gradient(135deg, #f6ecd2, #f4e6c3); }
-.vf-card.vf-wrong { background: linear-gradient(135deg, #f6dcdc, #f3cfcf); }
+.vf-card.vf-ok {
+  background: linear-gradient(135deg, #e3f0e0, #d7ecd4);
+}
+
+.vf-card.vf-almost {
+  background: linear-gradient(135deg, #f6ecd2, #f4e6c3);
+}
+
+.vf-card.vf-wrong {
+  background: linear-gradient(135deg, #f6dcdc, #f3cfcf);
+}
 
 .vf-card-top {
   display: flex;
@@ -400,7 +432,9 @@ img.ach-badge { object-fit: contain; }
   position: relative;
 }
 
-.vf-speak-btn:hover { background: rgba(28, 26, 23, 0.06); }
+.vf-speak-btn:hover {
+  background: rgba(28, 26, 23, 0.06);
+}
 
 .vf-speak-btn-sm {
   width: 22px;
@@ -475,7 +509,9 @@ img.ach-badge { object-fit: contain; }
   color: #1c1a17;
 }
 
-.vf-card-actions .vf-card-btn { margin-left: auto; }
+.vf-card-actions .vf-card-btn {
+  margin-left: auto;
+}
 
 .vf-card-btn {
   padding: 0 22px;
@@ -509,7 +545,9 @@ img.ach-badge { object-fit: contain; }
   cursor: pointer;
 }
 
-.vf-card-btn-ghost:hover:not(:disabled) { background: rgba(28, 26, 23, 0.06); }
+.vf-card-btn-ghost:hover:not(:disabled) {
+  background: rgba(28, 26, 23, 0.06);
+}
 
 .vf-card-btn-ghost:disabled {
   opacity: 0.35;
@@ -524,7 +562,10 @@ img.ach-badge { object-fit: contain; }
   word-break: break-all;
 }
 
-.vf-diff-char.ok { color: #1c1a17; }
+.vf-diff-char.ok {
+  color: #1c1a17;
+}
+
 .vf-diff-char.bad {
   color: #a5311f;
   background: rgba(165, 49, 31, 0.14);
@@ -800,7 +841,12 @@ img.ach-badge { object-fit: contain; }
   transition: color 0.12s, border-color 0.12s;
   white-space: nowrap;
 }
-.vfst-ghost:hover { color: #1c1a17; border-color: rgba(15, 15, 15, 0.4); }
+
+.vfst-ghost:hover {
+  color: #1c1a17;
+  border-color: rgba(15, 15, 15, 0.4);
+}
+
 .vfst-ghost-dot {
   width: 5px;
   height: 5px;
