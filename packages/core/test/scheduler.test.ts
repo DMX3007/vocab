@@ -43,25 +43,19 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
-  it('grade 5 ("easy") past the mandatory burst graduates immediately with the easy interval', () => {
+  it('grade 5 ("easy") past the mandatory burst graduates immediately, at the same interval the full ladder earns', () => {
     let s: SrsState = initialState('sm2', NOW);
     for (let i = 0; i < DEFAULT_CONFIG.learningBurstSteps; i++) s = sm2.schedule(s, 4, NOW); // clear the burst
     expect(s.stepIndex).toBe(DEFAULT_CONFIG.learningBurstSteps);
 
     s = sm2.schedule(s, 5, NOW); // now past the burst -> easy can skip
     expect(s.phase).toBe('review');
-    expect(s.intervalDays).toBe(DEFAULT_CONFIG.easyIntervalDays);
+    // Not a shortcut to a BIGGER interval than patient full completion —
+    // see graduatingIntervalDays's doc comment.
+    expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
   });
 
-  it('the early easy-skip never grants more than walking the full ladder would', () => {
-    // Clearing the burst is a couple minutes of same-sitting reps; walking
-    // the full ladder proves retention across real hours/days. The first
-    // should never out-earn the second, or a rushed word ends up trusted
-    // further out than a patiently-drilled one.
-    expect(DEFAULT_CONFIG.easyIntervalDays).toBeLessThan(DEFAULT_CONFIG.graduatingIntervalDays);
-  });
-
-  it('the ladder runs 25s x5, then 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, then graduates at 7d', () => {
+  it('the ladder runs 25s x5, then 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, then graduates at 1d', () => {
     let s: SrsState = initialState('sm2', NOW);
 
     const offsets: number[] = [];
@@ -71,7 +65,7 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     }
     expect(offsets).toEqual([
       sec(25), sec(25), sec(25), sec(25), sec(25),
-      min(15), min(30), min(45), hours(2), hours(6), days(1), days(2), days(3), days(7),
+      min(15), min(30), min(45), hours(2), hours(6), days(1), days(2), days(3), days(1),
     ]); // the last (14th) pass graduates
     expect(s.phase).toBe('review');
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
@@ -85,7 +79,7 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
     }
     expect(s.phase).toBe('review');
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
-    expect(s.dueAt.getTime()).toBe(NOW.getTime() + days(7));
+    expect(s.dueAt.getTime()).toBe(NOW.getTime() + days(1));
   });
 
   it('failed answer resets to the start of the burst, no matter how far along it was', () => {

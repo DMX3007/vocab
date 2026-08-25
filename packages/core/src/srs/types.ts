@@ -43,15 +43,15 @@ export interface SchedulerConfig {
   learningBurstSteps: number;
   /** steps after a lapse, minutes */
   relearningStepsMin: number[];
-  /** first review interval after graduating learning, days */
+  /** First review interval after graduating learning, days — whether
+   *  graduated by walking the whole ladder or by an early grade-5 ("easy")
+   *  skip past the mandatory burst (see sm2.ts's scheduleLearning). Kept
+   *  at the "curve of remembering" convention every mainstream SRS uses:
+   *  the first real spaced check is ~1 day out regardless of how much
+   *  same-day drilling preceded it — ease-based multiplicative growth
+   *  (scheduleReview) is what builds the actual long-interval curve from
+   *  there, not a big manual first jump. */
   graduatingIntervalDays: number;
-  /** interval when graduating with grade 5 ("easy") past the mandatory
-   *  burst, days. Deliberately LESS than graduatingIntervalDays: clearing
-   *  only the burst (a handful of ~25s-spaced reps, all in the same
-   *  sitting) proves far less than walking the full escalating ladder
-   *  (which spans real hours/days), so it should never out-earn full
-   *  completion — see sm2.ts's scheduleLearning. */
-  easyIntervalDays: number;
   /** floor for the ease factor */
   minEase: number;
   /** multiplier applied to the pre-lapse interval after relearning */
@@ -76,7 +76,7 @@ const DAY = 86_400;
 // failing and retrying feels the same as the word's very first attempt.
 
 export const GENTLE_CONFIG: SchedulerConfig = {
-  // 25s x1 -> 10m -> 2h -> 1d, graduating at 2d.
+  // 25s x1 -> 10m -> 2h -> 1d, graduating at 1d.
   learningStepsSec: [
     25 * SEC, // 0: also the "just failed" retry delay
     25 * SEC, // 1: the one mandatory burst rep
@@ -86,14 +86,13 @@ export const GENTLE_CONFIG: SchedulerConfig = {
   ],
   learningBurstSteps: 1,
   relearningStepsMin: [10],
-  graduatingIntervalDays: 2,
-  easyIntervalDays: 1,
+  graduatingIntervalDays: 1,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };
 
 export const STANDARD_CONFIG: SchedulerConfig = {
-  // 25s x2 -> 1m -> 5m -> 20m -> 1h -> 4h -> 1d -> 2d, graduating at 4d.
+  // 25s x2 -> 1m -> 5m -> 20m -> 1h -> 4h -> 1d -> 2d, graduating at 1d.
   learningStepsSec: [
     25 * SEC, // 0: also the "just failed" retry delay
     25 * SEC, // 1
@@ -108,18 +107,20 @@ export const STANDARD_CONFIG: SchedulerConfig = {
   ],
   learningBurstSteps: 2,
   relearningStepsMin: [10],
-  graduatingIntervalDays: 4,
-  easyIntervalDays: 2,
+  graduatingIntervalDays: 1,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };
 
 export const AGGRESSIVE_CONFIG: SchedulerConfig = {
   // 25s x5 -> 15m -> 30m -> 45m -> 2h -> 6h -> 1d -> 2d -> 3d, graduating
-  // at 7d. The original ladder — deliberately thorough: the very first
-  // config this app shipped with graduated after 1 day and could reach 3
-  // days after a single post-graduation pass, which read as the app
-  // rushing a freshly-learned word out of daily rotation.
+  // at 1d. The original ladder — deliberately thorough: the most touches
+  // and the longest same-day-to-week escalation before the app trusts a
+  // word with real spaced review at all. What comes AFTER graduating no
+  // longer scales with pace — every pace hands off to the same
+  // ease-multiplied "curve of remembering" growth (see scheduleReview),
+  // so more drilling buys a more thoroughly-proven word, not a bigger
+  // first jump away from daily rotation.
   learningStepsSec: [
     25 * SEC, // 0: also the "just failed" retry delay
     25 * SEC, // 1
@@ -138,8 +139,7 @@ export const AGGRESSIVE_CONFIG: SchedulerConfig = {
   ],
   learningBurstSteps: 5,
   relearningStepsMin: [10],
-  graduatingIntervalDays: 7,
-  easyIntervalDays: 3,
+  graduatingIntervalDays: 1,
   minEase: 1.3,
   lapseIntervalFactor: 0.5,
 };

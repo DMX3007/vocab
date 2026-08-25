@@ -15,17 +15,20 @@ describe('getAlgoInfo', () => {
     const info = getAlgoInfo('sm2');
     expect(info.growsPastChain).toBe(true);
     expect(formatChain(info.chainSeconds)).toBe(
-      '25s x5 → 15m → 30m → 45m → 2h → 6h → 1d → 2d → 3d → 7d',
+      '25s x5 → 15m → 30m → 45m → 2h → 6h → 1d → 2d → 3d → 1d',
     );
   });
 
   it('sm2: describes whichever pace is passed, not a fixed config', () => {
-    expect(formatChain(getAlgoInfo('sm2', 'gentle').chainSeconds)).toBe('25s → 10m → 2h → 1d → 2d');
+    // gentle's last learning step (1d) and its graduating interval (also
+    // 1d, same "curve of remembering" starting point every pace shares)
+    // collapse into "1d x2".
+    expect(formatChain(getAlgoInfo('sm2', 'gentle').chainSeconds)).toBe('25s → 10m → 2h → 1d x2');
     expect(formatChain(getAlgoInfo('sm2', 'standard').chainSeconds)).toBe(
-      '25s x2 → 1m → 5m → 20m → 1h → 4h → 1d → 2d → 4d',
+      '25s x2 → 1m → 5m → 20m → 1h → 4h → 1d → 2d → 1d',
     );
     expect(formatChain(getAlgoInfo('sm2', 'aggressive').chainSeconds)).toBe(
-      '25s x5 → 15m → 30m → 45m → 2h → 6h → 1d → 2d → 3d → 7d',
+      '25s x5 → 15m → 30m → 45m → 2h → 6h → 1d → 2d → 3d → 1d',
     );
   });
 

@@ -33,11 +33,11 @@ function walkLadder(config: typeof GENTLE_CONFIG): { offsets: number[]; final: S
 }
 
 describe('GENTLE_CONFIG', () => {
-  it('runs 25s x1, then 10m -> 2h -> 1d, then graduates at 2d', () => {
+  it('runs 25s x1, then 10m -> 2h -> 1d, then graduates at 1d', () => {
     const { offsets, final } = walkLadder(GENTLE_CONFIG);
-    expect(offsets).toEqual([sec(25), min(10), hours(2), days(1), days(2)]);
+    expect(offsets).toEqual([sec(25), min(10), hours(2), days(1), days(1)]);
     expect(final.phase).toBe('review');
-    expect(final.intervalDays).toBe(2);
+    expect(final.intervalDays).toBe(1);
   });
 
   it("grade 5 (\"easy\") can skip ahead right after the single mandatory rep", () => {
@@ -47,18 +47,18 @@ describe('GENTLE_CONFIG', () => {
     expect(s.stepIndex).toBe(GENTLE_CONFIG.learningBurstSteps);
     s = sm2.schedule(s, 5, NOW);
     expect(s.phase).toBe('review');
-    expect(s.intervalDays).toBe(GENTLE_CONFIG.easyIntervalDays);
+    expect(s.intervalDays).toBe(GENTLE_CONFIG.graduatingIntervalDays);
   });
 });
 
 describe('STANDARD_CONFIG', () => {
-  it('runs 25s x2, then 1m -> 5m -> 20m -> 1h -> 4h -> 1d -> 2d, then graduates at 4d', () => {
+  it('runs 25s x2, then 1m -> 5m -> 20m -> 1h -> 4h -> 1d -> 2d, then graduates at 1d', () => {
     const { offsets, final } = walkLadder(STANDARD_CONFIG);
     expect(offsets).toEqual([
-      sec(25), sec(25), min(1), min(5), min(20), hours(1), hours(4), days(1), days(2), days(4),
+      sec(25), sec(25), min(1), min(5), min(20), hours(1), hours(4), days(1), days(2), days(1),
     ]);
     expect(final.phase).toBe('review');
-    expect(final.intervalDays).toBe(4);
+    expect(final.intervalDays).toBe(1);
   });
 });
 
@@ -68,9 +68,9 @@ describe('AGGRESSIVE_CONFIG', () => {
     const { offsets, final } = walkLadder(AGGRESSIVE_CONFIG);
     expect(offsets).toEqual([
       sec(25), sec(25), sec(25), sec(25), sec(25),
-      min(15), min(30), min(45), hours(2), hours(6), days(1), days(2), days(3), days(7),
+      min(15), min(30), min(45), hours(2), hours(6), days(1), days(2), days(3), days(1),
     ]);
-    expect(final.intervalDays).toBe(7);
+    expect(final.intervalDays).toBe(1);
   });
 });
 
@@ -84,13 +84,16 @@ describe('PACE_CONFIGS', () => {
   it('escalates in strictly increasing thoroughness: gentle has the fewest steps, aggressive the most', () => {
     expect(GENTLE_CONFIG.learningStepsSec.length).toBeLessThan(STANDARD_CONFIG.learningStepsSec.length);
     expect(STANDARD_CONFIG.learningStepsSec.length).toBeLessThan(AGGRESSIVE_CONFIG.learningStepsSec.length);
-    expect(GENTLE_CONFIG.graduatingIntervalDays).toBeLessThan(STANDARD_CONFIG.graduatingIntervalDays);
-    expect(STANDARD_CONFIG.graduatingIntervalDays).toBeLessThan(AGGRESSIVE_CONFIG.graduatingIntervalDays);
   });
 
-  it('never lets the early easy-skip out-earn walking the full ladder, in any pace', () => {
+  it('graduates every pace at the same "curve of remembering" starting point (1 day)', () => {
+    // Paces differ in how much same-day drilling a word gets before the
+    // app trusts it with real spaced review — not in the size of that
+    // first spaced gap. Every mainstream SRS starts real review ~1 day
+    // out regardless of how thorough the learning phase was; multiplicative
+    // ease growth (scheduleReview) is what builds the curve from there.
     for (const config of [GENTLE_CONFIG, STANDARD_CONFIG, AGGRESSIVE_CONFIG]) {
-      expect(config.easyIntervalDays).toBeLessThan(config.graduatingIntervalDays);
+      expect(config.graduatingIntervalDays).toBe(1);
     }
   });
 });

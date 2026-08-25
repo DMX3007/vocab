@@ -99,8 +99,10 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
     const pastMandatoryBurst = state.stepIndex >= config.learningBurstSteps;
     if (isPerfect(grade) && pastMandatoryBurst) {
       // Confidently correct, and the mandatory drilling is already done —
-      // skip the remaining escalation steps.
-      return enterReviewPhase(state, config.easyIntervalDays, now);
+      // skip the remaining escalation steps and graduate at the same
+      // interval walking them would have earned. Not a shortcut to a
+      // BIGGER interval — see graduatingIntervalDays's doc comment.
+      return enterReviewPhase(state, config.graduatingIntervalDays, now);
     }
 
     const nextStepIndex = state.stepIndex + 1;
