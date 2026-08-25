@@ -45,13 +45,15 @@ export interface Word {
   dictionaryFetchedAt: Date | null;
 }
 
+export type WireSrsState = Omit<SrsState, 'dueAt'> & { dueAt: string };
+
 export type WireWord = Omit<Word, 'createdAt' | 'updatedAt' | 'deletedAt' | 'shelvedAt' | 'dictionaryFetchedAt' | 'srsState'> & {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
   shelvedAt: string | null;
   dictionaryFetchedAt: string | null;
-  srsState: Omit<Word['srsState'], 'dueAt'> & { dueAt: string };
+  srsState: WireSrsState;
 };
 
 export type ReviewMode = 'typing' | 'voice';

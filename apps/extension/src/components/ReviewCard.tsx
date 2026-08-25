@@ -31,6 +31,7 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [shelveSuggestionDismissed, setShelveSuggestionDismissed] = useState(false);
   const [shelving, setShelving] = useState(false);
+  const [marking, setMarking] = useState(false);
   const [dictInfo, setDictInfo] = useState<Word['dictionary']>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number>(Date.now());
@@ -84,6 +85,21 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
       return;
     }
     setCard(session.currentCard);
+  }
+
+  /** The user is confident their answer was actually right — a typo the
+   *  SRS's own tolerance didn't happen to cover, most often. Re-grades the
+   *  just-shown verdict as correct in place; the card stays open so they
+   *  can see the corrected verdict before moving on. */
+  async function markCorrect() {
+    if (marking) return;
+    setMarking(true);
+    try {
+      const corrected = await session.markLastAnsweredCorrect(new Date());
+      if (corrected) setVerdict(corrected);
+    } finally {
+      setMarking(false);
+    }
   }
 
   /** The user agreed the struggling word is worth setting aside — shelve it
@@ -197,6 +213,18 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
             <span key={i} className={`vf-diff-char ${d.correct ? 'ok' : 'bad'}`}>{d.char}</span>
           ))}
         </div>
+      )}
+
+      {verdict && verdict.verdict === 'wrong' && (
+        <button
+          type="button"
+          className="vf-mark-correct-btn"
+          onClick={() => void markCorrect()}
+          disabled={marking}
+          title={t('card.markCorrectTitle')}
+        >
+          {marking ? t('card.marking') : t('card.markCorrect')}
+        </button>
       )}
 
       {verdict ? (

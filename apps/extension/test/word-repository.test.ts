@@ -330,6 +330,35 @@ describe('recordReview', () => {
   });
 });
 
+describe('correctReview (fixing a wrongly-graded typo after the fact)', () => {
+  it('produces the SAME result as if the corrected grade had been recorded originally', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const preReviewState = w.srsState;
+
+    // What a straight-up correct answer would have produced, from a clean word.
+    const w2 = await repo.saveWord({ ...sample, term: 'other' }, NOW);
+    const straightCorrect = await repo.recordReview(w2.id, 4, 'typing', NOW);
+
+    // The user typo'd it, got marked wrong, then corrected it.
+    await repo.recordReview(w.id, 1, 'typing', NOW);
+    const corrected = await repo.correctReview(w.id, preReviewState, 4, NOW, later(5_000));
+
+    expect(corrected.srsState).toEqual(straightCorrect.srsState);
+  });
+
+  it('overwrites the existing log entry rather than adding a second one', async () => {
+    const w = await repo.saveWord(sample, NOW);
+    const preReviewState = w.srsState;
+    await repo.recordReview(w.id, 1, 'typing', NOW);
+    await repo.correctReview(w.id, preReviewState, 4, NOW, later(5_000));
+
+    const logs = await repo.getReviewLogs(w.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]!.grade).toBe(4);
+    expect(logs[0]!.reviewedAt.getTime()).toBe(NOW.getTime()); // the ORIGINAL moment, not the correction time
+  });
+});
+
 describe('getAllReviewLogs (across every word and language, for Progress stats)', () => {
   it('returns every log, oldest first, regardless of word or language', async () => {
     const a = await repo.saveWord(sample, NOW);

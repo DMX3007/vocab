@@ -214,6 +214,37 @@ describe('ReviewSession (normal mode)', () => {
     });
   });
 
+  describe('markLastAnsweredCorrect', () => {
+    it('is a no-op before any answer has happened', async () => {
+      await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', NOW);
+      await expect(session.markLastAnsweredCorrect(NOW)).resolves.toBeNull();
+    });
+
+    it('re-grades a wrongly-marked answer as correct, matching what a straight pass would have produced', async () => {
+      const w = await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', NOW);
+
+      const wrong = await session.answer('totally wrong', { latencyMs: 2000 }, NOW);
+      expect(wrong.verdict).toBe('wrong');
+      expect(session.lastAnsweredWord?.srsState.lapses).toBe(1);
+
+      const corrected = await session.markLastAnsweredCorrect(new Date(NOW.getTime() + 5_000));
+      expect(corrected?.verdict).toBe('correct');
+      expect(session.lastAnsweredWord?.srsState.lapses).toBe(0); // the lapse never happened
+      // A normal first-step pass, scheduled from the ORIGINAL answer time
+      // (NOW) — not the correction time, and not stacked on the failed
+      // review's already-reset stepIndex.
+      expect(session.lastAnsweredWord?.srsState.dueAt.getTime()).toBe(NOW.getTime() + 25_000);
+
+      const logs = await repo.getReviewLogs(w.id);
+      expect(logs).toHaveLength(1); // corrected in place, not stacked
+      expect(logs[0]!.grade).toBe(4);
+    });
+  });
+
   it('shuffle() swaps the current card for a different one, without grading or dropping it', async () => {
     const a = await save('fortitude', 'стойкость', minutesAgo(30));
     await save('candor', 'откровенность', minutesAgo(20));

@@ -533,6 +533,30 @@ img.ach-badge { object-fit: contain; }
   text-decoration-color: rgba(165, 49, 31, 0.6);
 }
 
+.vf-mark-correct-btn {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(28, 26, 23, 0.16);
+  border-radius: 8px;
+  background: transparent;
+  color: #5c4f45;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vf-mark-correct-btn:hover:not(:disabled) {
+  background: rgba(28, 26, 23, 0.06);
+  color: #1c1a17;
+}
+
+.vf-mark-correct-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .vf-dict {
   margin-top: 12px;
   padding: 10px 12px;

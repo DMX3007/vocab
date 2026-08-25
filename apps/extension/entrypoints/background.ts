@@ -161,6 +161,19 @@ export default defineBackground(() => {
         void settingsStore.load().then(refreshBadge);
         return word;
       }
+      case 'CORRECT_REVIEW': {
+        const { wordId, preReviewState, grade, reviewedAt, now } = message.payload;
+        const word = await repo.correctReview(
+          wordId,
+          { ...preReviewState, dueAt: new Date(preReviewState.dueAt) },
+          grade,
+          new Date(reviewedAt),
+          new Date(now),
+        );
+        void checkAchievements();
+        void settingsStore.load().then(refreshBadge);
+        return word;
+      }
       case 'GET_REVIEW_LOGS':
         return repo.getReviewLogs(message.payload.wordId);
       case 'DELETE_WORD':

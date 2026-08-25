@@ -257,6 +257,9 @@ export const strings: Record<TranslationKey, string> = {
   'card.checking': 'Проверка…',
   'card.check': 'Проверить',
   'card.struggling': 'Не даётся это слово ({misses}) — отложить его?',
+  'card.markCorrectTitle': 'Засчитать как верный ответ — например, это была просто опечатка',
+  'card.markCorrect': 'На самом деле я прав(а)',
+  'card.marking': 'Отмечаем…',
 
   // ── Tooltip (add-word popup on the page) ─────────────────────
   'tooltip.translationPlaceholder': 'Перевод...',

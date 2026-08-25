@@ -261,6 +261,9 @@ export const strings = {
   'card.checking': 'Checking…',
   'card.check': 'Check',
   'card.struggling': 'Struggling with this one ({misses}) — set it aside for now?',
+  'card.markCorrectTitle': "Count this as correct instead — e.g. it was just a typo",
+  'card.markCorrect': 'Actually, I was right',
+  'card.marking': 'Marking…',
 
   // ── Tooltip (add-word popup on the page) ─────────────────────
   'tooltip.translationPlaceholder': 'Translation...',

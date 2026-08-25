@@ -5,17 +5,27 @@ import {
   type GradeContext,
   type GradeResult,
   type Grade,
+  type SrsState,
 } from '@vocably/core';
 import type { Word, ReviewMode } from '../storage/types';
 import { sortForReview, type AlgoFilter } from './library';
 
-// The session only needs these three methods. Both the real WordRepository
+// Grade awarded when the user overrides a "wrong" verdict to correct (see
+// markLastAnsweredCorrect) — a normal pass, not GRADE_CORRECT_FAST (5):
+// they're fixing a marking mistake, not claiming the extra confidence a
+// perfect/instant answer would (5 skips ahead in scheduleLearning — see
+// packages/core's sm2.ts — which a typo-correction shouldn't trigger).
+const OVERRIDE_CORRECT_GRADE: Grade = 4;
+
+// The session only needs these four methods. Both the real WordRepository
 // (used in tests) and the messaging wordClient (used in the popup) satisfy
 // this, so the session works the same in both worlds.
 export interface SessionDataSource {
   getDueWords(now: Date, langTo: string): Promise<Word[]>;
   getAllWords(langTo: string): Promise<Word[]>;
   recordReview(wordId: string, grade: Grade, mode: ReviewMode, now: Date): Promise<Word>;
+  /** See WordRepository.correctReview's doc comment. */
+  correctReview(wordId: string, preReviewState: SrsState, grade: Grade, reviewedAt: Date, now: Date): Promise<Word>;
   shelveWord(wordId: string, now: Date): Promise<Word>;
 }
 
@@ -91,6 +101,12 @@ export class ReviewSession {
    *  lets the UI decide whether to suggest shelving it without threading a
    *  whole extra round-trip. Null before the first answer of the session. */
   private lastAnswered: Word | null = null;
+  /** lastAnswered's SRS state from BEFORE that answer, plus the moment it
+   *  was answered — captured alongside lastAnswered so markLastAnsweredCorrect
+   *  can replay the scheduler from the same starting point recordReview used,
+   *  instead of stacking a second review on top of the wrong one. */
+  private lastAnsweredPreState: SrsState | null = null;
+  private lastAnsweredAt: Date | null = null;
 
   constructor(
     private readonly repo: SessionDataSource,
@@ -184,6 +200,8 @@ export class ReviewSession {
     const card = this.currentCardCache!;
 
     const result = gradeAnswer(text, card.expected, context);
+    this.lastAnsweredPreState = word.srsState; // captured before recordReview mutates it
+    this.lastAnsweredAt = now;
     this.lastAnswered = await this.repo.recordReview(word.id, result.grade, 'typing', now);
 
     this.index += 1;
@@ -197,6 +215,25 @@ export class ReviewSession {
   async shelveLastAnswered(now: Date): Promise<void> {
     if (!this.lastAnswered) return;
     this.lastAnswered = await this.repo.shelveWord(this.lastAnswered.id, now);
+  }
+
+  /** The user is confident the just-graded "wrong" answer was actually
+   *  right — a typo the SRS's own tolerance didn't happen to cover, most
+   *  often. Re-grades it as a normal pass instead of stacking a second
+   *  review on top of the wrong one (see WordRepository.correctReview). A
+   *  no-op — returning null — before any answer, or once the last answer
+   *  was already correct (nothing to fix). */
+  async markLastAnsweredCorrect(now: Date): Promise<GradeResult | null> {
+    if (!this.lastAnswered || !this.lastAnsweredPreState || !this.lastAnsweredAt) return null;
+
+    this.lastAnswered = await this.repo.correctReview(
+      this.lastAnswered.id,
+      this.lastAnsweredPreState,
+      OVERRIDE_CORRECT_GRADE,
+      this.lastAnsweredAt,
+      now,
+    );
+    return { verdict: 'correct', grade: OVERRIDE_CORRECT_GRADE };
   }
 
   // ── internal ───────────────────────────────────────────────────

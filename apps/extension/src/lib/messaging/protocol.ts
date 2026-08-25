@@ -1,4 +1,4 @@
-import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog } from '../storage/types';
+import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog, WireSrsState } from '../storage/types';
 import type { AlgoId, Grade, Pace } from '@vocably/core';
 import type { AlgoFilter } from '../review/library';
 
@@ -14,6 +14,8 @@ export type RequestMap = {
   GET_DUE_WORDS: { langTo: string; now: string };
   COUNT_WORDS: { langTo: string };
   RECORD_REVIEW: { wordId: string; grade: Grade; mode: ReviewMode; now: string };
+  /** See WordRepository.correctReview's doc comment. */
+  CORRECT_REVIEW: { wordId: string; preReviewState: WireSrsState; grade: Grade; reviewedAt: string; now: string };
   GET_REVIEW_LOGS: { wordId: string };
   DELETE_WORD: { wordId: string; now: string };
   GET_ALL_LOGS: Record<string, never>;
@@ -38,6 +40,7 @@ export type ResponseMap = {
   GET_DUE_WORDS: WireWord[];
   COUNT_WORDS: number;
   RECORD_REVIEW: WireWord;
+  CORRECT_REVIEW: WireWord;
   GET_REVIEW_LOGS: unknown[];
   DELETE_WORD: null;
   GET_ALL_LOGS: WireReviewLog[];

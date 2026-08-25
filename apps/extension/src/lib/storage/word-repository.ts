@@ -237,6 +237,40 @@ export class WordRepository {
     return updated;
   }
 
+  /** Corrects a just-recorded review that graded a typo/near-miss as wrong
+   *  when the user is confident their answer was actually right — e.g. a
+   *  fat-fingered letter the SRS's own typo tolerance didn't happen to
+   *  cover. Replays the scheduler from `preReviewState` (the word's SRS
+   *  state from BEFORE that review — the caller must have captured it at
+   *  answer time) with a passing grade, so the result is IDENTICAL to what
+   *  would have happened had it been graded correct the first time — not a
+   *  second review stacked on top of the wrong one. Overwrites the most
+   *  recent log entry for the word (by reviewedAt) rather than adding a
+   *  new one, so review counts/stats aren't double-counted. Safe because
+   *  this only ever runs immediately after that exact review, before any
+   *  other review of the same word could land in between. */
+  async correctReview(
+    wordId: string,
+    preReviewState: SrsState,
+    grade: Grade,
+    reviewedAt: Date,
+    now: Date,
+  ): Promise<Word> {
+    const word = await this.db.words.get(wordId);
+    if (!word) throw new Error(`Word not found: ${wordId}`);
+
+    const srsState = schedulerFor(preReviewState).schedule(preReviewState, grade, reviewedAt);
+    const updated: Word = { ...word, srsState, updatedAt: now };
+
+    await this.db.transaction('rw', this.db.words, this.db.reviewLogs, async () => {
+      await this.db.words.put(updated);
+      const logs = await this.db.reviewLogs.where('wordId').equals(wordId).toArray();
+      const latest = logs.reduce((a, b) => (a.reviewedAt.getTime() >= b.reviewedAt.getTime() ? a : b));
+      await this.db.reviewLogs.put({ ...latest, grade });
+    });
+    return updated;
+  }
+
   /** Switches one or more words onto a different algorithm/pace. There's no
    *  honest way to convert an ease factor into a Leitner box (or back), or to
    *  re-map a stepIndex onto a differently-shaped ladder, so progress
