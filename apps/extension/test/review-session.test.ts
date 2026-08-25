@@ -3,7 +3,8 @@ import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DEFAULT_CONFIG } from '@vocably/core';
 import { WordRepository } from '../src/lib/storage/word-repository';
-import { ReviewSession, DEFAULT_SESSION_CONFIG } from '../src/lib/review/session';
+import { ReviewSession, DEFAULT_SESSION_CONFIG, type SessionDataSource } from '../src/lib/review/session';
+import type { ReviewLog } from '../src/lib/storage/types';
 
 // The orchestrator glues the building blocks into one flow:
 //   repository (which words are due) + core (direction, grading, scheduling).
@@ -75,7 +76,7 @@ describe('ReviewSession (normal mode)', () => {
     const repeat = await save('candor', 'откровенность', minutesAgo(60 * 24 * 30));
     const tenDaysAgo = new Date(NOW.getTime() - 10 * 24 * 60 * 60_000);
     for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
-      await repo.recordReview(repeat.id, 4, 'typing', tenDaysAgo); // walk the full ladder to graduate, interval 1d
+      await repo.recordReview(repeat.id, 4, 'typing', 'forward', tenDaysAgo); // walk the full ladder to graduate, interval 1d
     }
     const graduated = (await repo.getWord(repeat.id))!;
     expect(graduated.srsState.intervalDays).toBeGreaterThan(0); // confirms it's "repeat", not fresh
@@ -112,6 +113,61 @@ describe('ReviewSession (normal mode)', () => {
     expect(card.direction).toBe('reverse');
     expect(card.prompt).toBe('стойкость'); // reverse: show the translation...
     expect(card.expected).toEqual(['fortitude']); // ...ask for the term
+  });
+
+  describe('direction picking uses REAL history, not a fixed 50/50', () => {
+    // rng=0.3 is the discriminating value here: with a genuinely neutral
+    // 50/50 split (chanceOfForward=0.5), 0.3 < 0.5 -> 'forward'. Once the
+    // word's real history skews hard toward reverse failing, chanceOfForward
+    // drops well below 0.3 -> 'reverse'. A regression back to the old
+    // hardcoded-neutral stats would make this test pick 'forward' again.
+    const discriminatingRng = () => 0.3;
+
+    it('a fresh word with no history still gets a neutral 50/50 (not skewed by default)', async () => {
+      await save('fortitude', 'стойкость', minutesAgo(30));
+      const session = new ReviewSession(repo, { mode: 'normal' }, discriminatingRng);
+      await session.start('ru', NOW);
+      expect(session.currentCard!.direction).toBe('forward');
+    });
+
+    it('weights toward whichever direction the word has actually been failed in', async () => {
+      const w = await save('fortitude', 'стойкость', minutesAgo(30));
+      // Reverse: failed every time. Forward: passed every time.
+      for (let i = 0; i < 5; i++) await repo.recordReview(w.id, 1, 'typing', 'reverse', minutesAgo(20));
+      for (let i = 0; i < 5; i++) await repo.recordReview(w.id, 4, 'typing', 'forward', minutesAgo(10));
+
+      const session = new ReviewSession(repo, { mode: 'normal' }, discriminatingRng);
+      await session.start('ru', NOW);
+      // Same rng value that picked 'forward' with no history now picks
+      // 'reverse' — real per-direction failure history is driving this,
+      // not a coin flip on every card.
+      expect(session.currentCard!.direction).toBe('reverse');
+    });
+
+    it('logs from before the `direction` field existed are skipped, not miscounted', async () => {
+      const w = await save('fortitude', 'стойкость', minutesAgo(30));
+      for (let i = 0; i < 5; i++) await repo.recordReview(w.id, 1, 'typing', 'reverse', minutesAgo(20));
+      // Simulate legacy data: strip `direction` off the stored logs, and
+      // proxy every other call straight through to the real repo.
+      const legacyLogs = (await repo.getReviewLogs(w.id)).map((l) => {
+        const { direction: _direction, ...rest } = l;
+        return rest as unknown as ReviewLog;
+      });
+      const legacyRepo: SessionDataSource = {
+        getDueWords: (...args) => repo.getDueWords(...args),
+        getAllWords: (...args) => repo.getAllWords(...args),
+        recordReview: (...args) => repo.recordReview(...args),
+        correctReview: (...args) => repo.correctReview(...args),
+        shelveWord: (...args) => repo.shelveWord(...args),
+        getAllReviewLogs: async () => legacyLogs,
+      };
+
+      const session = new ReviewSession(legacyRepo, { mode: 'normal' }, discriminatingRng);
+      await session.start('ru', NOW);
+      // No usable direction on any log -> falls back to neutral, same as a
+      // word with no history at all.
+      expect(session.currentCard!.direction).toBe('forward');
+    });
   });
 
   it('answering grades the response and advances to the next card', async () => {
@@ -317,7 +373,7 @@ describe('ReviewSession (normal mode)', () => {
 
   it('start({ includeAll }) queues every word, even ones not yet due (manual review)', async () => {
     const fresh = await save('fortitude', 'стойкость', minutesAgo(30));
-    await repo.recordReview(fresh.id, 5, 'typing', NOW); // advances a step, not due yet
+    await repo.recordReview(fresh.id, 5, 'typing', 'forward', NOW); // advances a step, not due yet
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
     await session.start('ru', NOW, { includeAll: true });
     expect(session.total).toBe(1); // included despite not being due

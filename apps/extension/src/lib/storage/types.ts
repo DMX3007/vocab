@@ -1,4 +1,4 @@
-import type { SrsState } from '@vocably/core';
+import type { Direction, SrsState } from '@vocably/core';
 
 /** One cached dictionary lookup (see lib/dictionary/freeDictionary.ts) —
  *  a definition, its part of speech, and an example sentence when the
@@ -58,13 +58,17 @@ export type WireWord = Omit<Word, 'createdAt' | 'updatedAt' | 'deletedAt' | 'she
 
 export type ReviewMode = 'typing' | 'voice';
 
-/** Append-only record of one review. The source of truth for SRS history. */
+/** Append-only record of one review. The source of truth for SRS history —
+ *  including which direction was asked, so pickDirection (see
+ *  @vocably/core) can weight future reviews toward whichever direction the
+ *  user actually struggles with, instead of a fixed 50/50 guess. */
 export interface ReviewLog {
   id: string;
   wordId: string;
   reviewedAt: Date;
   mode: ReviewMode;
   grade: number;
+  direction: Direction;
 }
 
 export type WireReviewLog = Omit<ReviewLog, 'reviewedAt'> & { reviewedAt: string };

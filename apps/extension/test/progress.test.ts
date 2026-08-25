@@ -43,7 +43,7 @@ function word(overrides: Partial<Word> = {}): Word {
 
 function log(wordId: string, grade: number, daysAgo: number): ReviewLog {
   const reviewedAt = new Date(NOW.getTime() - daysAgo * 86_400_000);
-  return { id: `l${Math.random()}`, wordId, grade, mode: 'typing', reviewedAt };
+  return { id: `l${Math.random()}`, wordId, grade, mode: 'typing', direction: 'forward', reviewedAt };
 }
 
 describe('computeProgressStats', () => {

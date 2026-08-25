@@ -8,6 +8,7 @@ import {
   type Grade,
   type SrsAlgorithm,
   type SrsState,
+  type Direction,
 } from '@vocably/core';
 import type { DictionaryInfo, ReviewLog, ReviewMode, SaveWordInput, Word } from './types';
 
@@ -211,11 +212,15 @@ export class WordRepository {
     return updated;
   }
 
-  /** Records a review: advance SRS via the core scheduler + append a log. */
+  /** Records a review: advance SRS via the core scheduler + append a log.
+   *  `direction` is logged (not just used for grading) so pickDirection can
+   *  later read real per-direction history back out — see
+   *  ReviewSession.directionStatsByWord. */
   async recordReview(
     wordId: string,
     grade: Grade,
     mode: ReviewMode,
+    direction: Direction,
     now: Date,
   ): Promise<Word> {
     const word = await this.db.words.get(wordId);
@@ -232,6 +237,7 @@ export class WordRepository {
         reviewedAt: now,
         mode,
         grade,
+        direction,
       });
     });
     return updated;
@@ -248,7 +254,10 @@ export class WordRepository {
    *  recent log entry for the word (by reviewedAt) rather than adding a
    *  new one, so review counts/stats aren't double-counted. Safe because
    *  this only ever runs immediately after that exact review, before any
-   *  other review of the same word could land in between. */
+   *  other review of the same word could land in between. The corrected
+   *  entry keeps the original log's `direction` (spread from `latest`,
+   *  below) — correcting a grade never changes which direction was
+   *  actually asked. */
   async correctReview(
     wordId: string,
     preReviewState: SrsState,

@@ -1,5 +1,5 @@
 import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog, WireSrsState } from '../storage/types';
-import type { AlgoId, Grade, Pace } from '@vocably/core';
+import type { AlgoId, Direction, Grade, Pace } from '@vocably/core';
 import type { AlgoFilter } from '../review/library';
 
 // Why this exists: in a Chrome extension the content script runs in the
@@ -13,7 +13,7 @@ export type RequestMap = {
   GET_ALL_WORDS: { langTo: string };
   GET_DUE_WORDS: { langTo: string; now: string };
   COUNT_WORDS: { langTo: string };
-  RECORD_REVIEW: { wordId: string; grade: Grade; mode: ReviewMode; now: string };
+  RECORD_REVIEW: { wordId: string; grade: Grade; mode: ReviewMode; direction: Direction; now: string };
   /** See WordRepository.correctReview's doc comment. */
   CORRECT_REVIEW: { wordId: string; preReviewState: WireSrsState; grade: Grade; reviewedAt: string; now: string };
   GET_REVIEW_LOGS: { wordId: string };

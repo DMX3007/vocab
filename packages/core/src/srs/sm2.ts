@@ -2,20 +2,16 @@ import {
   addDays,
   addMinutes,
   addSeconds,
+  isFailedGrade,
   type Grade,
   type SchedulerConfig,
   type SrsAlgorithm,
   type SrsState,
 } from './types.js';
 
-// ── What grades mean ─────────────────────────────────────────────
-// 0..2 — the user failed the card
-// 3..4 — the user passed
-// 5    — the user passed perfectly ("easy")
-const MINIMUM_PASSING_GRADE: Grade = 3;
 const PERFECT_GRADE: Grade = 5;
 
-const isFailed = (grade: Grade): boolean => grade < MINIMUM_PASSING_GRADE;
+const isFailed = isFailedGrade;
 const isPerfect = (grade: Grade): boolean => grade === PERFECT_GRADE;
 
 // A review interval can never be shorter than one day.

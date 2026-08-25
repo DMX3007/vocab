@@ -1,13 +1,15 @@
 import {
   gradeAnswer,
   pickDirection,
+  isFailedGrade,
   type Direction,
+  type DirectionStats,
   type GradeContext,
   type GradeResult,
   type Grade,
   type SrsState,
 } from '@vocably/core';
-import type { Word, ReviewMode } from '../storage/types';
+import type { Word, ReviewMode, ReviewLog } from '../storage/types';
 import { sortForReview, type AlgoFilter } from './library';
 
 // Grade awarded when the user overrides a "wrong" verdict to correct (see
@@ -23,10 +25,15 @@ const OVERRIDE_CORRECT_GRADE: Grade = 4;
 export interface SessionDataSource {
   getDueWords(now: Date, langTo: string): Promise<Word[]>;
   getAllWords(langTo: string): Promise<Word[]>;
-  recordReview(wordId: string, grade: Grade, mode: ReviewMode, now: Date): Promise<Word>;
+  recordReview(wordId: string, grade: Grade, mode: ReviewMode, direction: Direction, now: Date): Promise<Word>;
   /** See WordRepository.correctReview's doc comment. */
   correctReview(wordId: string, preReviewState: SrsState, grade: Grade, reviewedAt: Date, now: Date): Promise<Word>;
   shelveWord(wordId: string, now: Date): Promise<Word>;
+  /** Every review ever logged, across every word and language — used once
+   *  at start() to build real per-direction stats for pickDirection (see
+   *  directionStatsByWord). Same call Progress stats already use, so this
+   *  adds no new plumbing. */
+  getAllReviewLogs(): Promise<ReviewLog[]>;
 }
 
 export type SessionMode = 'normal'; // 'intensive' (Yagodkin) arrives in its own loop
@@ -107,6 +114,12 @@ export class ReviewSession {
    *  instead of stacking a second review on top of the wrong one. */
   private lastAnsweredPreState: SrsState | null = null;
   private lastAnsweredAt: Date | null = null;
+  /** Real per-word direction stats, built once from the review log at
+   *  start() — not recomputed per card. Safe to snapshot for the session's
+   *  duration: a snapshot session never grades the same word twice (see
+   *  the class doc comment), so no word's history can change mid-session
+   *  in a way that would make a stale entry wrong. */
+  private directionStatsByWord: Map<string, DirectionStats> = new Map();
 
   constructor(
     private readonly repo: SessionDataSource,
@@ -139,6 +152,7 @@ export class ReviewSession {
     this.index = 0;
     this.answeredCount = 0;
     this.started = true;
+    this.directionStatsByWord = await this.buildDirectionStats();
     this.refreshCurrentCard();
   }
 
@@ -202,7 +216,7 @@ export class ReviewSession {
     const result = gradeAnswer(text, card.expected, context);
     this.lastAnsweredPreState = word.srsState; // captured before recordReview mutates it
     this.lastAnsweredAt = now;
-    this.lastAnswered = await this.repo.recordReview(word.id, result.grade, 'typing', now);
+    this.lastAnswered = await this.repo.recordReview(word.id, result.grade, 'typing', card.direction, now);
 
     this.index += 1;
     this.answeredCount += 1;
@@ -268,15 +282,40 @@ export class ReviewSession {
     };
   }
 
-  /**
-   * Per-direction failure stats for the picker. The full version reads the
-   * review log; for now we start neutral (50/50) — wiring real per-direction
-   * history is a small follow-up once logs carry the direction.
-   */
-  private directionStats(_word: Word) {
-    return {
-      forward: { shown: 0, failed: 0 },
-      reverse: { shown: 0, failed: 0 },
-    };
+  /** Per-direction failure stats for the picker (see directionStatsByWord).
+   *  A word with no logged history yet — brand new, or pre-dating the
+   *  `direction` field on ReviewLog — correctly falls back to neutral
+   *  (0 shown either way): pickDirection's own Laplace smoothing turns that
+   *  into an honest 50/50, not a fixed default. */
+  private directionStats(word: Word): DirectionStats {
+    return (
+      this.directionStatsByWord.get(word.id) ?? {
+        forward: { shown: 0, failed: 0 },
+        reverse: { shown: 0, failed: 0 },
+      }
+    );
+  }
+
+  /** Builds real per-word, per-direction shown/failed counts from the
+   *  review log, once per session — see directionStatsByWord's comment for
+   *  why a one-time snapshot is safe. Logs written before `direction`
+   *  existed on ReviewLog have no direction to attribute — skipped rather
+   *  than guessed, same as the codebase's existing pattern for evolving a
+   *  persisted schema (compare schedulerFor's pace fallback). */
+  private async buildDirectionStats(): Promise<Map<string, DirectionStats>> {
+    const logs = await this.repo.getAllReviewLogs();
+    const byWord = new Map<string, DirectionStats>();
+    for (const log of logs) {
+      if (!log.direction) continue;
+      let stats = byWord.get(log.wordId);
+      if (!stats) {
+        stats = { forward: { shown: 0, failed: 0 }, reverse: { shown: 0, failed: 0 } };
+        byWord.set(log.wordId, stats);
+      }
+      const counters = stats[log.direction];
+      counters.shown += 1;
+      if (isFailedGrade(log.grade as Grade)) counters.failed += 1;
+    }
+    return byWord;
   }
 }

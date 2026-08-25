@@ -155,7 +155,7 @@ export default defineBackground(() => {
       case 'RECORD_REVIEW': {
         const word = await repo.recordReview(
           message.payload.wordId, message.payload.grade,
-          message.payload.mode, new Date(message.payload.now),
+          message.payload.mode, message.payload.direction, new Date(message.payload.now),
         );
         void checkAchievements();
         void settingsStore.load().then(refreshBadge);

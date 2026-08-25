@@ -1,5 +1,5 @@
 import type { SaveWordInput, Word, ReviewMode, ReviewLog } from '../storage/types';
-import type { AlgoId, Grade, Pace, SrsState } from '@vocably/core';
+import type { AlgoId, Direction, Grade, Pace, SrsState } from '@vocably/core';
 import type { Message, ResponseMap, MessageType } from './protocol';
 import { reviveWord, reviveWords, reviveReviewLogs } from './revive';
 
@@ -28,9 +28,9 @@ export const wordClient = {
   async countWords(langTo: string): Promise<number> {
     return (await send({ type: 'COUNT_WORDS', payload: { langTo } })) as number;
   },
-  async recordReview(wordId: string, grade: Grade, mode: ReviewMode, now: Date): Promise<Word> {
+  async recordReview(wordId: string, grade: Grade, mode: ReviewMode, direction: Direction, now: Date): Promise<Word> {
     return reviveWord(
-      (await send({ type: 'RECORD_REVIEW', payload: { wordId, grade, mode, now: now.toISOString() } })),
+      (await send({ type: 'RECORD_REVIEW', payload: { wordId, grade, mode, direction, now: now.toISOString() } })),
     );
   },
   async correctReview(

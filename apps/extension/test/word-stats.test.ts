@@ -34,7 +34,14 @@ function word(overrides: Omit<Partial<Word>, 'srsState'> & { srsState?: Partial<
 }
 
 function log(wordId: string, grade: number): ReviewLog {
-  return { id: `l${Math.random()}`, wordId, grade: grade as ReviewLog['grade'], mode: 'typing', reviewedAt: NOW };
+  return {
+    id: `l${Math.random()}`,
+    wordId,
+    grade: grade as ReviewLog['grade'],
+    mode: 'typing',
+    direction: 'forward',
+    reviewedAt: NOW,
+  };
 }
 
 describe('computeWordStatsById', () => {

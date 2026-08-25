@@ -1,4 +1,13 @@
 export type Grade = 0 | 1 | 2 | 3 | 4 | 5;
+// ── What a grade means ───────────────────────────────────────────
+// 0..2 — the user failed the card
+// 3..4 — the user passed
+// 5    — the user passed perfectly ("easy")
+// The single source of truth for "did this count as a pass" — reused by
+// sm2.ts's scheduling AND by the extension's per-direction stats (which
+// direction the user actually struggles with, for pickDirection below).
+export const MINIMUM_PASSING_GRADE: Grade = 3;
+export const isFailedGrade = (grade: Grade): boolean => grade < MINIMUM_PASSING_GRADE;
 export type Phase = 'learning' | 'review' | 'relearning';
 export type AlgoId = 'sm2' | 'leitner'; // 'fsrs' reserved for a later loop
 /** How hard a word gets drilled before the app trusts it with a long gap.

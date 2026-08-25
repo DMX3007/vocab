@@ -77,7 +77,7 @@ describe('getDueWords (scoped to the active target language)', () => {
     const due = await repo.saveWord(sample, NOW);
     // push a second word into the future by reviewing it well
     const fresh = await repo.saveWord({ ...sample, term: 'alacrity', translation: 'рвение' }, NOW);
-    await repo.recordReview(fresh.id, 5, 'typing', NOW); // advances a step, due in ~25s
+    await repo.recordReview(fresh.id, 5, 'typing', 'forward', NOW); // advances a step, due in ~25s
 
     const result = await repo.getDueWords(later(1000), 'ru');
     const ids = result.map((w) => w.id);
@@ -119,7 +119,7 @@ describe('shelveWord / unshelveWord', () => {
 
   it('leaves algorithm progress untouched — shelving is not the same as resetting', async () => {
     const w = await repo.saveWord(sample, NOW);
-    const reviewed = await repo.recordReview(w.id, 4, 'typing', NOW);
+    const reviewed = await repo.recordReview(w.id, 4, 'typing', 'forward', NOW);
     const shelved = await repo.shelveWord(w.id, later(1000));
     expect(shelved.srsState.stepIndex).toBe(reviewed.srsState.stepIndex);
     const unshelved = await repo.unshelveWord(w.id, later(2000));
@@ -146,7 +146,7 @@ describe('clearLibrary', () => {
 
   it('leaves review logs intact — clearing the word list is not clearing history', async () => {
     const w = await repo.saveWord(sample, NOW);
-    await repo.recordReview(w.id, 4, 'typing', NOW);
+    await repo.recordReview(w.id, 4, 'typing', 'forward', NOW);
     await repo.clearLibrary('ru', later(1000));
     expect(await repo.getReviewLogs(w.id)).toHaveLength(1);
   });
@@ -198,7 +198,7 @@ describe('setDictionaryInfo', () => {
 
   it('leaves SRS progress and everything else untouched', async () => {
     const w = await repo.saveWord(sample, NOW);
-    const reviewed = await repo.recordReview(w.id, 4, 'typing', NOW);
+    const reviewed = await repo.recordReview(w.id, 4, 'typing', 'forward', NOW);
     const updated = await repo.setDictionaryInfo(w.id, info, later(1000));
     expect(updated.srsState).toEqual(reviewed.srsState);
   });
@@ -240,7 +240,7 @@ describe('countWords (per language, for the dropdown badges)', () => {
 describe('updateWord', () => {
   it('replaces the translations and bumps updatedAt, without resetting SRS progress', async () => {
     const w = await repo.saveWord(sample, NOW);
-    await repo.recordReview(w.id, 4, 'typing', NOW); // advance SRS a bit
+    await repo.recordReview(w.id, 4, 'typing', 'forward', NOW); // advance SRS a bit
     const before = (await repo.getWord(w.id))!;
 
     const updated = await repo.updateWord(w.id, { translations: ['непреклонность'] }, later(5000));
@@ -313,15 +313,15 @@ describe('recordReview', () => {
   it('advances the SRS state through the core scheduler and pushes dueAt forward', async () => {
     const w = await repo.saveWord(sample, NOW);
     const dueBefore = w.srsState.dueAt.getTime();
-    const after = await repo.recordReview(w.id, 4, 'typing', NOW);
+    const after = await repo.recordReview(w.id, 4, 'typing', 'forward', NOW);
     expect(after.srsState.dueAt.getTime()).toBeGreaterThan(dueBefore);
     expect(after.srsState.stepIndex).toBeGreaterThan(0); // advanced within the learning ladder
   });
 
   it('appends an immutable review log entry (source of truth)', async () => {
     const w = await repo.saveWord(sample, NOW);
-    await repo.recordReview(w.id, 4, 'typing', NOW);
-    await repo.recordReview(w.id, 1, 'voice', later(60_000));
+    await repo.recordReview(w.id, 4, 'typing', 'forward', NOW);
+    await repo.recordReview(w.id, 1, 'voice', 'forward', later(60_000));
     const logs = await repo.getReviewLogs(w.id);
     expect(logs).toHaveLength(2);
     expect(logs[0]!.grade).toBe(4);
@@ -337,10 +337,10 @@ describe('correctReview (fixing a wrongly-graded typo after the fact)', () => {
 
     // What a straight-up correct answer would have produced, from a clean word.
     const w2 = await repo.saveWord({ ...sample, term: 'other' }, NOW);
-    const straightCorrect = await repo.recordReview(w2.id, 4, 'typing', NOW);
+    const straightCorrect = await repo.recordReview(w2.id, 4, 'typing', 'forward', NOW);
 
     // The user typo'd it, got marked wrong, then corrected it.
-    await repo.recordReview(w.id, 1, 'typing', NOW);
+    await repo.recordReview(w.id, 1, 'typing', 'forward', NOW);
     const corrected = await repo.correctReview(w.id, preReviewState, 4, NOW, later(5_000));
 
     expect(corrected.srsState).toEqual(straightCorrect.srsState);
@@ -349,7 +349,7 @@ describe('correctReview (fixing a wrongly-graded typo after the fact)', () => {
   it('overwrites the existing log entry rather than adding a second one', async () => {
     const w = await repo.saveWord(sample, NOW);
     const preReviewState = w.srsState;
-    await repo.recordReview(w.id, 1, 'typing', NOW);
+    await repo.recordReview(w.id, 1, 'typing', 'forward', NOW);
     await repo.correctReview(w.id, preReviewState, 4, NOW, later(5_000));
 
     const logs = await repo.getReviewLogs(w.id);
@@ -366,8 +366,8 @@ describe('getAllReviewLogs (across every word and language, for Progress stats)'
       { ...sample, term: 'casa', translation: 'дом', langTo: 'es' },
       NOW,
     );
-    await repo.recordReview(b.id, 5, 'typing', later(1000));
-    await repo.recordReview(a.id, 3, 'typing', NOW);
+    await repo.recordReview(b.id, 5, 'typing', 'forward', later(1000));
+    await repo.recordReview(a.id, 3, 'typing', 'forward', NOW);
     const logs = await repo.getAllReviewLogs();
     expect(logs).toHaveLength(2);
     expect(logs[0]!.wordId).toBe(a.id); // NOW comes before later(1000)
@@ -393,8 +393,8 @@ describe('per-word algorithm', () => {
     const sm2Word = await repo.saveWord(sample, NOW, 'sm2');
     const leitnerWord = await repo.saveWord({ ...sample, term: 'candor' }, NOW, 'leitner');
 
-    const afterSm2 = await repo.recordReview(sm2Word.id, 4, 'typing', NOW);
-    const afterLeitner = await repo.recordReview(leitnerWord.id, 4, 'typing', NOW);
+    const afterSm2 = await repo.recordReview(sm2Word.id, 4, 'typing', 'forward', NOW);
+    const afterLeitner = await repo.recordReview(leitnerWord.id, 4, 'typing', 'forward', NOW);
 
     expect(afterSm2.srsState.algo).toBe('sm2');
     expect(afterLeitner.srsState.algo).toBe('leitner');
@@ -411,7 +411,7 @@ describe('per-word algorithm', () => {
     it('switches the algorithm and resets progress to fresh/due-now', async () => {
       let w = await repo.saveWord(sample, NOW, 'sm2');
       for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
-        w = await repo.recordReview(w.id, 4, 'typing', NOW); // walk the full learning ladder to graduate
+        w = await repo.recordReview(w.id, 4, 'typing', 'forward', NOW); // walk the full learning ladder to graduate
       }
       expect(w.srsState.intervalDays).toBeGreaterThan(0);
 
