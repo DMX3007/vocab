@@ -40,14 +40,12 @@ describe('GENTLE_CONFIG', () => {
     expect(final.intervalDays).toBe(1);
   });
 
-  it("grade 5 (\"easy\") can skip ahead right after the single mandatory rep", () => {
+  it('grade 5 ("easy") still walks the ladder — no shortcut, even on gentle\'s short one', () => {
     const sm2 = createScheduler('sm2', GENTLE_CONFIG);
     let s = initialState('sm2', NOW, 'aggressive');
-    s = sm2.schedule(s, 4, NOW); // clear the one-step burst
-    expect(s.stepIndex).toBe(GENTLE_CONFIG.learningBurstSteps);
     s = sm2.schedule(s, 5, NOW);
-    expect(s.phase).toBe('review');
-    expect(s.intervalDays).toBe(GENTLE_CONFIG.graduatingIntervalDays);
+    expect(s.phase).toBe('learning'); // one step, not straight to graduation
+    expect(s.stepIndex).toBe(1);
   });
 });
 

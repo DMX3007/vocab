@@ -25,33 +25,36 @@ describe('initial state', () => {
   });
 });
 
-describe('learning phase (mandatory burst, then escalating pauses)', () => {
+describe('learning phase (same-sitting burst, then escalating pauses)', () => {
   it('correct answer advances one step; the first wait is 25 seconds', () => {
     const s0 = initialState('sm2', NOW);
-    // default ladder: 5-step mandatory burst (25s each), then 15m/30m/45m/2h/6h/1d/2d/3d
+    // default ladder: 5x 25s reps, then 15m/30m/45m/2h/6h/1d/2d/3d
     const s1 = sm2.schedule(s0, 4, NOW);
     expect(s1.phase).toBe('learning');
     expect(s1.stepIndex).toBe(1);
     expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
-  it('grade 5 ("easy") during the mandatory burst does NOT skip ahead', () => {
+  it('grade 5 ("easy") advances exactly one step, same as any other pass — no shortcut past the ladder', () => {
+    // The schedule a word ends up on must always match the ladder shown in
+    // the Plan tab, never depend on how easy or fast an answer felt.
     const s0 = initialState('sm2', NOW);
-    const s1 = sm2.schedule(s0, 5, NOW); // still inside the burst (step 0 < burstSteps)
-    expect(s1.phase).toBe('learning'); // no early graduation
-    expect(s1.stepIndex).toBe(1);
-    expect(s1.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
+    const easy = sm2.schedule(s0, 5, NOW);
+    const normal = sm2.schedule(s0, 4, NOW);
+    expect(easy).toEqual(normal);
+    expect(easy.phase).toBe('learning');
+    expect(easy.stepIndex).toBe(1);
+    expect(easy.dueAt.getTime()).toBe(NOW.getTime() + sec(25));
   });
 
-  it('grade 5 ("easy") past the mandatory burst graduates immediately, at the same interval the full ladder earns', () => {
+  it('even a run of all-grade-5 passes still walks the entire ladder before graduating', () => {
     let s: SrsState = initialState('sm2', NOW);
-    for (let i = 0; i < DEFAULT_CONFIG.learningBurstSteps; i++) s = sm2.schedule(s, 4, NOW); // clear the burst
-    expect(s.stepIndex).toBe(DEFAULT_CONFIG.learningBurstSteps);
-
-    s = sm2.schedule(s, 5, NOW); // now past the burst -> easy can skip
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length - 1; i++) {
+      s = sm2.schedule(s, 5, NOW);
+      expect(s.phase).toBe('learning'); // never jumps to 'review' early
+    }
+    s = sm2.schedule(s, 5, NOW); // the final step graduates, same as any pass would
     expect(s.phase).toBe('review');
-    // Not a shortcut to a BIGGER interval than patient full completion —
-    // see graduatingIntervalDays's doc comment.
     expect(s.intervalDays).toBe(DEFAULT_CONFIG.graduatingIntervalDays);
   });
 
@@ -85,7 +88,7 @@ describe('learning phase (mandatory burst, then escalating pauses)', () => {
   it('failed answer resets to the start of the burst, no matter how far along it was', () => {
     let s: SrsState = initialState('sm2', NOW);
     for (let i = 0; i < 7; i++) s = sm2.schedule(s, 4, NOW); // deep into the escalation phase
-    expect(s.stepIndex).toBeGreaterThan(DEFAULT_CONFIG.learningBurstSteps);
+    expect(s.stepIndex).toBe(7);
 
     s = sm2.schedule(s, 1, NOW); // fail
     expect(s.phase).toBe('learning');

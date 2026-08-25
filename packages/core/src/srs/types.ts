@@ -39,27 +39,21 @@ export interface SrsState {
 }
 
 export interface SchedulerConfig {
-  /** in-day repetition steps for new words, in SECONDS: a mandatory
-   *  rapid-fire burst (see learningBurstSteps) followed by escalating
-   *  pauses, so a brand-new word gets drilled hard before it's ever
-   *  trusted with a multi-day gap. */
+  /** in-day repetition steps for new words, in SECONDS: a rapid-fire burst
+   *  followed by escalating pauses, so a brand-new word gets drilled
+   *  through every step before it's ever trusted with a multi-day gap.
+   *  Every pass advances exactly one step regardless of how easy or fast
+   *  it felt — see sm2.ts's scheduleLearning — so a word's actual schedule
+   *  always matches this ladder, never a shortcut past it. */
   learningStepsSec: number[];
-  /** how many of the LEADING learningStepsSec are mandatory — even a
-   *  perfect/instant answer can't skip past these. Only once a word is
-   *  past this many steps can grade 5 ("easy") jump straight to
-   *  graduation; answering fast on a word's very first rep doesn't prove
-   *  it's actually memorized long-term, it's just fresh in memory. */
-  learningBurstSteps: number;
   /** steps after a lapse, minutes */
   relearningStepsMin: number[];
-  /** First review interval after graduating learning, days — whether
-   *  graduated by walking the whole ladder or by an early grade-5 ("easy")
-   *  skip past the mandatory burst (see sm2.ts's scheduleLearning). Kept
-   *  at the "curve of remembering" convention every mainstream SRS uses:
-   *  the first real spaced check is ~1 day out regardless of how much
-   *  same-day drilling preceded it — ease-based multiplicative growth
-   *  (scheduleReview) is what builds the actual long-interval curve from
-   *  there, not a big manual first jump. */
+  /** First review interval after graduating learning (walking the whole
+   *  ladder above), days. Kept at the "curve of remembering" convention
+   *  every mainstream SRS uses: the first real spaced check is ~1 day out
+   *  regardless of how much same-day drilling preceded it — ease-based
+   *  multiplicative growth (scheduleReview) is what builds the actual
+   *  long-interval curve from there, not a big manual first jump. */
   graduatingIntervalDays: number;
   /** floor for the ease factor */
   minEase: number;
@@ -72,11 +66,14 @@ const MIN = 60;
 const HOUR = 3_600;
 const DAY = 86_400;
 
-// Three hand-tuned ladders, all sharing the same shape (a mandatory
-// same-sitting burst, then an escalating same-day-to-week ladder, then
-// classic SM-2 ease-based growth) but differing in how many touches a word
-// gets and how fast it graduates. Aggressive is the original ladder this
-// app shipped with; Gentle and Standard trade drilling depth for speed.
+// Three hand-tuned ladders, all sharing the same shape (a same-sitting
+// burst, then an escalating same-day-to-week ladder, then classic SM-2
+// ease-based growth) but differing in how many touches a word gets and how
+// long that ladder runs before graduating. Aggressive is the original
+// ladder this app shipped with; Gentle and Standard trade drilling depth
+// for speed. Every step is walked in order regardless of how easy or fast
+// an answer felt — see sm2.ts's scheduleLearning — so this ladder IS the
+// schedule, not just what a lucky run might land on.
 //
 // A note on indexing: learningStepsSec[0] is never experienced on a clean
 // pass — a pass at stepIndex i waits learningStepsSec[i+1] (see sm2.ts's
@@ -88,12 +85,11 @@ export const GENTLE_CONFIG: SchedulerConfig = {
   // 25s x1 -> 10m -> 2h -> 1d, graduating at 1d.
   learningStepsSec: [
     25 * SEC, // 0: also the "just failed" retry delay
-    25 * SEC, // 1: the one mandatory burst rep
+    25 * SEC, // 1: the one same-sitting burst rep
     10 * MIN, // 2
     2 * HOUR, // 3
     1 * DAY, // 4
   ],
-  learningBurstSteps: 1,
   relearningStepsMin: [10],
   graduatingIntervalDays: 1,
   minEase: 1.3,
@@ -114,7 +110,6 @@ export const STANDARD_CONFIG: SchedulerConfig = {
     1 * DAY, // 8
     2 * DAY, // 9
   ],
-  learningBurstSteps: 2,
   relearningStepsMin: [10],
   graduatingIntervalDays: 1,
   minEase: 1.3,
@@ -146,7 +141,6 @@ export const AGGRESSIVE_CONFIG: SchedulerConfig = {
     2 * DAY, // 12
     3 * DAY, // 13
   ],
-  learningBurstSteps: 5,
   relearningStepsMin: [10],
   graduatingIntervalDays: 1,
   minEase: 1.3,

@@ -9,10 +9,7 @@ import {
   type SrsState,
 } from './types.js';
 
-const PERFECT_GRADE: Grade = 5;
-
 const isFailed = isFailedGrade;
-const isPerfect = (grade: Grade): boolean => grade === PERFECT_GRADE;
 
 // A review interval can never be shorter than one day.
 const MINIMUM_REVIEW_INTERVAL_DAYS = 1;
@@ -49,9 +46,6 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
   // not silently mis-schedule reviews later.
   if (learningSteps.length === 0) throw new Error('learningStepsSec must not be empty');
   if (relearningSteps.length === 0) throw new Error('relearningStepsMin must not be empty');
-  if (config.learningBurstSteps < 0 || config.learningBurstSteps > learningSteps.length) {
-    throw new Error('learningBurstSteps must be between 0 and learningStepsSec.length');
-  }
 
   const secondsAtStep = (steps: number[], index: number): number => {
     const seconds = steps[index];
@@ -76,10 +70,10 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
   });
 
   /** New word: a mandatory rapid-fire burst, then escalating pauses, then
-   *  graduate. A confident "easy" answer can only skip ahead once the
-   *  mandatory burst is behind it (see learningBurstSteps) — answering
-   *  fast right after adding a word doesn't prove it's memorized
-   *  long-term, it's just sitting in short-term memory. Failing at any
+   *  graduate. Every pass — however confident or fast — advances exactly
+   *  one step; there's no shortcut past the ladder for an easy/instant
+   *  answer, so the interval a word ends up on always matches the ladder
+   *  shown in the Plan tab, not how easy answering felt. Failing at any
    *  point resets all the way back to the start of the burst: the word
    *  gets drilled as many times as it takes. */
   const scheduleLearning = (state: SrsState, grade: Grade, now: Date): SrsState => {
@@ -90,15 +84,6 @@ export function createSm2(config: SchedulerConfig): SrsAlgorithm {
         lapses: state.lapses + 1,
         dueAt: addSeconds(now, secondsAtStep(learningSteps, 0)),
       };
-    }
-
-    const pastMandatoryBurst = state.stepIndex >= config.learningBurstSteps;
-    if (isPerfect(grade) && pastMandatoryBurst) {
-      // Confidently correct, and the mandatory drilling is already done —
-      // skip the remaining escalation steps and graduate at the same
-      // interval walking them would have earned. Not a shortcut to a
-      // BIGGER interval — see graduatingIntervalDays's doc comment.
-      return enterReviewPhase(state, config.graduatingIntervalDays, now);
     }
 
     const nextStepIndex = state.stepIndex + 1;
