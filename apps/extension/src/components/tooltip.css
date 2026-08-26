@@ -461,8 +461,16 @@ img.ach-badge {
   cursor: text;
 }
 
+.vf-card-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .vf-card-input {
   width: 100%;
+  flex: 1;
   padding: 12px 14px;
   border: 1px solid rgba(28, 26, 23, 0.12);
   border-radius: 12px;
@@ -471,7 +479,6 @@ img.ach-badge {
   font-size: 15px;
   outline: none;
   box-sizing: border-box;
-  margin-top: 14px;
   position: relative;
 }
 
@@ -482,6 +489,33 @@ img.ach-badge {
 .vf-card-input:disabled,
 .vf-card-input:read-only {
   opacity: 0.8;
+}
+
+.vf-mic-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(28, 26, 23, 0.12);
+  border-radius: 12px;
+  background: #faf7f2;
+  color: #6b5c50;
+  cursor: pointer;
+}
+
+.vf-mic-btn:hover { background: rgba(28, 26, 23, 0.06); }
+
+.vf-mic-btn.listening {
+  background: #a5311f;
+  border-color: #a5311f;
+  color: #fff;
+  animation: vf-mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes vf-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(165, 49, 31, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(165, 49, 31, 0); }
 }
 
 .vf-card-actions,

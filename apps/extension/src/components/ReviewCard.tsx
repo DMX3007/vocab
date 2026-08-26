@@ -8,6 +8,7 @@ import { shouldSuggestShelving } from '../lib/review/library';
 import { diffChars } from '../lib/review/diff';
 import { maskSpoilers } from '../lib/review/spoiler-mask';
 import { useI18n } from '../lib/i18n';
+import { isSpeechRecognitionSupported, listen, type VoiceListenHandle } from '../lib/voice/speech-recognition';
 
 interface Props {
   session: ReviewSession;
@@ -33,13 +34,30 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   const [shelving, setShelving] = useState(false);
   const [marking, setMarking] = useState(false);
   const [dictInfo, setDictInfo] = useState<Word['dictionary']>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number>(Date.now());
+  const voiceHandleRef = useRef<VoiceListenHandle | null>(null);
+  /** Whether the CURRENT card's answer came from voice input — logged as
+   *  the review's mode (see session.answer's `mode` param). Reset on every
+   *  new card, not just on submit, so switching cards mid-listen doesn't
+   *  leak a stale "voice" label onto a later typed answer. */
+  const usedVoiceRef = useRef(false);
 
   useEffect(() => {
     inputRef.current?.focus();
     startedAt.current = Date.now();
+    usedVoiceRef.current = false;
+    // A new card (including via shuffle) must stop any in-flight listening
+    // from the PREVIOUS card — otherwise a late result could fill the new
+    // card's input with an answer meant for a different word.
+    voiceHandleRef.current?.stop();
+    setListening(false);
+    setVoiceError(null);
   }, [card]);
+
+  useEffect(() => () => void voiceHandleRef.current?.stop(), []);
 
   // Fetches the example/definition only once the verdict is up — after the
   // user's already tried to recall the word, never as a hint beforehand.
@@ -64,7 +82,7 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
     setChecking(true);
     const latencyMs = Date.now() - startedAt.current;
     try {
-      const result = await session.answer(answer, { latencyMs }, new Date());
+      const result = await session.answer(answer, { latencyMs }, new Date(), usedVoiceRef.current ? 'voice' : 'typing');
       setVerdict(result);
     } catch (err) {
       console.error(err, 'Error: while checking answer');
@@ -75,9 +93,11 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   }
 
   function next() {
+    voiceHandleRef.current?.stop();
     setVerdict(null);
     setAnswer('');
     setError(null);
+    setVoiceError(null);
     setShelveSuggestionDismissed(false);
     setDone((d) => ({ ...d, index: d.index + 1 }));
     if (session.isFinished) {
@@ -85,6 +105,41 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
       return;
     }
     setCard(session.currentCard);
+  }
+
+  /** Toggles speech-to-text for the answer box (Ctrl/Cmd+Shift+V, or the
+   *  mic button). One listening turn ends itself on silence/a result — this
+   *  only needs to handle the "cancel early" half explicitly. Fills the
+   *  input with the transcript rather than auto-submitting: a misheard
+   *  word should be as easy to fix as a typo, not force a wrong grade. */
+  function toggleVoice() {
+    if (verdict) return;
+    if (listening) {
+      voiceHandleRef.current?.stop();
+      return;
+    }
+    setVoiceError(null);
+    setListening(true);
+    const langCode = card!.direction === 'forward' ? card!.langTo : card!.langFrom;
+    voiceHandleRef.current = listen(langCode, {
+      onResult: (transcript) => {
+        if (transcript) {
+          setAnswer(transcript);
+          usedVoiceRef.current = true;
+        }
+      },
+      onError: (code) => {
+        setVoiceError(
+          code === 'not-supported' ? t('card.voiceUnsupported')
+          : code === 'not-allowed' ? t('card.voiceDenied')
+          : t('card.voiceError'),
+        );
+      },
+      onEnd: () => {
+        setListening(false);
+        voiceHandleRef.current = null;
+      },
+    });
   }
 
   /** The user is confident their answer was actually right — a typo the
@@ -125,6 +180,11 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+      e.preventDefault(); // don't let it fall through and paste/insert 'v'
+      toggleVoice();
+      return;
+    }
     if (e.key !== 'Enter') return;
     if (verdict) { next(); return; }
     if (answer.trim() && !checking) void check();
@@ -192,20 +252,38 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
         </div>
       )}
 
-      <input
-        ref={inputRef}
-        className="vf-card-input"
-        placeholder={card.direction === 'forward' ? t('card.translationPlaceholder') : t('card.originalPlaceholder')}
-        value={answer}
-        readOnly={!!verdict}
-        // readOnly, not disabled: a disabled input blurs itself the instant
-        // it's set (moving focus out of the card entirely, which the host
-        // page's own keydown listeners are deliberately isolated from — see
-        // suppressOuterListeners in content.ts), so the very next Enter
-        // press to advance the card would go nowhere. readOnly blocks
-        // edits without giving up focus.
-        onChange={(e) => setAnswer(e.target.value)}
-      />
+      <div className="vf-card-input-row">
+        <input
+          ref={inputRef}
+          className="vf-card-input"
+          placeholder={
+            listening ? t('card.listening')
+            : card.direction === 'forward' ? t('card.translationPlaceholder')
+            : t('card.originalPlaceholder')
+          }
+          value={answer}
+          readOnly={!!verdict}
+          // readOnly, not disabled: a disabled input blurs itself the instant
+          // it's set (moving focus out of the card entirely, which the host
+          // page's own keydown listeners are deliberately isolated from — see
+          // suppressOuterListeners in content.ts), so the very next Enter
+          // press to advance the card would go nowhere. readOnly blocks
+          // edits without giving up focus.
+          onChange={(e) => setAnswer(e.target.value)}
+        />
+        {!verdict && isSpeechRecognitionSupported() && (
+          <button
+            type="button"
+            className={`vf-mic-btn ${listening ? 'listening' : ''}`}
+            onClick={toggleVoice}
+            title={t('card.voiceToggleTitle')}
+            aria-label={t('card.voiceToggleTitle')}
+          >
+            <Icon name="mic" size={16} />
+          </button>
+        )}
+      </div>
+      {voiceError && <div className="vf-hint">{voiceError}</div>}
 
       {verdict && verdict.verdict !== 'correct' && (
         <div className="vf-diff" title={t('card.diffTitle')}>

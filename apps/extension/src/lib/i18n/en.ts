@@ -264,6 +264,11 @@ export const strings = {
   'card.markCorrectTitle': "Count this as correct instead — e.g. it was just a typo",
   'card.markCorrect': 'Actually, I was right',
   'card.marking': 'Marking…',
+  'card.voiceToggleTitle': 'Speak your answer (Ctrl/Cmd+Shift+V)',
+  'card.listening': 'Listening…',
+  'card.voiceUnsupported': "Voice input isn't supported in this browser.",
+  'card.voiceDenied': 'Microphone access was denied — check this site’s permissions.',
+  'card.voiceError': "Didn't catch that — try again.",
 
   // ── Tooltip (add-word popup on the page) ─────────────────────
   'tooltip.translationPlaceholder': 'Translation...',

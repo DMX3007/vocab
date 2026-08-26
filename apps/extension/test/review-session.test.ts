@@ -194,6 +194,16 @@ describe('ReviewSession (normal mode)', () => {
     expect(await repo.getReviewLogs(w.id)).toHaveLength(1);
   });
 
+  it('defaults to "typing" mode, but records "voice" when the answer came from speech (ReviewCard\'s mic button)', async () => {
+    const w = await save('fortitude', 'стойкость', minutesAgo(30));
+    const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+    await session.start('ru', NOW);
+    await session.answer('стойкость', { latencyMs: 2000 }, NOW, 'voice');
+
+    const logs = await repo.getReviewLogs(w.id);
+    expect(logs[0]!.mode).toBe('voice');
+  });
+
   it('a snapshot session does not re-queue a word failed during it', async () => {
     await save('fortitude', 'стойкость', minutesAgo(30));
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);

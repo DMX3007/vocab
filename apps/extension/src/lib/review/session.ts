@@ -205,8 +205,12 @@ export class ReviewSession {
   /** Grades the answer, persists it (SRS + log), and advances to the next
    *  card. Grades against currentCardCache.expected — the SAME card the
    *  user was just shown — never a freshly-recomputed one; see
-   *  currentCardCache's comment for why that distinction matters. */
-  async answer(text: string, context: GradeContext, now: Date): Promise<GradeResult> {
+   *  currentCardCache's comment for why that distinction matters. `mode`
+   *  is purely a log label (voice answers are graded on the SAME
+   *  transcribed text a keyboard answer would be, via the same input box —
+   *  see ReviewCard's markLastAnsweredCorrect/voice wiring) — it doesn't
+   *  change grading, only what gets recorded for stats/limits. */
+  async answer(text: string, context: GradeContext, now: Date, mode: ReviewMode = 'typing'): Promise<GradeResult> {
     if (this.isFinished) {
       throw new Error('Cannot answer: the session is already finished.');
     }
@@ -216,7 +220,7 @@ export class ReviewSession {
     const result = gradeAnswer(text, card.expected, context);
     this.lastAnsweredPreState = word.srsState; // captured before recordReview mutates it
     this.lastAnsweredAt = now;
-    this.lastAnswered = await this.repo.recordReview(word.id, result.grade, 'typing', card.direction, now);
+    this.lastAnswered = await this.repo.recordReview(word.id, result.grade, mode, card.direction, now);
 
     this.index += 1;
     this.answeredCount += 1;

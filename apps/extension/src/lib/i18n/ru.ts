@@ -260,6 +260,11 @@ export const strings: Record<TranslationKey, string> = {
   'card.markCorrectTitle': 'Засчитать как верный ответ — например, это была просто опечатка',
   'card.markCorrect': 'На самом деле я прав(а)',
   'card.marking': 'Отмечаем…',
+  'card.voiceToggleTitle': 'Произнесите ответ (Ctrl/Cmd+Shift+V)',
+  'card.listening': 'Слушаю…',
+  'card.voiceUnsupported': 'Голосовой ввод не поддерживается в этом браузере.',
+  'card.voiceDenied': 'Доступ к микрофону запрещён — проверьте разрешения этого сайта.',
+  'card.voiceError': 'Не удалось распознать — попробуйте ещё раз.',
 
   // ── Tooltip (add-word popup on the page) ─────────────────────
   'tooltip.translationPlaceholder': 'Перевод...',
