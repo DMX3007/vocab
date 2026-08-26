@@ -82,9 +82,24 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
     if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
     setListening(false);
     setVoiceError(null);
-    if (voiceModeEnabled && card) startListening();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card]);
+
+  // Deliberately a SEPARATE effect from the per-card reset above, keyed on
+  // BOTH card and voiceModeEnabled — not folded into the reset effect above
+  // (which only depends on `card`). Two real timing gaps that fix depends
+  // on: (1) voiceModeEnabled loads from storage ASYNCHRONOUSLY, well after
+  // the first card's own [card] effect has already run once with its
+  // stale initial `false` — since a real session only ever shows ONE card
+  // (maxCards: 1), that effect would never get a second chance to see the
+  // loaded value. (2) toggling the mode ON from the popup mid-review, with
+  // a card already open, must arm THAT card immediately, not wait for a
+  // next one that (per (1)) may never come. Re-running whenever either
+  // value changes covers both: startListening() itself is a safe no-op if
+  // a turn's already in flight or a verdict's already showing.
+  useEffect(() => {
+    if (voiceModeEnabled && card && !verdict) startListening();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card, voiceModeEnabled]);
 
   useEffect(() => () => {
     voiceHandleRef.current?.stop();
@@ -190,16 +205,18 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
 
   /** The mic button / Ctrl-Shift-V shortcut now toggles the PERSISTENT
    *  voice-mode setting (shared with the popup's Review tab), not just
-   *  this one card's listening — turning it on starts listening
-   *  immediately for the card on screen; turning it off stops whatever's
-   *  in flight and every future card goes back to normal typing. */
+   *  this one card's listening — turning it on arms the card on screen;
+   *  turning it off stops whatever's in flight and every future card goes
+   *  back to normal typing. Deliberately does NOT call startListening()
+   *  itself when turning on — the [card, voiceModeEnabled] effect above
+   *  already reacts to this same setVoiceModeEnabled and does that, and
+   *  calling it from both places risked two overlapping recognition
+   *  sessions racing on stale `listening` closures. */
   async function toggleVoiceMode() {
     const enabled = !voiceModeEnabled;
     setVoiceModeEnabled(enabled); // optimistic — settingsStore.subscribe will confirm it right behind this
     await settingsStore.update((s) => ({ ...s, voiceReviewEnabled: enabled }));
-    if (enabled) {
-      startListening();
-    } else {
+    if (!enabled) {
       voiceHandleRef.current?.stop();
     }
   }
