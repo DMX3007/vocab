@@ -18,18 +18,37 @@ export function wordStatus(word: Word, now: Date): WordStatus {
   return 'fresh';
 }
 
-/** A word that hasn't graduated its algorithm's first ladder step yet: SM-2
- *  still walking the learning steps, or Leitner never reviewed at all.
- *  Same "fresh" bucket wordStatus() reports, exposed on its own since the
- *  review queue needs it independently of the due/mastered/learning label. */
+/** A word that has never actually been attempted — saved, but not answered
+ *  even once (right or wrong). The mirror image of isBurstWord below; see
+ *  its comment for why `lapses` has to be checked alongside `stepIndex`
+ *  (a wrong answer resets stepIndex to 0, so stepIndex alone can't tell
+ *  "just missed it" apart from "never tried").
+ *
+ *  Deliberately NOT `intervalDays === 0`, which is what this used to be:
+ *  intervalDays stays 0 for a word's WHOLE learning ladder (scheduleLearning
+ *  never touches it — only graduating does), so that test called a word
+ *  "fresh" through all 14 default learning steps, not just when brand-new.
+ *  Paired with sortForReview's absolute fresh-first rule and a one-card
+ *  session, that starved the repeat backlog outright — see sortForReview. */
 export function isFreshWord(word: Word): boolean {
-  return word.srsState.intervalDays === 0;
+  const { stepIndex, lapses, repetitions } = word.srsState;
+  return stepIndex === 0 && lapses === 0 && repetitions === 0;
 }
 
-/** Review queue order: brand-new words first (so learning stays a priority
- *  instead of getting crowded out by an ever-growing repeat backlog), then
- *  everything else most-overdue first. Each group keeps its own due-order
- *  internally — this only decides which group goes first. */
+/** Review queue order: never-attempted words first (so a word you just saved
+ *  gets started promptly instead of sitting behind a long backlog), then
+ *  everything else most-overdue first.
+ *
+ *  That head start is deliberately ONE-SHOT — it lasts only until a word's
+ *  first answer, not for its whole learning ladder. Absolute priority for
+ *  an entire phase can't just delay the other group, it starves it forever
+ *  whenever the priority group keeps refilling: learning steps are ~25
+ *  SECONDS apart, so a handful of half-learned words re-enter the queue
+ *  continuously and, with one card graded per session (maxCards), nothing
+ *  that had graduated would ever come up again — words piling up "due" in
+ *  the popup for hours while review kept serving the same few. Once a word
+ *  has been touched once it competes on plain overdue-ness like everything
+ *  else, so no word can be crowded out indefinitely. */
 export function sortForReview(words: Word[]): Word[] {
   return [...words].sort((a, b) => {
     const aFresh = isFreshWord(a);

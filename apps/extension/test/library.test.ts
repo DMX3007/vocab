@@ -103,26 +103,53 @@ describe('filterWords', () => {
   });
 });
 
+/** Never answered at all: the state initialState() hands a just-saved word. */
+const untouched = { stepIndex: 0, lapses: 0, repetitions: 0 } as const;
+
 describe('isFreshWord', () => {
-  it('true while intervalDays is still 0 (never graduated the first ladder step)', () => {
-    expect(isFreshWord(word({ srsState: { intervalDays: 0 } }))).toBe(true);
+  it('true for a word that has never been answered', () => {
+    expect(isFreshWord(word({ srsState: { ...untouched } }))).toBe(true);
   });
-  it('false once the interval has grown at all', () => {
-    expect(isFreshWord(word({ srsState: { intervalDays: 1 } }))).toBe(false);
+
+  it('false once it has been answered even once — including mid-learning-ladder', () => {
+    // The regression this whole helper was rewritten for: a word part-way
+    // through the learning ladder still has intervalDays === 0 (only
+    // graduating sets it), so the old intervalDays-based test called this
+    // "fresh" for all 14 default steps.
+    expect(isFreshWord(word({ srsState: { ...untouched, stepIndex: 1, intervalDays: 0 } }))).toBe(false);
+  });
+
+  it('false after a miss, which resets stepIndex but bumps lapses', () => {
+    expect(isFreshWord(word({ srsState: { ...untouched, lapses: 1 } }))).toBe(false);
+  });
+
+  it('false for a graduated word', () => {
+    expect(isFreshWord(word({ srsState: { repetitions: 1, intervalDays: 4 } }))).toBe(false);
   });
 });
 
 describe('sortForReview', () => {
-  it('puts every fresh word ahead of every repeat word, regardless of due order', () => {
-    const overdueRepeat = word({ id: 'overdue-repeat', srsState: { intervalDays: 10, dueAt: new Date(NOW.getTime() - 1_000_000) } });
-    const newerFresh = word({ id: 'newer-fresh', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 1_000) } });
-    // the repeat word is far more overdue, but the fresh word must still come first
+  it('puts a never-answered word ahead of a repeat word, regardless of due order', () => {
+    const overdueRepeat = word({ id: 'overdue-repeat', srsState: { repetitions: 3, intervalDays: 10, dueAt: new Date(NOW.getTime() - 1_000_000) } });
+    const newerFresh = word({ id: 'newer-fresh', srsState: { ...untouched, dueAt: new Date(NOW.getTime() - 1_000) } });
+    // the repeat word is far more overdue, but a word never once attempted still leads
     expect(sortForReview([overdueRepeat, newerFresh]).map((w) => w.id)).toEqual(['newer-fresh', 'overdue-repeat']);
   });
 
-  it('orders within the fresh group by due time, most-overdue first', () => {
-    const freshA = word({ id: 'a', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 5_000) } });
-    const freshB = word({ id: 'b', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 50_000) } });
+  it('REGRESSION: a half-learned word no longer outranks a badly-overdue one', () => {
+    // The reported bug: learning steps are ~25s apart, so half-learned words
+    // re-enter the queue constantly. When they counted as "fresh" they took
+    // absolute priority forever and words due hours ago simply piled up in
+    // the popup, never reaching the card. Now only NEVER-ANSWERED words get
+    // that head start, so overdue-ness decides between these two.
+    const justDrilled = word({ id: 'half-learned', srsState: { stepIndex: 3, repetitions: 0, intervalDays: 0, dueAt: new Date(NOW.getTime() - 25_000) } });
+    const hoursOverdue = word({ id: 'hours-overdue', srsState: { repetitions: 2, intervalDays: 4, dueAt: new Date(NOW.getTime() - 3 * 3_600_000) } });
+    expect(sortForReview([justDrilled, hoursOverdue]).map((w) => w.id)).toEqual(['hours-overdue', 'half-learned']);
+  });
+
+  it('orders within the never-answered group by due time, most-overdue first', () => {
+    const freshA = word({ id: 'a', srsState: { ...untouched, dueAt: new Date(NOW.getTime() - 5_000) } });
+    const freshB = word({ id: 'b', srsState: { ...untouched, dueAt: new Date(NOW.getTime() - 50_000) } });
     expect(sortForReview([freshA, freshB]).map((w) => w.id)).toEqual(['b', 'a']);
   });
 
@@ -133,8 +160,8 @@ describe('sortForReview', () => {
   });
 
   it('does not mutate the input array (order stays as given, even though the result reorders)', () => {
-    const repeat = word({ id: 'repeat', srsState: { intervalDays: 10, dueAt: new Date(NOW.getTime() - 1_000_000) } });
-    const fresh = word({ id: 'fresh', srsState: { intervalDays: 0, dueAt: new Date(NOW.getTime() - 1_000) } });
+    const repeat = word({ id: 'repeat', srsState: { repetitions: 3, intervalDays: 10, dueAt: new Date(NOW.getTime() - 1_000_000) } });
+    const fresh = word({ id: 'fresh', srsState: { ...untouched, dueAt: new Date(NOW.getTime() - 1_000) } });
     const words = [repeat, fresh]; // already in "repeat first" order — sortForReview must flip the OUTPUT, not this array
     const result = sortForReview(words);
     expect(words.map((w) => w.id)).toEqual(['repeat', 'fresh']); // input untouched

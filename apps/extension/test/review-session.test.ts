@@ -92,6 +92,41 @@ describe('ReviewSession (normal mode)', () => {
     expect(session.total).toBe(1); // with the default one-card cap, the repeat word doesn't even get queued
   });
 
+  it('REGRESSION: a badly-overdue word is not starved by words still walking the learning ladder', async () => {
+    // The reported bug, end to end: words showed as due in the popup for
+    // hours but never reached the card. Learning steps are ~25s apart, so
+    // half-learned words re-enter the queue constantly; while they counted
+    // as "fresh" they took absolute priority, and with one card graded per
+    // session (maxCards) nothing past the learning phase ever came up.
+    const overdue = await save('candor', 'откровенность', minutesAgo(60 * 24 * 30));
+    const longAgo = new Date(NOW.getTime() - 10 * 24 * 60 * 60_000);
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) {
+      await repo.recordReview(overdue.id, 4, 'typing', 'forward', longAgo); // graduate it, then leave it overdue
+    }
+
+    // Three words mid-ladder: each answered once, so each is due again in ~25s.
+    for (const term of ['alpha', 'beta', 'gamma']) {
+      const w = await save(term, `${term}-ru`, minutesAgo(5));
+      await repo.recordReview(w.id, 4, 'typing', 'forward', minutesAgo(5));
+    }
+
+    // Every one-card session, 30s apart — enough for the 25s steps to keep
+    // re-qualifying, which is exactly what used to crowd the backlog out.
+    const served: string[] = [];
+    let clock = NOW;
+    for (let i = 0; i < 6; i++) {
+      const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
+      await session.start('ru', clock);
+      const card = session.currentCard;
+      if (!card) break;
+      served.push(card.term);
+      await session.answer(card.expected[0]!, { latencyMs: 1000 }, clock);
+      clock = new Date(clock.getTime() + 30_000);
+    }
+    // It must come up promptly, not after the learning words cycle forever.
+    expect(served).toContain('candor');
+  });
+
   it('each card exposes a direction and what to show vs. what to ask', async () => {
     await save('fortitude', 'стойкость', minutesAgo(30));
     const session = new ReviewSession(repo, { mode: 'normal' }, forwardRng);
