@@ -56,6 +56,14 @@ export interface OverlaySettings {
    *  unlocked set against this is what tells a *new* unlock apart from one
    *  the user's already seen. */
   seenAchievements: string[];
+  /** Hands-free review: when on, every card auto-starts listening (no mic
+   *  button press needed), a transcript auto-submits for grading, and a
+   *  correct verdict auto-advances to the next card after a beat — a wrong
+   *  one stops and waits for Next/Finish like normal, so the mistake stays
+   *  on screen instead of flashing past. Toggleable from the Review tab
+   *  (Popup) or the mic button on the card itself; either one flips this
+   *  same stored value, shared via chrome.storage across every context. */
+  voiceReviewEnabled: boolean;
 }
 
 export function defaultSettings(): OverlaySettings {
@@ -78,6 +86,7 @@ export function defaultSettings(): OverlaySettings {
     lastMilestoneAwarded: 0,
     lastStreakReminderDate: null,
     seenAchievements: [],
+    voiceReviewEnabled: false,
   };
 }
 

@@ -19,6 +19,11 @@ interface Props {
   algo: AlgoId;
   pace: Pace;
   onAlgoChange: (algo: AlgoId, pace: Pace) => void;
+  /** Hands-free review — see OverlaySettings.voiceReviewEnabled's doc
+   *  comment for exactly what this turns on. Toggling here or from the mic
+   *  button on an open card flips the same stored value either way. */
+  voiceReviewEnabled: boolean;
+  onVoiceReviewEnabledChange: (enabled: boolean) => void;
   onStartReview: (algoFilter: AlgoFilter) => void;
   /** Unshelves the single oldest-shelved word and starts a review on it —
    *  offered only once nothing else is due (see the empty state below). */
@@ -65,7 +70,10 @@ function formatLadder(p: LadderProgress, t: ReturnType<typeof useI18n>['t']): st
   }
 }
 
-export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, algo, pace, onAlgoChange, onStartReview, onReviveShelved, ready, onDueCountChange }: Props) {
+export function ReviewPane({
+  words, logs, dueCount, targetLang, onLangChange, algo, pace, onAlgoChange,
+  voiceReviewEnabled, onVoiceReviewEnabledChange, onStartReview, onReviveShelved, ready, onDueCountChange,
+}: Props) {
   const { t, tp } = useI18n();
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
   const [now, setNow] = useState(() => Date.now());
@@ -154,6 +162,18 @@ export function ReviewPane({ words, logs, dueCount, targetLang, onLangChange, al
               ))}
             </select>
           </span>
+        </div>
+        <div className="tray-row full">
+          <span className="tray-label">{t('review.voiceMode')}</span>
+          <label className="toggle-switch" title={t('review.voiceModeHint')}>
+            <input
+              type="checkbox"
+              checked={voiceReviewEnabled}
+              onChange={(e) => onVoiceReviewEnabledChange(e.target.checked)}
+              disabled={!ready}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
         </div>
       </div>
 

@@ -9,6 +9,16 @@ import { diffChars } from '../lib/review/diff';
 import { maskSpoilers } from '../lib/review/spoiler-mask';
 import { useI18n } from '../lib/i18n';
 import { isSpeechRecognitionSupported, listen, type VoiceListenHandle } from '../lib/voice/speech-recognition';
+import { SettingsStore } from '../lib/review/settings-store';
+
+// A correct auto-submitted (voice mode) verdict lingers on screen this long
+// before auto-advancing — long enough to register "+10 XP" actually
+// happened, short enough that hands-free review still feels continuous. A
+// WRONG verdict never auto-advances at all (see submitAnswer) — the whole
+// point of stopping there is to make the user look at the mistake.
+const VOICE_AUTO_ADVANCE_DELAY_MS = 900;
+
+const settingsStore = new SettingsStore(browser.storage.local);
 
 interface Props {
   session: ReviewSession;
@@ -36,9 +46,16 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   const [dictInfo, setDictInfo] = useState<Word['dictionary']>(null);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  /** Hands-free mode (OverlaySettings.voiceReviewEnabled) — a value shared
+   *  with the popup's Review tab via chrome.storage, not local UI state:
+   *  toggling it here must show up there and vice versa. Loaded once and
+   *  kept live via subscribe() so flipping it from the popup mid-review
+   *  takes effect on the very next card without needing to reopen anything. */
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number>(Date.now());
   const voiceHandleRef = useRef<VoiceListenHandle | null>(null);
+  const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Whether the CURRENT card's answer came from voice input — logged as
    *  the review's mode (see session.answer's `mode` param). Reset on every
    *  new card, not just on submit, so switching cards mid-listen doesn't
@@ -46,18 +63,33 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   const usedVoiceRef = useRef(false);
 
   useEffect(() => {
+    void settingsStore.load().then((s) => setVoiceModeEnabled(s.voiceReviewEnabled));
+    settingsStore.subscribe((s) => setVoiceModeEnabled(s.voiceReviewEnabled));
+    // No unsubscribe: StorageArea.onChanged has no removeListener in this
+    // app's shared interface (see settings-store.ts) — matches every other
+    // long-lived subscribe() in this codebase (e.g. content.ts's own).
+  }, []);
+
+  useEffect(() => {
     inputRef.current?.focus();
     startedAt.current = Date.now();
     usedVoiceRef.current = false;
     // A new card (including via shuffle) must stop any in-flight listening
-    // from the PREVIOUS card — otherwise a late result could fill the new
-    // card's input with an answer meant for a different word.
+    // AND cancel any pending auto-advance from the PREVIOUS card — otherwise
+    // a late result/timer could fill in or skip past an answer meant for a
+    // different word.
     voiceHandleRef.current?.stop();
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
     setListening(false);
     setVoiceError(null);
+    if (voiceModeEnabled && card) startListening();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card]);
 
-  useEffect(() => () => void voiceHandleRef.current?.stop(), []);
+  useEffect(() => () => {
+    voiceHandleRef.current?.stop();
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+  }, []);
 
   // Fetches the example/definition only once the verdict is up — after the
   // user's already tried to recall the word, never as a hint beforehand.
@@ -76,14 +108,25 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verdict]);
 
-  async function check() {
+  /** Grades `text` and shows the verdict. Shared by the manual Check button
+   *  (reads the typed `answer` state) and voice auto-submit (passes the
+   *  fresh transcript directly, since it can't wait for React state to
+   *  catch up within the same tick). A CORRECT verdict in voice mode
+   *  auto-advances after a beat (see VOICE_AUTO_ADVANCE_DELAY_MS) — anything
+   *  else (wrong OR almost) stops here regardless of mode: the whole point
+   *  of hands-free review is speed on the easy cards, never at the cost of
+   *  skipping past a mistake before the user's actually seen it. */
+  async function submitAnswer(text: string, mode: 'typing' | 'voice') {
     if (!card || verdict || checking) return;
     setError(null);
     setChecking(true);
     const latencyMs = Date.now() - startedAt.current;
     try {
-      const result = await session.answer(answer, { latencyMs }, new Date(), usedVoiceRef.current ? 'voice' : 'typing');
+      const result = await session.answer(text, { latencyMs }, new Date(), mode);
       setVerdict(result);
+      if (mode === 'voice' && result.verdict === 'correct') {
+        autoAdvanceTimerRef.current = setTimeout(next, VOICE_AUTO_ADVANCE_DELAY_MS);
+      }
     } catch (err) {
       console.error(err, 'Error: while checking answer');
       setError(t('card.checkError'));
@@ -92,8 +135,14 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
     }
   }
 
+  function check() {
+    if (!answer.trim() || checking) return;
+    void submitAnswer(answer, usedVoiceRef.current ? 'voice' : 'typing');
+  }
+
   function next() {
     voiceHandleRef.current?.stop();
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
     setVerdict(null);
     setAnswer('');
     setError(null);
@@ -107,26 +156,23 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
     setCard(session.currentCard);
   }
 
-  /** Toggles speech-to-text for the answer box (Ctrl/Cmd+Shift+V, or the
-   *  mic button). One listening turn ends itself on silence/a result — this
-   *  only needs to handle the "cancel early" half explicitly. Fills the
-   *  input with the transcript rather than auto-submitting: a misheard
-   *  word should be as easy to fix as a typo, not force a wrong grade. */
-  function toggleVoice() {
-    if (verdict) return;
-    if (listening) {
-      voiceHandleRef.current?.stop();
-      return;
-    }
+  /** Starts one listening turn — called automatically for every new card
+   *  while voice mode is on, and manually when turning the mode on mid-card
+   *  (see toggleVoiceMode). A result auto-submits straight away rather than
+   *  just filling the box: that's the whole difference between "voice
+   *  mode" and the old one-shot mic button (see submitAnswer for what
+   *  happens next depending on the verdict). */
+  function startListening() {
+    if (verdict || listening) return;
     setVoiceError(null);
     setListening(true);
     const langCode = card!.direction === 'forward' ? card!.langTo : card!.langFrom;
     voiceHandleRef.current = listen(langCode, {
       onResult: (transcript) => {
-        if (transcript) {
-          setAnswer(transcript);
-          usedVoiceRef.current = true;
-        }
+        if (!transcript) return;
+        setAnswer(transcript);
+        usedVoiceRef.current = true;
+        void submitAnswer(transcript, 'voice');
       },
       onError: (code) => {
         setVoiceError(
@@ -140,6 +186,22 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
         voiceHandleRef.current = null;
       },
     });
+  }
+
+  /** The mic button / Ctrl-Shift-V shortcut now toggles the PERSISTENT
+   *  voice-mode setting (shared with the popup's Review tab), not just
+   *  this one card's listening — turning it on starts listening
+   *  immediately for the card on screen; turning it off stops whatever's
+   *  in flight and every future card goes back to normal typing. */
+  async function toggleVoiceMode() {
+    const enabled = !voiceModeEnabled;
+    setVoiceModeEnabled(enabled); // optimistic — settingsStore.subscribe will confirm it right behind this
+    await settingsStore.update((s) => ({ ...s, voiceReviewEnabled: enabled }));
+    if (enabled) {
+      startListening();
+    } else {
+      voiceHandleRef.current?.stop();
+    }
   }
 
   /** The user is confident their answer was actually right — a typo the
@@ -182,12 +244,12 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
   function onKeyDown(e: React.KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
       e.preventDefault(); // don't let it fall through and paste/insert 'v'
-      toggleVoice();
+      void toggleVoiceMode();
       return;
     }
     if (e.key !== 'Enter') return;
     if (verdict) { next(); return; }
-    if (answer.trim() && !checking) void check();
+    check();
   }
 
   if (!card) {
@@ -274,10 +336,11 @@ export function ReviewCard({ session, onFinished, onLookupDictionary }: Props) {
         {!verdict && isSpeechRecognitionSupported() && (
           <button
             type="button"
-            className={`vf-mic-btn ${listening ? 'listening' : ''}`}
-            onClick={toggleVoice}
+            className={`vf-mic-btn ${voiceModeEnabled ? 'enabled' : ''} ${listening ? 'listening' : ''}`}
+            onClick={() => void toggleVoiceMode()}
             title={t('card.voiceToggleTitle')}
             aria-label={t('card.voiceToggleTitle')}
+            aria-pressed={voiceModeEnabled}
           >
             <Icon name="mic" size={16} />
           </button>

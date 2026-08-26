@@ -329,6 +329,11 @@ export function Popup() {
     await refresh();
   }
 
+  async function handleVoiceReviewEnabledChange(voiceReviewEnabled: boolean) {
+    await settingsStore.update((s) => ({ ...s, voiceReviewEnabled }));
+    await refresh();
+  }
+
   async function handleMoveAlgo(wordIds: string[], algo: AlgoId, pace: Pace) {
     await wordClient.moveWordsAlgo(wordIds, algo, new Date(), pace);
     showToast(tp('toast.movedWords', wordIds.length, { algo: algo === 'sm2' ? 'SM-2' : 'Leitner' }));
@@ -554,6 +559,8 @@ export function Popup() {
             algo={settings?.defaultAlgo ?? 'sm2'}
             pace={settings?.defaultPace ?? 'aggressive'}
             onAlgoChange={handleDefaultAlgoChange}
+            voiceReviewEnabled={settings?.voiceReviewEnabled ?? false}
+            onVoiceReviewEnabledChange={handleVoiceReviewEnabledChange}
             onStartReview={handleStartReview}
             onReviveShelved={handleReviveShelved}
             ready={ready}

@@ -506,6 +506,15 @@ img.ach-badge {
 
 .vf-mic-btn:hover { background: rgba(28, 26, 23, 0.06); }
 
+/* Voice mode is ON but this exact card isn't actively listening yet (e.g.
+ * the instant between cards, or the mode was just enabled) — a steady tint,
+ * no animation, so it reads as "armed" rather than "listening right now". */
+.vf-mic-btn.enabled {
+  background: rgba(165, 49, 31, 0.12);
+  border-color: rgba(165, 49, 31, 0.4);
+  color: #a5311f;
+}
+
 .vf-mic-btn.listening {
   background: #a5311f;
   border-color: #a5311f;
