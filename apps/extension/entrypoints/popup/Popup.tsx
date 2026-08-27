@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
+// DEMO MODE (experimental — see src/lib/demo/). Removable with its block below.
+import { DemoPane } from '../../src/components/DemoPane';
 import { DraftStore } from '../../src/lib/storage/draft-store';
 import { OverlayLockStore } from '../../src/lib/review/overlay-lock';
 import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
@@ -329,6 +331,12 @@ export function Popup() {
     await refresh();
   }
 
+  /** DEMO MODE (experimental — see src/lib/demo/). Removable. */
+  async function handleDemoModeChange(demoModeEnabled: boolean) {
+    await settingsStore.update((s) => ({ ...s, demoModeEnabled }));
+    await refresh();
+  }
+
   async function handleVoiceReviewEnabledChange(voiceReviewEnabled: boolean) {
     await settingsStore.update((s) => ({ ...s, voiceReviewEnabled }));
     await refresh();
@@ -549,7 +557,18 @@ export function Popup() {
       )}
 
       <div className="tab-body">
-        {tab === 'review' && (
+        {/* DEMO MODE (experimental — see src/lib/demo/). Takes over the
+            Review tab entirely while on, which is also what makes it
+            obvious that normal review is paused. Remove this one block
+            plus the import to drop the feature. */}
+        {tab === 'review' && settings?.demoModeEnabled && (
+          <DemoPane
+            words={words}
+            targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
+            onExit={() => void handleDemoModeChange(false)}
+          />
+        )}
+        {tab === 'review' && !settings?.demoModeEnabled && (
           <ReviewPane
             words={words}
             logs={logs}
@@ -561,6 +580,7 @@ export function Popup() {
             onAlgoChange={handleDefaultAlgoChange}
             voiceReviewEnabled={settings?.voiceReviewEnabled ?? false}
             onVoiceReviewEnabledChange={handleVoiceReviewEnabledChange}
+            onEnterDemoMode={() => void handleDemoModeChange(true)}
             onStartReview={handleStartReview}
             onReviveShelved={handleReviveShelved}
             ready={ready}

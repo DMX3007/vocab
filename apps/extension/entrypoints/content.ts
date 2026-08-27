@@ -277,6 +277,7 @@ export default defineContentScript({
       burstPollInFlight = true;
       try {
         const settings = await settingsStore.load();
+        if (settings.demoModeEnabled) return; // DEMO MODE guard (removable — see OverlaySettings)
         if (isPausedOrSnoozed(settings, new Date())) return;
         if (isBlacklisted(settings, location.hostname)) return;
 

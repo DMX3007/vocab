@@ -3038,3 +3038,86 @@ img.ach-badge {
   font-size: 12px;
   font-weight: 700;
 }
+/* ── DEMO MODE (experimental — see src/lib/demo/). Safe to delete. ── */
+.demo-enter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(100% - 28px);
+  margin: 0 14px 12px;
+  padding: 9px 12px;
+  border: 1px dashed var(--rule);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.demo-enter:hover:not(:disabled) { background: var(--paper-2); color: var(--ink); }
+.demo-enter:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.demo-pane { padding: 14px; }
+
+.demo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.demo-badge {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--heat);
+}
+.demo-sub { font-size: 12px; color: var(--ink-4); margin-top: 3px; }
+.demo-exit { flex: none; padding: 5px 10px; font-size: 11.5px; }
+
+.demo-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.demo-difficulty { display: inline-flex; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
+.demo-diff-btn {
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.demo-diff-btn.active { background: var(--paper-3); color: var(--ink); }
+.demo-generate { flex: 1; }
+
+.demo-note {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--paper-2);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.demo-drill { margin-top: 14px; }
+.demo-prompt-row { display: flex; align-items: flex-start; gap: 8px; }
+.demo-phrase {
+  flex: 1;
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.demo-terms {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-5);
+}
+.demo-input-row { margin-top: 14px; }
+.demo-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.demo-actions .btn-primary { flex: 1; }

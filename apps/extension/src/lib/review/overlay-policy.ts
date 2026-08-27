@@ -64,6 +64,12 @@ export interface OverlaySettings {
    *  (Popup) or the mic button on the card itself; either one flips this
    *  same stored value, shared via chrome.storage across every context. */
   voiceReviewEnabled: boolean;
+  /** DEMO MODE (experimental — see src/lib/demo/prompt-api.ts's header).
+   *  While on, normal SRS review is suppressed everywhere: decideOverlay
+   *  below refuses to show, and content.ts's burst poll bails out. The two
+   *  guards that read this, plus this field, are the ENTIRE footprint the
+   *  demo has in non-demo code — deleting them removes the feature. */
+  demoModeEnabled: boolean;
 }
 
 export function defaultSettings(): OverlaySettings {
@@ -87,6 +93,7 @@ export function defaultSettings(): OverlaySettings {
     lastStreakReminderDate: null,
     seenAchievements: [],
     voiceReviewEnabled: false,
+    demoModeEnabled: false,
   };
 }
 
@@ -133,6 +140,11 @@ export function decideOverlay(
   now: Date,
 ): OverlayDecision {
   if (page.dueCount <= 0) return { action: 'idle', reason: 'nothing_due' };
+
+  // DEMO MODE guard (removable — see OverlaySettings.demoModeEnabled).
+  // Reported as 'paused' rather than a new reason so nothing downstream
+  // has to learn about the demo just to describe why it waited.
+  if (settings.demoModeEnabled) return { action: 'wait', reason: 'paused' };
 
   // Our own overrides first — the user's explicit choices win.
   if (settings.pausedIndefinitely) return { action: 'wait', reason: 'paused' };

@@ -300,6 +300,31 @@ export const strings = {
   'streak.dismiss': 'Dismiss',
   'streak.atRisk': '{n}-day streak at risk',
   'streak.reviewNow': 'Review now →',
+
+  // -- Demo mode (experimental -- see src/lib/demo/) -------------
+  'demo.badge': 'Demo mode',
+  'demo.subtitle': 'Speak your vocabulary. Nothing is scored.',
+  'demo.exit': 'Exit',
+  'demo.start': 'Give me a phrase',
+  'demo.another': 'Another phrase',
+  'demo.generating': 'Writing...',
+  'demo.next': 'Next',
+  'demo.simple': 'Simple',
+  'demo.hard': 'Hard',
+  'demo.submit': 'I said it',
+  'demo.replay': 'Hear it again',
+  'demo.answerPlaceholder': 'Say or type it in your target language...',
+  'demo.speakTitle': 'Answer by voice',
+  'demo.firstRunNote': "First run downloads Chrome's on-device model (a few GB, once). Nothing you type here leaves your device.",
+  'demo.downloading': 'Downloading the on-device model... {pct}%',
+  'demo.generateError': "Couldn't write a phrase - try again.",
+  'demo.voiceError': "Didn't catch that - try again.",
+  'demo.noWordsTitle': 'No words yet',
+  'demo.noWordsHint': 'Save a few words first - demo mode builds phrases out of your own library.',
+  'demo.unavailableTitle': "Chrome's built-in AI isn't available here",
+  'demo.unavailableHint': 'Needs desktop Chrome with the built-in model enabled. This mode is experimental - normal review still works when you exit.',
+  'demo.enter': 'Try demo mode',
+  'demo.enterHint': 'Experimental: on-device AI writes phrases from your words. Pauses normal review.',
 } as const;
 
 export type TranslationKey = keyof typeof strings;

@@ -24,6 +24,8 @@ interface Props {
    *  button on an open card flips the same stored value either way. */
   voiceReviewEnabled: boolean;
   onVoiceReviewEnabledChange: (enabled: boolean) => void;
+  /** DEMO MODE (experimental — see src/lib/demo/). Removable. */
+  onEnterDemoMode: () => void;
   onStartReview: (algoFilter: AlgoFilter) => void;
   /** Unshelves the single oldest-shelved word and starts a review on it —
    *  offered only once nothing else is due (see the empty state below). */
@@ -72,7 +74,7 @@ function formatLadder(p: LadderProgress, t: ReturnType<typeof useI18n>['t']): st
 
 export function ReviewPane({
   words, logs, dueCount, targetLang, onLangChange, algo, pace, onAlgoChange,
-  voiceReviewEnabled, onVoiceReviewEnabledChange, onStartReview, onReviveShelved, ready, onDueCountChange,
+  voiceReviewEnabled, onVoiceReviewEnabledChange, onEnterDemoMode, onStartReview, onReviveShelved, ready, onDueCountChange,
 }: Props) {
   const { t, tp } = useI18n();
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
@@ -176,6 +178,11 @@ export function ReviewPane({
           </label>
         </div>
       </div>
+
+      {/* DEMO MODE entry (experimental — see src/lib/demo/). Removable. */}
+      <button className="demo-enter" onClick={onEnterDemoMode} disabled={!ready} title={t('demo.enterHint')}>
+        <Icon name="sparkle" size={12} /> {t('demo.enter')}
+      </button>
 
       {dueCount > 0 && (
         <div className="review-filter-row">
