@@ -34,9 +34,26 @@ export interface DemoSession {
   destroy(): void;
 }
 
+/** The output languages Chrome's built-in model actually attests to. The
+ *  API logs a warning ("No output language was specified...") and gives
+ *  weaker output when you don't declare one, and anything outside this set
+ *  isn't supported at all — notably Russian, Italian, Portuguese and
+ *  Chinese, all of which this app otherwise offers as target languages.
+ *  drill.ts uses this to avoid ever ASKING the model for a language it
+ *  can't write. */
+export const MODEL_OUTPUT_LANGUAGES = ['de', 'en', 'es', 'fr', 'ja'] as const;
+
+export function modelCanWrite(langCode: string): boolean {
+  return (MODEL_OUTPUT_LANGUAGES as readonly string[]).includes(langCode);
+}
+
 interface CreateOptions {
   /** Called with 0..1 while the one-time model download runs. */
   onDownloadProgress?: (loaded: number) => void;
+  /** Languages the session is allowed to produce. Declaring these is what
+   *  silences Chrome's "no output language was specified" warning and lets
+   *  it attest output safety; every entry must be in MODEL_OUTPUT_LANGUAGES. */
+  outputLanguages?: string[];
 }
 
 /** The two shapes this API has shipped under. Kept structural (not a hard
@@ -100,8 +117,14 @@ export async function createSession(
   const api = getApi();
   if (!api) throw new Error('Chrome built-in AI is not available in this browser.');
 
+  const outputLanguages = options.outputLanguages?.filter(modelCanWrite) ?? [];
   return api.create({
     initialPrompts: [{ role: 'system', content: systemPrompt }],
+    // Declared per the Prompt API's language attestation. Falls back to
+    // English rather than omitting the field, since omitting it is exactly
+    // what triggers the warning.
+    expectedOutputs: [{ type: 'text', languages: outputLanguages.length > 0 ? outputLanguages : ['en'] }],
+    expectedInputs: [{ type: 'text', languages: ['en'] }],
     // The spec's download hook. Older builds ignore an unknown `monitor`
     // key rather than throwing, so passing it unconditionally is safe.
     monitor(m: { addEventListener: (type: string, cb: (e: { loaded: number }) => void) => void }) {

@@ -197,8 +197,22 @@ export default defineBackground(() => {
         const word = await repo.getWord(message.payload.wordId);
         if (!word) throw new Error(`Word not found: ${message.payload.wordId}`);
         if (word.dictionaryFetchedAt) return word; // already looked up, found or not
-        const info = await fetchDictionaryInfo(word.term);
-        return repo.setDictionaryInfo(word.id, info, new Date(message.payload.now));
+        // The definition is optional garnish under an already-graded card, and
+        // dictionaryapi.dev is a free third party that goes down (HTTP 5xx /
+        // Cloudflare 522) from time to time. An outage there must not surface
+        // as an extension error, so "couldn't check" is swallowed here and the
+        // word comes back unchanged — the card simply shows no definition.
+        //
+        // Deliberately does NOT stamp dictionaryFetchedAt in that case:
+        // fetchDictionaryInfo already distinguishes "no such entry" (null,
+        // worth caching forever) from a transport failure (throws), and
+        // caching a failure would mean never retrying once the API recovers.
+        try {
+          const info = await fetchDictionaryInfo(word.term);
+          return repo.setDictionaryInfo(word.id, info, new Date(message.payload.now));
+        } catch {
+          return word;
+        }
       }
       case 'UPDATE_WORD':
         return repo.updateWord(message.payload.wordId, message.payload.changes, new Date(message.payload.now));

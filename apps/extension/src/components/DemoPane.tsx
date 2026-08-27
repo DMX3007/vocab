@@ -19,6 +19,7 @@ import type { Word } from '../lib/storage/types';
 import {
   checkAvailability,
   createSession,
+  modelCanWrite,
   type DemoSession,
   type ModelAvailability,
 } from '../lib/demo/prompt-api';
@@ -44,6 +45,10 @@ interface Props {
 interface Drill {
   english: string;
   translated: string | null;
+  /** The picked words' own saved translations. Used as the cue when the
+   *  model can't write the target language (see buildDrillPrompt) — these
+   *  come from the user's library, so they're correct by construction. */
+  cues: string[];
   /** Which library words this phrase was built from — shown so the user
    *  can see what's being activated even if the model buried one. */
   terms: string[];
@@ -69,6 +74,7 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
   const [listening, setListening] = useState(false);
 
   // Which side of the pair the learner produces vs. reads.
+  const canTranslate = modelCanWrite(targetLang);
   const answerLang = direction === 'english' ? LEARNING_LANG : targetLang;
   const promptLang = direction === 'english' ? targetLang : LEARNING_LANG;
 
@@ -89,12 +95,15 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
     if (sessionRef.current) return sessionRef.current;
     const session = await createSession(SYSTEM_PROMPT, {
       onDownloadProgress: (loaded) => setDownloadPct(Math.round(loaded * 100)),
+      // English is always produced; the target only when the model can
+      // actually write it (createSession filters the rest out anyway).
+      outputLanguages: ['en', targetLang],
     });
     sessionRef.current = session;
     setDownloadPct(null);
     setAvailability('available');
     return session;
-  }, []);
+  }, [targetLang]);
 
   const generate = useCallback(async () => {
     if (generating) return;
@@ -107,18 +116,25 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
       const picked = pickDrillWords(words, difficulty);
       const terms = picked.map((w) => w.term);
       const session = await getSession();
-      const targetLabel = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang)?.label ?? targetLang;
+      const targetLabel = canTranslate
+        ? SUPPORTED_LANGUAGES.find((l) => l.code === targetLang)?.label ?? targetLang
+        : null;
       const raw = await session.prompt(buildDrillPrompt(terms, difficulty, targetLabel));
       const parsed = parseGeneratedPhrase(raw);
       if (!parsed.english) throw new Error('empty');
-      setDrill({ ...parsed, terms });
+      setDrill({
+        ...parsed,
+        translated: canTranslate ? parsed.translated : null,
+        terms,
+        cues: picked.map((w) => w.translations[0] ?? w.term),
+      });
     } catch (err) {
       console.error(err, 'Error: demo drill generation');
       setError(t('demo.generateError'));
     } finally {
       setGenerating(false);
     }
-  }, [generating, words, difficulty, targetLang, getSession, t]);
+  }, [generating, words, difficulty, targetLang, canTranslate, getSession, t]);
 
   function toggleVoice() {
     if (listening) { voiceRef.current?.stop(); return; }
@@ -220,12 +236,14 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
         <div className="demo-drill">
           <div className="demo-prompt-row">
             <div className="demo-phrase">
-              {direction === 'english' ? (drill.translated ?? drill.english) : drill.english}
+              {direction === 'english'
+                ? (drill.translated ?? drill.cues.join(', '))
+                : drill.english}
             </div>
             <button
               type="button"
               className="vf-speak-btn"
-              onClick={() => speak(direction === 'english' ? (drill.translated ?? drill.english) : drill.english, promptLang)}
+              onClick={() => speak(direction === 'english' ? (drill.translated ?? drill.cues.join(', ')) : drill.english, promptLang)}
               title={t('library.pronounce')}
               aria-label={t('library.pronounce')}
             >
@@ -233,7 +251,9 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
             </button>
           </div>
           {direction === 'english' && !drill.translated && (
-            <div className="demo-note">{t('demo.noTranslation')}</div>
+            <div className="demo-note">
+              {canTranslate ? t('demo.noTranslation') : t('demo.cueFallback')}
+            </div>
           )}
           <div className="demo-terms">{drill.terms.join(' · ')}</div>
 

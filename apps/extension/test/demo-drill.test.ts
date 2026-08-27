@@ -79,6 +79,15 @@ describe('buildDrillPrompt', () => {
     expect(buildDrillPrompt(['a'], 'simple', 'Japanese')).toContain('Japanese');
   });
 
+  it('does NOT ask for a translation when the model cannot write that language', () => {
+    // Russian et al. are outside the on-device model's attested output set
+    // (see MODEL_OUTPUT_LANGUAGES). Asking anyway yields confident nonsense,
+    // which is exactly what a learner can't detect — so we don't ask.
+    const p = buildDrillPrompt(['a'], 'simple', null);
+    expect(p).not.toMatch(/translate/i);
+    expect(p).toMatch(/one line only/i);
+  });
+
   it('the system prompt composes in English first, then translates', () => {
     // The phrase is always ORIGINATED in English — the model's strongest
     // language — and only then rendered into the target, so the half the

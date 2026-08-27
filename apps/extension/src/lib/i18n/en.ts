@@ -329,6 +329,7 @@ export const strings = {
   'demo.writeTarget': 'Write target',
   'demo.directionHint': 'Which language you produce. "Write English" shows the phrase in your language and asks you for the English.',
   'demo.referenceLabel': 'The original English was',
+  'demo.cueFallback': "Chrome's on-device model can't write your target language, so it can't translate the phrase. Build an English phrase from these words instead - the English original is revealed after you answer.",
   'demo.noTranslation': "The model didn't return a translation for this one - showing the English instead.",
   'demo.enter': 'Try demo mode',
   'demo.enterHint': 'Experimental: on-device AI writes phrases from your words. Pauses normal review.',

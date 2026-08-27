@@ -63,16 +63,26 @@ export const SYSTEM_PROMPT = [
   '- Keep it natural — something a person would actually say.',
 ].join('\n');
 
+/** `targetLanguageLabel` is null when the on-device model can't write that
+ *  language at all (see MODEL_OUTPUT_LANGUAGES — Russian, Italian,
+ *  Portuguese and Chinese are all outside its attested set). In that case
+ *  we simply don't ask for a translation: requesting output the model has
+ *  no support for produces confident-looking nonsense, which is the one
+ *  thing a learner can't detect. The UI falls back to prompting with the
+ *  user's OWN saved translations instead — from their library, so correct
+ *  by construction. */
 export function buildDrillPrompt(
   terms: string[],
   difficulty: DrillDifficulty,
-  targetLanguageLabel: string,
+  targetLanguageLabel: string | null,
 ): string {
   const list = terms.join(', ');
   const ask = difficulty === 'simple'
     ? `Write one short, simple English phrase (at most 8 words) using: ${list}`
     : `Write one English sentence (12-20 words) using: ${list}. It may be complex — use a subordinate clause or an idiom.`;
-  return `${ask}\nThen translate that phrase into ${targetLanguageLabel}.`;
+  return targetLanguageLabel === null
+    ? `${ask}\nReply with that one line only.`
+    : `${ask}\nThen translate that phrase into ${targetLanguageLabel}.`;
 }
 
 export interface GeneratedPhrase {
