@@ -323,6 +323,11 @@ export const strings = {
   'demo.noWordsHint': 'Save a few words first - demo mode builds phrases out of your own library.',
   'demo.unavailableTitle': "Chrome's built-in AI isn't available here",
   'demo.unavailableHint': 'Needs desktop Chrome with the built-in model enabled. This mode is experimental - normal review still works when you exit.',
+  'demo.writeEnglish': 'Write English',
+  'demo.writeTarget': 'Write target',
+  'demo.directionHint': 'Which language you produce. "Write English" shows the phrase in your language and asks you for the English.',
+  'demo.referenceLabel': 'The original English was',
+  'demo.noTranslation': "The model didn't return a translation for this one - showing the English instead.",
   'demo.enter': 'Try demo mode',
   'demo.enterHint': 'Experimental: on-device AI writes phrases from your words. Pauses normal review.',
 } as const;

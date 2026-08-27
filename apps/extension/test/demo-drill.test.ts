@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   pickDrillWords,
   buildDrillPrompt,
+  parseGeneratedPhrase,
   cleanGeneratedPhrase,
   canDrill,
   SYSTEM_PROMPT,
@@ -64,20 +65,57 @@ describe('pickDrillWords', () => {
 
 describe('buildDrillPrompt', () => {
   it('names every word in the prompt', () => {
-    const p = buildDrillPrompt(['fortitude', 'candor'], 'simple');
+    const p = buildDrillPrompt(['fortitude', 'candor'], 'simple', 'Russian');
     expect(p).toContain('fortitude');
     expect(p).toContain('candor');
   });
 
   it('asks for something longer/more complex on hard than on simple', () => {
-    expect(buildDrillPrompt(['a'], 'simple')).toMatch(/short|simple/i);
-    expect(buildDrillPrompt(['a'], 'hard')).toMatch(/complex|clause|idiom/i);
+    expect(buildDrillPrompt(['a'], 'simple', 'Russian')).toMatch(/short|simple/i);
+    expect(buildDrillPrompt(['a'], 'hard', 'Russian')).toMatch(/complex|clause|idiom/i);
   });
 
-  it('the system prompt pins the model to English only', () => {
-    // The safety property this whole mode rests on: the model must never
-    // author target-language text a learner can't check.
-    expect(SYSTEM_PROMPT).toMatch(/English only/i);
+  it('asks for the translation by the language\'s real name', () => {
+    expect(buildDrillPrompt(['a'], 'simple', 'Japanese')).toContain('Japanese');
+  });
+
+  it('the system prompt composes in English first, then translates', () => {
+    // The phrase is always ORIGINATED in English — the model's strongest
+    // language — and only then rendered into the target, so the half the
+    // learner is asked to produce is never the model's weakest output.
+    expect(SYSTEM_PROMPT).toMatch(/English first/i);
+    expect(SYSTEM_PROMPT).toMatch(/two lines/i);
+  });
+});
+
+describe('parseGeneratedPhrase', () => {
+  it('splits the two labelled lines', () => {
+    const r = parseGeneratedPhrase('EN: He showed great fortitude.\nTR: Он проявил стойкость.');
+    expect(r.english).toBe('He showed great fortitude.');
+    expect(r.translated).toBe('Он проявил стойкость.');
+  });
+
+  it('works without labels', () => {
+    const r = parseGeneratedPhrase('He showed fortitude.\nОн проявил стойкость.');
+    expect(r.english).toBe('He showed fortitude.');
+    expect(r.translated).toBe('Он проявил стойкость.');
+  });
+
+  it('ignores blank lines between the two', () => {
+    const r = parseGeneratedPhrase('EN: One.\n\n\nTR: Один.');
+    expect(r.english).toBe('One.');
+    expect(r.translated).toBe('Один.');
+  });
+
+  it('returns translated: null when the model only gave one line', () => {
+    // Must not throw — the UI just disables the direction that needs it.
+    const r = parseGeneratedPhrase('EN: He showed fortitude.');
+    expect(r.english).toBe('He showed fortitude.');
+    expect(r.translated).toBeNull();
+  });
+
+  it('returns an empty english for empty output rather than throwing', () => {
+    expect(parseGeneratedPhrase('')).toEqual({ english: '', translated: null });
   });
 });
 

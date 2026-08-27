@@ -8,6 +8,20 @@ import type { Word } from '../storage/types';
 
 export type DrillDifficulty = 'simple' | 'hard';
 
+/** Which language the LEARNER produces.
+ *
+ *  Naming here is deliberately about the learner, not about the app's
+ *  `targetLang` field — those mean opposite things and it's a real trap.
+ *  `targetLang` is the language words are translated INTO (Russian, say),
+ *  while `langFrom` is hardcoded 'en': the language of the pages you read,
+ *  which is the one you're actually learning. So a Russian speaker reading
+ *  English has targetLang = their NATIVE language.
+ *
+ *  'english'  — prompt shown in targetLang, learner writes English.
+ *               Producing the language you're learning: the useful drill.
+ *  'target'   — prompt shown in English, learner writes targetLang. */
+export type DrillDirection = 'english' | 'target';
+
 /** How many library words one generated phrase is built around. A hard
  *  phrase uses more of them, which is most of what makes it harder. */
 const WORDS_PER_DRILL: Record<DrillDifficulty, number> = { simple: 2, hard: 4 };
@@ -38,19 +52,51 @@ export function pickDrillWords(
  *  text teaches them errors they can't detect. The user translates INTO
  *  their target language themselves — the model never writes it. */
 export const SYSTEM_PROMPT = [
-  'You write very short English phrases for a vocabulary learner to translate.',
+  'You write very short phrases for a vocabulary learner to translate.',
   'Rules:',
-  '- Reply with ONE phrase only. No quotes, no explanation, no list, no preamble.',
-  '- Write in English only.',
+  '- Compose the phrase in English first. Then translate it.',
+  '- Reply with EXACTLY two lines and nothing else:',
+  '  EN: <the English phrase>',
+  '  TR: <the translation>',
+  '- No quotes, no explanation, no list, no preamble.',
   '- Use every word you are given, in any grammatical form.',
   '- Keep it natural — something a person would actually say.',
 ].join('\n');
 
-export function buildDrillPrompt(terms: string[], difficulty: DrillDifficulty): string {
+export function buildDrillPrompt(
+  terms: string[],
+  difficulty: DrillDifficulty,
+  targetLanguageLabel: string,
+): string {
   const list = terms.join(', ');
-  return difficulty === 'simple'
+  const ask = difficulty === 'simple'
     ? `Write one short, simple English phrase (at most 8 words) using: ${list}`
     : `Write one English sentence (12-20 words) using: ${list}. It may be complex — use a subordinate clause or an idiom.`;
+  return `${ask}\nThen translate that phrase into ${targetLanguageLabel}.`;
+}
+
+export interface GeneratedPhrase {
+  english: string;
+  /** The targetLang rendering, or null when the model didn't give a usable
+   *  second line. Only ever shown as a PROMPT to understand — never as a
+   *  reference answer to imitate, since a small model is least reliable
+   *  exactly here and a learner couldn't tell a bad one from a good one. */
+  translated: string | null;
+}
+
+/** Splits the model's two labelled lines apart. Tolerant of a missing or
+ *  differently-labelled second line: a translation we can't trust to exist
+ *  simply disables the direction that depends on it, rather than failing
+ *  the whole drill. */
+export function parseGeneratedPhrase(raw: string): GeneratedPhrase {
+  const lines = raw
+    .split('\n')
+    .map((l) => cleanGeneratedPhrase(l))
+    .filter((l) => l.length > 0);
+  return {
+    english: lines[0] ?? '',
+    translated: lines[1] ?? null,
+  };
 }
 
 /** Small models like to wrap output in quotes, prefix it ("Sure! Here's..."),

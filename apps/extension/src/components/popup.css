@@ -3121,3 +3121,19 @@ img.ach-badge {
 .demo-input-row { margin-top: 14px; }
 .demo-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .demo-actions .btn-primary { flex: 1; }
+.demo-reference {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--leaf);
+  background: var(--paper-2);
+  border-radius: 0 9px 9px 0;
+}
+.demo-reference-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 4px;
+}
+.demo-reference-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); }

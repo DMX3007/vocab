@@ -26,36 +26,51 @@ import {
   SYSTEM_PROMPT,
   buildDrillPrompt,
   canDrill,
-  cleanGeneratedPhrase,
+  parseGeneratedPhrase,
   pickDrillWords,
   type DrillDifficulty,
+  type DrillDirection,
 } from '../lib/demo/drill';
+import { SUPPORTED_LANGUAGES } from '../lib/languages';
 
 interface Props {
   words: Word[];
-  /** The language the user renders the English phrase INTO. */
+  /** The app's targetLang: the language words are translated INTO. Note this
+   *  is NOT necessarily the language being learned — see DrillDirection. */
   targetLang: string;
   onExit: () => void;
 }
 
 interface Drill {
-  phrase: string;
+  english: string;
+  translated: string | null;
   /** Which library words this phrase was built from — shown so the user
    *  can see what's being activated even if the model buried one. */
   terms: string[];
 }
+
+/** The language of the page text this app captures words from, and so the
+ *  language most users are actually learning (see DrillDirection). */
+const LEARNING_LANG = 'en';
 
 export function DemoPane({ words, targetLang, onExit }: Props) {
   const { t } = useI18n();
   const [availability, setAvailability] = useState<ModelAvailability | null>(null);
   const [downloadPct, setDownloadPct] = useState<number | null>(null);
   const [difficulty, setDifficulty] = useState<DrillDifficulty>('simple');
+  // Defaults to producing English: that's the language you're learning if
+  // you're reading English pages, and producing it is the point.
+  const [direction, setDirection] = useState<DrillDirection>('english');
   const [drill, setDrill] = useState<Drill | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [listening, setListening] = useState(false);
+
+  // Which side of the pair the learner produces vs. reads.
+  const answerLang = direction === 'english' ? LEARNING_LANG : targetLang;
+  const promptLang = direction === 'english' ? targetLang : LEARNING_LANG;
 
   const sessionRef = useRef<DemoSession | null>(null);
   const voiceRef = useRef<VoiceListenHandle | null>(null);
@@ -92,22 +107,23 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
       const picked = pickDrillWords(words, difficulty);
       const terms = picked.map((w) => w.term);
       const session = await getSession();
-      const raw = await session.prompt(buildDrillPrompt(terms, difficulty));
-      const phrase = cleanGeneratedPhrase(raw);
-      if (!phrase) throw new Error('empty');
-      setDrill({ phrase, terms });
+      const targetLabel = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang)?.label ?? targetLang;
+      const raw = await session.prompt(buildDrillPrompt(terms, difficulty, targetLabel));
+      const parsed = parseGeneratedPhrase(raw);
+      if (!parsed.english) throw new Error('empty');
+      setDrill({ ...parsed, terms });
     } catch (err) {
       console.error(err, 'Error: demo drill generation');
       setError(t('demo.generateError'));
     } finally {
       setGenerating(false);
     }
-  }, [generating, words, difficulty, getSession, t]);
+  }, [generating, words, difficulty, targetLang, getSession, t]);
 
   function toggleVoice() {
     if (listening) { voiceRef.current?.stop(); return; }
     setListening(true);
-    voiceRef.current = listen(targetLang, {
+    voiceRef.current = listen(answerLang, {
       onResult: (transcript) => { if (transcript) setAnswer(transcript); },
       onError: () => setError(t('demo.voiceError')),
       onEnd: () => { setListening(false); voiceRef.current = null; },
@@ -121,7 +137,7 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
     if (!answer.trim() || submitted) return;
     voiceRef.current?.stop();
     setSubmitted(true);
-    speak(answer, targetLang);
+    speak(answer, answerLang);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -161,6 +177,21 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
 
       <div className="demo-controls">
         <div className="demo-difficulty">
+          {(['english', 'target'] as const).map((d) => (
+            <button
+              key={d}
+              className={`demo-diff-btn ${direction === d ? 'active' : ''}`}
+              onClick={() => setDirection(d)}
+              title={t('demo.directionHint')}
+            >
+              {d === 'english' ? t('demo.writeEnglish') : t('demo.writeTarget')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="demo-controls">
+        <div className="demo-difficulty">
           {(['simple', 'hard'] as const).map((d) => (
             <button
               key={d}
@@ -188,17 +219,22 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
       {drill && (
         <div className="demo-drill">
           <div className="demo-prompt-row">
-            <div className="demo-phrase">{drill.phrase}</div>
+            <div className="demo-phrase">
+              {direction === 'english' ? (drill.translated ?? drill.english) : drill.english}
+            </div>
             <button
               type="button"
               className="vf-speak-btn"
-              onClick={() => speak(drill.phrase, 'en')}
+              onClick={() => speak(direction === 'english' ? (drill.translated ?? drill.english) : drill.english, promptLang)}
               title={t('library.pronounce')}
               aria-label={t('library.pronounce')}
             >
               <Icon name="volume" size={16} />
             </button>
           </div>
+          {direction === 'english' && !drill.translated && (
+            <div className="demo-note">{t('demo.noTranslation')}</div>
+          )}
           <div className="demo-terms">{drill.terms.join(' · ')}</div>
 
           <div className="vf-card-input-row demo-input-row">
@@ -221,6 +257,24 @@ export function DemoPane({ words, targetLang, onExit }: Props) {
               </button>
             )}
           </div>
+
+          {submitted && direction === 'english' && (
+            <div className="demo-reference">
+              <div className="demo-reference-label">{t('demo.referenceLabel')}</div>
+              <div className="demo-reference-row">
+                <span>{drill.english}</span>
+                <button
+                  type="button"
+                  className="vf-speak-btn"
+                  onClick={() => speak(drill.english, LEARNING_LANG)}
+                  title={t('library.pronounce')}
+                  aria-label={t('library.pronounce')}
+                >
+                  <Icon name="volume" size={14} />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="demo-actions">
             {!submitted ? (
