@@ -5,7 +5,7 @@ import { SettingsStore } from '../../src/lib/review/settings-store';
 import { DemoPane } from '../../src/components/DemoPane';
 import { DraftStore } from '../../src/lib/storage/draft-store';
 import { OverlayLockStore } from '../../src/lib/review/overlay-lock';
-import { resume, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings } from '../../src/lib/review/overlay-policy';
+import { resume, pauseFor, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings, type PausePreset } from '../../src/lib/review/overlay-policy';
 import { applyStreakMaintenance, computeProgressStats, resolveUnlockedAchievement } from '../../src/lib/review/progress';
 import { ACHIEVEMENT_TIER_KEY, ACHIEVEMENT_TRACK_KEY } from '../../src/lib/review/achievement-copy';
 import type { AchievementUnlockedMessage } from '../../src/lib/messaging/protocol';
@@ -67,6 +67,7 @@ export function Popup() {
   const [currentHost, setCurrentHost] = useState<string | null>(null);
   const [currentTabId, setCurrentTabId] = useState<number | null>(null);
   const [elsewhereReview, setElsewhereReview] = useState<{ tabId: number; host: string | null } | null>(null);
+  const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const s = await settingsStore.load();
@@ -348,6 +349,18 @@ export function Popup() {
     await refresh();
   }
 
+  /** Pauses the INTERRUPTIONS, not the schedule. Nothing here touches any
+   *  word's dueAt (see pauseFor — it only writes settings), so words keep
+   *  coming due and the Review tab's countdowns keep ticking the whole
+   *  time; you simply don't get a card pushed at you. Until now this could
+   *  only be triggered from the review card's own Pause menu, which meant
+   *  waiting to be interrupted before you could ask not to be. */
+  async function handlePause(preset: PausePreset) {
+    setPauseMenuOpen(false);
+    await settingsStore.update((s) => pauseFor(s, new Date(), preset));
+    await refresh();
+  }
+
   async function handleResume() {
     await settingsStore.update((s) => resume(s));
     await refresh();
@@ -527,10 +540,32 @@ export function Popup() {
         ))}
       </div>
 
-      {(isPaused || isSnoozed) && (
+      {(isPaused || isSnoozed) ? (
         <div className="vf-pausebar">
           <span>{isPaused ? t('pausebar.remindersPaused') : t('pausebar.snoozed')}</span>
           <button className="vf-resume" onClick={handleResume}>{t('pausebar.resumeNow')}</button>
+        </div>
+      ) : (
+        <div className="vf-pausebar idle">
+          <span>{t('pausebar.remindersActive')}</span>
+          <div className="vf-pause-wrap">
+            <button
+              className="vf-pause-btn"
+              onClick={() => setPauseMenuOpen((v) => !v)}
+              aria-expanded={pauseMenuOpen}
+              title={t('pausebar.pauseHint')}
+            >
+              {t('overlay.pause')} {'\u25be'}
+            </button>
+            {pauseMenuOpen && (
+              <div className="vf-pause-menu">
+                <button onClick={() => void handlePause('15m')}>{t('overlay.pause15m')}</button>
+                <button onClick={() => void handlePause('1h')}>{t('overlay.pause1h')}</button>
+                <button onClick={() => void handlePause('tomorrow')}>{t('overlay.pauseTomorrow')}</button>
+                <button onClick={() => void handlePause('indefinite')}>{t('overlay.pauseIndefinite')}</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

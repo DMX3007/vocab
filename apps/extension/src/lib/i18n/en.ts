@@ -16,6 +16,8 @@ export const strings = {
   'tab.plan': 'Plan',
   'pausebar.remindersPaused': 'Reminders paused',
   'pausebar.snoozed': 'Snoozed',
+  'pausebar.remindersActive': 'Reminders on',
+  'pausebar.pauseHint': "Stops review cards interrupting you. Words keep coming due in the background - the timers don't stop.",
   'pausebar.resumeNow': 'Resume now',
   'sitebar.activeOn': 'Active on {host}',
   'sitebar.disabledOn': 'Disabled on {host}',

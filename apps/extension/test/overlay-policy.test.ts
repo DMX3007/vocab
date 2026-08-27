@@ -35,6 +35,28 @@ const settings = (over: Partial<OverlaySettings> = {}): OverlaySettings => ({
   ...over,
 });
 
+describe('pausing suppresses interruptions WITHOUT touching the schedule', () => {
+  // The property the popup's pause button is sold on: it stops cards being
+  // pushed at you, but every word keeps its own dueAt, so the backlog and
+  // the Review tab's countdowns keep advancing in real time while paused.
+  it.each(['15m', '1h', 'tomorrow', 'indefinite'] as const)(
+    'pauseFor(%s) changes only the two pause fields, nothing else',
+    (preset) => {
+      const before = settings();
+      const after = pauseFor(before, NOW, preset);
+      const { pausedUntil: _pu, pausedIndefinitely: _pi, ...restBefore } = before;
+      const { pausedUntil: _pu2, pausedIndefinitely: _pi2, ...restAfter } = after;
+      expect(restAfter).toEqual(restBefore);
+      expect(before).not.toBe(after); // pure: the original is never mutated
+    },
+  );
+
+  it('a paused overlay reports "waiting", not "nothing due" — the words are still due', () => {
+    const decision = decideOverlay(settings({ pausedIndefinitely: true }), page, NOW);
+    expect(decision).toEqual({ action: 'wait', reason: 'paused' });
+  });
+});
+
 describe('decideOverlay', () => {
   it('DEMO MODE suppresses normal review entirely (experimental — see src/lib/demo/)', () => {
     // The whole isolation contract: while the demo is on, the ambient

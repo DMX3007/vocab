@@ -3137,3 +3137,47 @@ img.ach-badge {
   margin-bottom: 4px;
 }
 .demo-reference-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); }
+
+/* Pause control shown in the same strip the "paused" bar occupies, so the
+   row either offers a pause or offers a resume — never both. */
+.vf-pausebar.idle {
+  background: var(--paper-2);
+  color: var(--ink-4);
+}
+.vf-pause-wrap { position: relative; }
+.vf-pause-btn {
+  background: transparent;
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.vf-pause-btn:hover { background: var(--paper-3); color: var(--ink); }
+.vf-pause-menu {
+  position: absolute;
+  top: 120%;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.vf-pause-menu button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.vf-pause-menu button:hover { background: var(--paper-3); }
