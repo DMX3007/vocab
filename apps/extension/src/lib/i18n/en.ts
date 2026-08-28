@@ -333,6 +333,21 @@ export const strings = {
   'demo.noTranslation': "The model didn't return a translation for this one - showing the English instead.",
   'demo.enter': 'Try demo mode',
   'demo.enterHint': 'Experimental: on-device AI writes phrases from your words. Pauses normal review.',
+  'demo.voiceToggleTitle': 'Hands-free mode - the mic opens on every new phrase (Ctrl/Cmd+Shift+V)',
+  'demo.voiceUnsupported': "Voice input isn't supported in this browser.",
+  'demo.voiceDenied': 'Chrome only asks for the microphone from a real tab, not from this popup.',
+  'demo.allowMic': 'Allow microphone',
+
+  // ── Microphone permission page ───────────────────────────────
+  'mic.title': 'Microphone access',
+  'mic.body': 'Vocably needs your microphone so you can answer by speaking. Chrome will only ask for it from a real tab - that is why this page opened instead of prompting in the popup.',
+  'mic.allow': 'Allow microphone',
+  'mic.asking': 'Waiting for Chrome...',
+  'mic.retry': 'Try again',
+  'mic.granted': 'Microphone enabled. Close this tab and reopen Vocably - voice will work everywhere now.',
+  'mic.denied': 'Chrome blocked the microphone. Click the mic icon at the right of the address bar, allow it, then try again.',
+  'mic.close': 'Close this tab',
+  'mic.note': 'Nothing is recorded or uploaded by this page. It asks for the permission and releases the microphone immediately.',
 } as const;
 
 export type TranslationKey = keyof typeof strings;

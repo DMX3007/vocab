@@ -1,0 +1,64 @@
+/* Standalone page — deliberately does NOT pull in popup.css. That stylesheet
+   is sized for a 420px panel and carries the whole popup's cascade; this is
+   one card on a full-width tab. */
+
+:root {
+  --mic-bg: #f6f7f9;
+  --mic-surface: #ffffff;
+  --mic-text: #1b1f24;
+  --mic-muted: #5b636d;
+  --mic-accent: #3b6cf6;
+  --mic-ok: #17803d;
+  --mic-bad: #c0392b;
+  --mic-border: #e3e6ea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mic-bg: #14171a;
+    --mic-surface: #1d2126;
+    --mic-text: #e8eaed;
+    --mic-muted: #9aa3ad;
+    --mic-accent: #6f95ff;
+    --mic-ok: #4ade80;
+    --mic-bad: #ff8a7a;
+    --mic-border: #2c3238;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mic-bg);
+  color: var(--mic-text);
+  font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.mic-card {
+  max-width: 30rem;
+  margin: 2rem;
+  padding: 2rem;
+  background: var(--mic-surface);
+  border: 1px solid var(--mic-border);
+  border-radius: 14px;
+}
+
+.mic-title { margin: 0 0 0.75rem; font-size: 1.25rem; }
+.mic-body { margin: 0 0 1.25rem; }
+.mic-ok { color: var(--mic-ok); }
+.mic-bad { color: var(--mic-bad); }
+.mic-note { margin: 1.25rem 0 0; font-size: 0.8125rem; color: var(--mic-muted); }
+
+.mic-btn {
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  color: #fff;
+  background: var(--mic-accent);
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.mic-btn:disabled { opacity: 0.6; cursor: default; }

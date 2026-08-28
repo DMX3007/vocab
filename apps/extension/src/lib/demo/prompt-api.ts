@@ -5,8 +5,14 @@
 // isolated experiment. Removing the feature means: delete this folder,
 // delete DemoPane.tsx, drop `demoModeEnabled` from OverlaySettings, and
 // remove the two one-line guards that read it (overlay-policy.ts's
-// decideOverlay and content.ts's pollForBurstDrill). Nothing else in the
+// decideOverlay and content.ts's pollForBurstDrill), and drop the
+// `.demo-*` / `.demo-pane .vf-*` blocks from popup.css. Nothing else in the
 // extension imports from here.
+//
+// Two things demo mode ADDED but does not own, so leave them in place:
+// lib/voice/mic-permission.ts and the entrypoints/mic-permission/ page.
+// They fix a real Chrome limitation for any extension-page voice input, not
+// just this experiment.
 // ─────────────────────────────────────────────────────────────────
 //
 // Thin wrapper over Chrome's built-in on-device model (Gemini Nano) via

@@ -6,11 +6,14 @@ import { toSpeechLang } from '../tts';
 // keyboard, just with the box pre-filled instead of auto-submitted: a
 // misheard word is still editable before it's graded.
 //
-// Only ever runs from the on-page review overlay (a content script), so the
-// mic permission prompt is attributed to whatever SITE the overlay happens
-// to be showing on top of, not to the extension itself — Chrome has no
-// stable "ask once, works everywhere" option for a content script. That's
-// a real rough edge (first use on each new site re-prompts), not a bug.
+// Runs from two very different surfaces, and the mic permission behaves
+// differently in each — see mic-permission.ts for the full story:
+//   • the on-page review overlay (a content script): the prompt is attributed
+//     to whatever SITE the overlay is drawn on, so first use on each new site
+//     re-prompts. A rough edge, not a bug.
+//   • the popup's demo pane (an extension page): Chrome will NOT prompt there
+//     at all, and reports 'not-allowed' until the permission has been granted
+//     once from an extension page opened in a real tab.
 
 type SpeechRecognitionCtor = new () => SpeechRecognition;
 
@@ -55,6 +58,10 @@ export function listen(langCode: string, callbacks: VoiceListenCallbacks): Voice
   const Ctor = getRecognitionCtor();
   if (!Ctor) {
     callbacks.onError('not-supported');
+    // onEnd fires here too, per its contract below: callers flip their
+    // "listening" flag on BEFORE calling listen(), and only onEnd flips it
+    // back — skipping it would leave the mic button lit forever.
+    callbacks.onEnd();
     return null;
   }
 
@@ -80,6 +87,17 @@ export function listen(langCode: string, callbacks: VoiceListenCallbacks): Voice
   };
   recognition.onend = endOnce;
 
-  recognition.start();
+  // start() throws synchronously (InvalidStateError) if a turn is somehow
+  // already running. Reported through the SAME callbacks as any other
+  // failure rather than propagating: a throw out of here would escape a
+  // click handler and strand the caller's "listening" flag on forever, with
+  // the mic button stuck lit and unclickable.
+  try {
+    recognition.start();
+  } catch {
+    callbacks.onError('start-failed');
+    endOnce();
+    return null;
+  }
   return { stop: () => recognition.stop() };
 }

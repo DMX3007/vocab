@@ -49,9 +49,32 @@ describe('listen', () => {
   it('returns null and reports "not-supported" when the browser has no speech API', () => {
     delete (globalThis as any).webkitSpeechRecognition;
     const onError = vi.fn();
-    const handle = listen('en', { onResult: vi.fn(), onError, onEnd: vi.fn() });
+    const onEnd = vi.fn();
+    const handle = listen('en', { onResult: vi.fn(), onError, onEnd });
     expect(handle).toBeNull();
     expect(onError).toHaveBeenCalledWith('not-supported');
+    // onEnd must fire on EVERY exit path: callers set their "listening" flag
+    // before calling listen() and only ever clear it in onEnd, so skipping it
+    // here strands the mic button lit and unclickable forever.
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a throwing start() through the callbacks instead of propagating', () => {
+    // start() throws InvalidStateError if a turn is somehow already running.
+    // Letting that escape would blow up out of a click handler and, again,
+    // strand the caller's "listening" flag with no end event to clear it.
+    (globalThis as any).webkitSpeechRecognition = vi.fn().mockImplementation(() => {
+      instance = new FakeRecognition();
+      instance.start = vi.fn(() => { throw new DOMException('busy', 'InvalidStateError'); });
+      return instance;
+    });
+    const onError = vi.fn();
+    const onEnd = vi.fn();
+    let handle: ReturnType<typeof listen>;
+    expect(() => { handle = listen('en', { onResult: vi.fn(), onError, onEnd }); }).not.toThrow();
+    expect(handle!).toBeNull();
+    expect(onError).toHaveBeenCalledWith('start-failed');
+    expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
   it('maps the language via the same BCP-47 table speak() uses, and starts listening', () => {
