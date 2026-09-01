@@ -24,7 +24,7 @@ const BADGE_COUNT_CAP = 99;
 const BADGE_COLOR = '#C15A34'; // matches --heat in popup.css/tooltip.css
 
 export default defineBackground(() => {
-  console.log('[Vocably] service worker alive');
+  console.log('[BrowseVocab] service worker alive');
   const repo = new WordRepository();
   const ready = repo.open();
   const settingsStore = new SettingsStore(browser.storage.local);
@@ -128,7 +128,7 @@ export default defineBackground(() => {
     const msg = message as Message
     if (!BACKGROUND_COMMAND_TYPES.has(msg?.type as BackgroundCommand['type'])) {
       handle(msg).then(sendResponse).catch((err) => {
-        console.error('[Vocably] message error', msg.type, err);
+        console.error('[BrowseVocab] message error', msg.type, err);
         sendResponse({ __error: String(err) });
       });
     }

@@ -407,7 +407,7 @@ export function Popup() {
   async function handleExportLibrary() {
     const all = await wordClient.exportLibrary();
     const date = new Date().toISOString().slice(0, 10);
-    downloadJson(`vocably-export-${date}.json`, all);
+    downloadJson(`browsevocab-export-${date}.json`, all);
     showToast(tp('toast.exportedWords', all.length));
   }
 
@@ -683,12 +683,12 @@ export function Popup() {
   );
 }
 
-// Placeholder mark for the Vocably rename — a plain serif V standing in
-// for a proper logo until one gets designed.
+// Placeholder mark for BrowseVocab — a plain serif B standing in for a
+// proper logo until one gets designed.
 function BrandMark() {
   return (
     <div className="brand-mark">
-      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20 }}>V</span>
+      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20 }}>B</span>
     </div>
   );
 }
