@@ -177,6 +177,82 @@ describe('relearning phase', () => {
     expect(again.phase).toBe('relearning');
     expect(again.stepIndex).toBe(0);
   });
+
+  it('advances through a MULTI-step relearning ladder before returning to review', () => {
+    // Every shipped pace sets relearningStepsMin to a single step, so a pass
+    // always graduates immediately and scheduleRelearning's "advance one
+    // step" branch is unreachable in production. It is still live code that
+    // a future config could switch on, so it gets a config of its own here
+    // rather than sitting permanently uncovered.
+    const multiStep = createScheduler('sm2', { ...DEFAULT_CONFIG, relearningStepsMin: [10, 60] });
+    let s: SrsState = initialState('sm2', NOW);
+    for (let i = 0; i < DEFAULT_CONFIG.learningStepsSec.length; i++) s = multiStep.schedule(s, 4, NOW);
+    s = multiStep.schedule(s, 0, new Date(s.dueAt)); // -> relearning, step 0
+
+    const midway = multiStep.schedule(s, 4, new Date(s.dueAt));
+    expect(midway.phase).toBe('relearning'); // not back in review yet
+    expect(midway.stepIndex).toBe(1);
+    expect(midway.dueAt.getTime() - s.dueAt.getTime()).toBe(min(60));
+
+    const graduated = multiStep.schedule(midway, 4, new Date(midway.dueAt));
+    expect(graduated.phase).toBe('review');
+  });
+});
+
+// The question this file exists to answer for a reader: there is no flag
+// anywhere that marks a word "learnt". Graduating out of the learning ladder
+// is the only real state transition; everything the UI calls "mastered" is
+// derived live from intervalDays (see the extension's isMastered). These
+// tests pin the whole path end to end, so a change to the ladder, the
+// graduating interval, or the ease table can't silently move the goalposts.
+describe('the full journey: new word -> graduated -> past the 21-day mastery threshold', () => {
+  const MASTERY_THRESHOLD_DAYS = 21; // mirrors the extension's MASTERED_INTERVAL_DAYS
+
+  /** Answers a fresh word with `grade` until its interval crosses the
+   *  threshold, always answering exactly when it falls due. */
+  function runToMastery(grade: 3 | 4 | 5) {
+    let s: SrsState = initialState('sm2', NOW);
+    let reps = 0;
+    let graduatedAtRep = -1;
+    while (s.intervalDays < MASTERY_THRESHOLD_DAYS && reps < 200) {
+      s = sm2.schedule(s, grade, new Date(s.dueAt));
+      reps += 1;
+      if (graduatedAtRep < 0 && s.phase === 'review') graduatedAtRep = reps;
+    }
+    return { state: s, reps, graduatedAtRep, elapsedDays: (s.dueAt.getTime() - NOW.getTime()) / days(1) };
+  }
+
+  it('graduates only after every single learning step, then needs review reps on top', () => {
+    const { graduatedAtRep, reps } = runToMastery(4);
+    // 14 drills to leave the learning ladder — the aggressive ladder's full
+    // length, confirming nothing shortcuts it — then 4 more spaced reviews.
+    expect(graduatedAtRep).toBe(DEFAULT_CONFIG.learningStepsSec.length);
+    expect(reps).toBe(18);
+  });
+
+  it('crosses the threshold by overshooting it, never by landing on it', () => {
+    // Ease-multiplied growth jumps 20d -> 50d, so no word is ever "exactly
+    // mastered". Anything asserting equality with 21 would be wrong.
+    const { state } = runToMastery(4);
+    expect(state.intervalDays).toBe(50);
+    expect(state.intervalDays).toBeGreaterThan(MASTERY_THRESHOLD_DAYS);
+  });
+
+  it('a word answered "hard" every time takes MORE reps but reaches mastery in FEWER days', () => {
+    // Not a bug, and worth pinning because it reads backwards at first: a
+    // low ease means shorter intervals, so the struggling word is seen more
+    // often and packs its extra reps into less calendar time.
+    const hard = runToMastery(3);
+    const normal = runToMastery(4);
+    expect(hard.reps).toBeGreaterThan(normal.reps);
+    expect(hard.elapsedDays).toBeLessThan(normal.elapsedDays);
+  });
+
+  it('a perfect run still walks the whole ladder — "easy" buys a bigger interval, not fewer drills', () => {
+    const easy = runToMastery(5);
+    expect(easy.graduatedAtRep).toBe(DEFAULT_CONFIG.learningStepsSec.length);
+    expect(easy.reps).toBeLessThan(runToMastery(4).reps);
+  });
 });
 
 describe('ease table matches the published SM-2 formula', () => {

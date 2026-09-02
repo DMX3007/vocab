@@ -6,6 +6,8 @@ import {
   ONE_OFF_ACHIEVEMENTS, ACHIEVEMENT_TIERS, type AchievementTrackProgress,
 } from '../src/lib/review/progress';
 import { defaultSettings } from '../src/lib/review/overlay-policy';
+import { wordStatus } from '../src/lib/review/library';
+import { createScheduler, PACE_CONFIGS } from '@vocably/core';
 import type { Word, ReviewLog } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00'); // a Saturday, local time
@@ -220,6 +222,43 @@ describe('isMastered', () => {
   it('Leitner: mastered once it reaches the last box, even though its 16-day interval never hits 21', () => {
     expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 5, intervalDays: 16 } as Word['srsState'] }))).toBe(true);
     expect(isMastered(word({ srsState: { algo: 'leitner', stepIndex: 4, intervalDays: 8 } as Word['srsState'] }))).toBe(false);
+  });
+});
+
+// "Mastered" is not a badge a word earns and keeps — nothing is ever written
+// to say so. It is re-derived from the CURRENT interval on every read, so
+// forgetting a word can take it back out again, and the Progress tab's
+// mastered count can legitimately go down. These pin that, because it is the
+// single most surprising thing about how this app defines "learnt".
+describe('mastery is reversible, not a one-way flag', () => {
+  const sm2 = createScheduler('sm2', PACE_CONFIGS.aggressive);
+  const reviewWord = (intervalDays: number) =>
+    word({ srsState: { algo: 'sm2', pace: 'aggressive', phase: 'review', stepIndex: 0, dueAt: NOW, intervalDays, easeFactor: 2.5, repetitions: 5, lapses: 0 } });
+
+  it('forgetting a barely-mastered word drops it back under the threshold', () => {
+    const before = reviewWord(29);
+    expect(isMastered(before)).toBe(true);
+
+    const after = word({ srsState: sm2.schedule(before.srsState, 1, NOW) });
+    expect(after.srsState.phase).toBe('relearning');
+    expect(after.srsState.intervalDays).toBe(15); // halved by lapseIntervalFactor
+    expect(isMastered(after)).toBe(false); // the count on the Progress tab just went down
+  });
+
+  it('forgetting a long-interval word halves it but leaves it mastered', () => {
+    // Same single lapse, opposite outcome — mastery depends only on where
+    // the halved interval lands, never on how the word got there.
+    const after = word({ srsState: sm2.schedule(reviewWord(50).srsState, 1, NOW) });
+    expect(after.srsState.intervalDays).toBe(25);
+    expect(isMastered(after)).toBe(true);
+  });
+
+  it('a mastered word that is due reads as due, not mastered', () => {
+    // wordStatus checks due BEFORE mastered on purpose; this pins that the
+    // two states genuinely overlap rather than being mutually exclusive.
+    const due = reviewWord(50);
+    expect(isMastered(due)).toBe(true);
+    expect(wordStatus(due, NOW)).toBe('due');
   });
 });
 
