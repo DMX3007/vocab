@@ -171,9 +171,13 @@ export function PracticeCard({ targetLang, onClose }: Props) {
     }
   }
 
-  /** Submitting is purely "I'm done saying it" — nothing is graded. The
-   *  answer is read back so the user hears their own production, which is
-   *  the only feedback this mode offers by design. */
+  /** Submitting is purely "I'm done saying it" — nothing is graded.
+   *
+   *  What gets read aloud is the GENERATED phrase, never the user's own
+   *  words. Speaking your own sentence back teaches nothing: a transcript of
+   *  what you already said (or worse, what the recognizer mis-heard) is not
+   *  a model to compare yourself against. The version worth hearing is the
+   *  one you were producing toward. */
   function submitAnswer(text: string) {
     if (!text.trim() || submittedRef.current) return;
     submittedRef.current = true;
@@ -181,7 +185,7 @@ export function PracticeCard({ targetLang, onClose }: Props) {
     voiceRef.current?.stop();
     setListening(false);
     setSubmitted(true);
-    speak(text, answerLang);
+    if (referenceText) speak(referenceText, answerLang);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -199,6 +203,13 @@ export function PracticeCard({ targetLang, onClose }: Props) {
   const promptText = drill
     ? (direction === 'english' ? (drill.translated ?? drill.cues.join(', ')) : drill.english)
     : '';
+  /** The generated phrase in the language the user was asked to produce —
+   *  the reference to hear and read after answering. Null when the model
+   *  side of that pair is missing (see resolveTranslation), in which case
+   *  there is simply nothing to compare against and nothing is spoken. */
+  const referenceText = drill
+    ? (direction === 'english' ? drill.english : drill.translated)
+    : null;
 
   if (availability === 'unsupported' || availability === 'unavailable') {
     return (
@@ -311,15 +322,15 @@ export function PracticeCard({ targetLang, onClose }: Props) {
             )}
           </div>
 
-          {submitted && direction === 'english' && (
+          {submitted && referenceText && (
             <div className="vf-practice-reference">
               <div className="vf-practice-reference-label">{t('practice.referenceLabel')}</div>
               <div className="vf-practice-reference-row">
-                <span>{drill.english}</span>
+                <span>{referenceText}</span>
                 <button
                   type="button"
                   className="vf-speak-btn"
-                  onClick={() => speak(drill.english, LEARNING_LANG)}
+                  onClick={() => speak(referenceText, answerLang)}
                   title={t('library.pronounce')}
                   aria-label={t('library.pronounce')}
                 >
@@ -338,11 +349,11 @@ export function PracticeCard({ targetLang, onClose }: Props) {
           `.vf-card-btn { margin-left: auto }`, which is fine for the review
           card's single button but shoves two apart into opposite corners. */}
       <div className="vf-practice-actions">
-        {drill && submitted && (
+        {drill && submitted && referenceText && (
           <button
             type="button"
             className="vf-card-btn-ghost"
-            onClick={() => speak(answer, answerLang)}
+            onClick={() => speak(referenceText, answerLang)}
             title={t('practice.replay')}
           >
             <Icon name="volume" size={13} /> {t('practice.replay')}
