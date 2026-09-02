@@ -52,7 +52,7 @@ export const strings = {
   'pace.standard': 'Standard',
   'pace.aggressive': 'Aggressive',
   'review.filterLabel': 'Review',
-  'review.startBtn': 'Review “{term}” →',
+  'review.startBtn': 'Review →',
   'review.voiceMode': 'Voice mode',
   'review.voiceModeHint': 'Each card listens automatically — a correct spoken answer advances on its own; a wrong one waits for you to hit Next.',
   'review.allCaughtUp': 'All caught up',

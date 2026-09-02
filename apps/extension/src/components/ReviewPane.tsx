@@ -200,7 +200,7 @@ export function ReviewPane({
       {due.length > 0 && (
         <div style={{ padding: '0 14px 12px' }}>
           <button className="btn-primary" onClick={() => onStartReview(reviewFilter)} disabled={!ready}>
-            <Icon name="sparkle" size={13} /> {t('review.startBtn', { term: due[0]!.term })}
+            <Icon name="sparkle" size={13} /> {t('review.startBtn')}
           </button>
         </div>
       )}

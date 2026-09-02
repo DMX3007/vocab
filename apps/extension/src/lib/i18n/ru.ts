@@ -50,7 +50,7 @@ export const strings: Record<TranslationKey, string> = {
   'pace.standard': 'Стандартный',
   'pace.aggressive': 'Интенсивный',
   'review.filterLabel': 'Повторить',
-  'review.startBtn': 'Повторить «{term}» →',
+  'review.startBtn': 'Повторить →',
   'review.voiceMode': 'Голосовой режим',
   'review.voiceModeHint': 'Каждая карточка слушает автоматически — верный устный ответ продвигает дальше сам; неверный ждёт, пока вы нажмёте «Далее».',
   'review.allCaughtUp': 'Всё повторено',
