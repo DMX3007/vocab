@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   pickDrillWords,
   buildDrillPrompt,
   parseGeneratedPhrase,
   cleanGeneratedPhrase,
   canDrill,
+  resolveTranslation,
   SYSTEM_PROMPT,
 } from '../src/lib/practice/drill';
 import type { Word } from '../src/lib/storage/types';
@@ -176,5 +177,52 @@ describe('canDrill', () => {
 
   it('true as soon as one usable word exists', () => {
     expect(canDrill([word()])).toBe(true);
+  });
+});
+
+describe('resolveTranslation', () => {
+  const ok = (text: string) => vi.fn().mockResolvedValue(text);
+
+  it('uses the model when it can actually write that language', async () => {
+    const translate = ok('never used');
+    const r = await resolveTranslation('Er zeigte Mut.', 'He showed fortitude.', 'en', 'de', translate);
+    expect(r).toEqual({ text: 'Er zeigte Mut.', source: 'model' });
+    expect(translate).not.toHaveBeenCalled(); // no needless network call
+  });
+
+  it('REGRESSION: falls back to the provider for a language the model cannot write', async () => {
+    // Russian is outside MODEL_OUTPUT_LANGUAGES, so the model returns no
+    // second line. Without this fallback the card showed only the bare list
+    // of words — not a phrase to translate — which is exactly how practice
+    // mode appeared broken for Russian users.
+    const translate = ok('Он проявил стойкость.');
+    const r = await resolveTranslation(null, 'He showed fortitude.', 'en', 'ru', translate);
+    expect(r).toEqual({ text: 'Он проявил стойкость.', source: 'provider' });
+    expect(translate).toHaveBeenCalledWith('He showed fortitude.', 'en', 'ru');
+  });
+
+  it('ignores a model translation in a language it does not attest to', async () => {
+    // A model that answers in Russian anyway is confidently wrong in the one
+    // way a learner cannot catch, so it is discarded rather than shown.
+    const translate = ok('Он проявил стойкость.');
+    const r = await resolveTranslation('Он праявил стойкасть.', 'He showed fortitude.', 'en', 'ru', translate);
+    expect(r.source).toBe('provider');
+  });
+
+  it('returns none when the provider fails, rather than throwing', async () => {
+    // Offline or rate-limited is an everyday case; the UI drops to word cues.
+    const r = await resolveTranslation(null, 'He showed fortitude.', 'en', 'ru', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(r).toEqual({ text: null, source: 'none' });
+  });
+
+  it('returns none for a blank provider response', async () => {
+    const r = await resolveTranslation(null, 'He showed fortitude.', 'en', 'ru', ok('   '));
+    expect(r).toEqual({ text: null, source: 'none' });
+  });
+
+  it('never calls the provider with an empty phrase', async () => {
+    const translate = ok('x');
+    expect(await resolveTranslation(null, '   ', 'en', 'ru', translate)).toEqual({ text: null, source: 'none' });
+    expect(translate).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@
 // returns. No browser APIs here, so it's all unit-testable.
 
 import type { Word } from '../storage/types';
+import { modelCanWrite } from './prompt-api';
 
 export type DrillDifficulty = 'simple' | 'hard';
 
@@ -68,9 +69,8 @@ export const SYSTEM_PROMPT = [
  *  Portuguese and Chinese are all outside its attested set). In that case
  *  we simply don't ask for a translation: requesting output the model has
  *  no support for produces confident-looking nonsense, which is the one
- *  thing a learner can't detect. The UI falls back to prompting with the
- *  user's OWN saved translations instead — from their library, so correct
- *  by construction. */
+ *  thing a learner can't detect. Those languages get their translation from
+ *  the separate provider instead — see resolveTranslation. */
 export function buildDrillPrompt(
   terms: string[],
   difficulty: DrillDifficulty,
@@ -126,6 +126,41 @@ export function cleanGeneratedPhrase(raw: string): string {
     // drop symmetric wrapping quotes
     .replace(/^["'“‘](.*)["'”’]$/, '$1')
     .trim();
+}
+
+/** Gets the phrase into the language the learner reads it in, in order of
+ *  trust, and says which source won.
+ *
+ *  The on-device model only attests to five output languages
+ *  (MODEL_OUTPUT_LANGUAGES), so for Russian — and Italian, Portuguese,
+ *  Chinese — it returns no second line at all. Before this fallback existed
+ *  the card had nothing left to show but the bare list of words, which is
+ *  not a phrase anyone can translate: the mode silently stopped working for
+ *  exactly the languages it was least able to serve.
+ *
+ *  `translate` is injected so this stays testable without a network call;
+ *  the worker passes the same provider the Add-Word tooltip's AUTO button
+ *  uses. A provider failure is not an error here — cues are a worse but
+ *  honest last resort, and the UI explains itself when it lands there. */
+export async function resolveTranslation(
+  modelTranslation: string | null,
+  english: string,
+  sourceLang: string,
+  targetLang: string,
+  translate: (text: string, from: string, to: string) => Promise<string>,
+): Promise<{ text: string | null; source: 'model' | 'provider' | 'none' }> {
+  // Trusted only when the model can actually write the language — asking it
+  // anyway yields confident nonsense, the one thing a learner can't detect.
+  if (modelCanWrite(targetLang) && modelTranslation) {
+    return { text: modelTranslation, source: 'model' };
+  }
+  if (!english.trim()) return { text: null, source: 'none' };
+  try {
+    const text = (await translate(english, sourceLang, targetLang)).trim();
+    return text ? { text, source: 'provider' } : { text: null, source: 'none' };
+  } catch {
+    return { text: null, source: 'none' };
+  }
 }
 
 /** Whether the library has enough usable words to drill at all. */

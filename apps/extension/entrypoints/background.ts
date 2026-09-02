@@ -8,7 +8,7 @@ import { translateWord } from '../src/lib/translate/mymemory';
 import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
 import { validateLicense } from '../src/lib/licensing/license-client';
 import { checkAvailability, createSession, modelCanWrite, type PracticeSession } from '../src/lib/practice/prompt-api';
-import { SYSTEM_PROMPT, buildDrillPrompt, parseGeneratedPhrase, pickDrillWords, type DrillDifficulty } from '../src/lib/practice/drill';
+import { SYSTEM_PROMPT, buildDrillPrompt, parseGeneratedPhrase, pickDrillWords, resolveTranslation, type DrillDifficulty } from '../src/lib/practice/drill';
 import { SUPPORTED_LANGUAGES } from '../src/lib/languages';
 import type { Message, AchievementUnlockedMessage, BackgroundCommand, RequestShowOverlayResponse, PracticeDrill } from '../src/lib/messaging/protocol';
 
@@ -20,6 +20,9 @@ import type { Message, AchievementUnlockedMessage, BackgroundCommand, RequestSho
 // and Dexie/browser.storage reopen lazily, so we keep no long-lived state.
 
 const ALARM = 'vocably-review';
+/** The language pages are read in, and so the one practice phrases are
+ *  always composed in before being rendered into the user's own language. */
+const PRACTICE_SOURCE_LANG = 'en';
 const TICK_MINUTES = 1; // check often; the throttle/cap keep it polite
 // Caps an unreasonably large due count so the 4-character badge doesn't
 // visually overflow the toolbar icon.
@@ -284,9 +287,20 @@ export default defineBackground(() => {
 
     const parsed = parseGeneratedPhrase(raw);
     if (!parsed.english) throw new Error('The model returned nothing usable');
+
+    // Model first where it's trustworthy, then the tooltip's own translation
+    // provider, then nothing — see resolveTranslation for why that order.
+    const { text: translated } = await resolveTranslation(
+      parsed.translated,
+      parsed.english,
+      PRACTICE_SOURCE_LANG,
+      langTo,
+      translateWord,
+    );
+
     return {
       english: parsed.english,
-      translated: canTranslate ? parsed.translated : null,
+      translated,
       terms,
       cues: picked.map((w) => w.translations[0] ?? w.term),
     };

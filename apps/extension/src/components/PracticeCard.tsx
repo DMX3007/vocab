@@ -25,6 +25,7 @@ import { speak } from '../lib/tts';
 import { isSpeechRecognitionSupported, listen, type VoiceListenHandle } from '../lib/voice/speech-recognition';
 import { classifyVoiceError } from '../lib/voice/mic-permission';
 import { SettingsStore } from '../lib/review/settings-store';
+import { SUPPORTED_LANGUAGES } from '../lib/languages';
 import { wordClient } from '../lib/messaging/client';
 import type { PracticeDrill } from '../lib/messaging/protocol';
 import type { ModelAvailability } from '../lib/practice/prompt-api';
@@ -65,6 +66,11 @@ export function PracticeCard({ targetLang, onClose }: Props) {
 
   const answerLang = direction === 'english' ? LEARNING_LANG : targetLang;
   const promptLang = direction === 'english' ? targetLang : LEARNING_LANG;
+  // Named by the actual language rather than "target"/"English" labels —
+  // "target" is jargon, and it means the opposite of what a learner assumes
+  // (see DrillDirection). Buttons read "English" / "Русский".
+  const targetLangLabel = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang)?.label ?? targetLang;
+  const answerLangLabel = direction === 'english' ? t('practice.langEnglish') : targetLangLabel;
 
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceRef = useRef<VoiceListenHandle | null>(null);
@@ -208,35 +214,54 @@ export function PracticeCard({ targetLang, onClose }: Props) {
     <div className="vf-card vf-practice" onKeyDown={onKeyDown}>
       <div className="vf-card-top">
         <span className="vf-card-dir">{t('practice.badge')}</span>
-        <div className="vf-practice-toggles">
-          {(['english', 'target'] as const).map((d) => (
-            <button
-              key={d}
-              className={`vf-practice-toggle ${direction === d ? 'active' : ''}`}
-              onClick={() => setDirection(d)}
-              title={t('practice.directionHint')}
-            >
-              {d === 'english' ? t('practice.writeEnglish') : t('practice.writeTarget')}
-            </button>
-          ))}
-          {(['simple', 'hard'] as const).map((d) => (
-            <button
-              key={d}
-              className={`vf-practice-toggle ${difficulty === d ? 'active' : ''}`}
-              onClick={() => setDifficulty(d)}
-            >
-              {t(d === 'simple' ? 'practice.simple' : 'practice.hard')}
-            </button>
-          ))}
+      </div>
+
+      {/* Two labelled groups rather than one undifferentiated strip of four
+          buttons: without the labels there was no way to tell which pair did
+          what, and they read as decoration rather than controls. */}
+      <div className="vf-practice-controls">
+        <div className="vf-practice-control">
+          <span className="vf-practice-control-label">{t('practice.iWriteIn')}</span>
+          <div className="vf-practice-seg">
+            {(['english', 'target'] as const).map((d) => (
+              <button
+                key={d}
+                className={`vf-practice-toggle ${direction === d ? 'active' : ''}`}
+                onClick={() => setDirection(d)}
+                title={t('practice.directionHint')}
+              >
+                {d === 'english' ? t('practice.langEnglish') : targetLangLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="vf-practice-control">
+          <span className="vf-practice-control-label">{t('practice.lengthLabel')}</span>
+          <div className="vf-practice-seg">
+            {(['simple', 'hard'] as const).map((d) => (
+              <button
+                key={d}
+                className={`vf-practice-toggle ${difficulty === d ? 'active' : ''}`}
+                onClick={() => setDifficulty(d)}
+              >
+                {t(d === 'simple' ? 'practice.simple' : 'practice.hard')}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {!drill && (
         <div className="vf-practice-intro">
           <p className="vf-card-prompt">{t('practice.introTitle')}</p>
-          <p className="vf-card-ctx">
-            {availability === 'downloadable' ? t('practice.firstRunNote') : t('practice.introHint')}
-          </p>
+          <ol className="vf-practice-steps">
+            <li>{t('practice.step1')}</li>
+            <li>{t('practice.step2', { lang: answerLangLabel })}</li>
+            <li>{t('practice.step3')}</li>
+          </ol>
+          {availability === 'downloadable' && (
+            <p className="vf-card-ctx">{t('practice.firstRunNote')}</p>
+          )}
         </div>
       )}
 
@@ -255,11 +280,13 @@ export function PracticeCard({ targetLang, onClose }: Props) {
             </button>
           </div>
           {direction === 'english' && !drill.translated && (
-            <div className="vf-card-ctx">
-              {canTranslate ? t('practice.noTranslation') : t('practice.cueFallback')}
-            </div>
+            <div className="vf-card-ctx">{t('practice.cueFallback')}</div>
           )}
-          <div className="vf-practice-terms">{drill.terms.join(' · ')}</div>
+          <div className="vf-practice-terms">
+            <span className="vf-practice-terms-label">{t('practice.builtFrom')}</span>
+            {drill.terms.join(' · ')}
+          </div>
+          <div className="vf-practice-task">{t('practice.taskHint', { lang: answerLangLabel })}</div>
 
           <div className="vf-card-input-row">
             <input
@@ -307,12 +334,10 @@ export function PracticeCard({ targetLang, onClose }: Props) {
       {voiceError && <div className="vf-hint">{voiceError}</div>}
       {error && <div className="vf-hint">{error}</div>}
 
-      <div className="vf-card-actions">
-        {drill && !submitted && (
-          <button className="vf-card-btn" onClick={() => submitAnswer(answer)} disabled={!answer.trim()}>
-            {t('practice.submit')}
-          </button>
-        )}
+      {/* Its own class rather than .vf-card-actions: that rule ends in
+          `.vf-card-btn { margin-left: auto }`, which is fine for the review
+          card's single button but shoves two apart into opposite corners. */}
+      <div className="vf-practice-actions">
         {drill && submitted && (
           <button
             type="button"
@@ -323,9 +348,20 @@ export function PracticeCard({ targetLang, onClose }: Props) {
             <Icon name="volume" size={13} /> {t('practice.replay')}
           </button>
         )}
-        <button className="vf-card-btn" onClick={() => void generate()} disabled={generating}>
-          {generating ? t('practice.generating') : drill ? t('practice.another') : t('practice.start')}
-        </button>
+        <div className="vf-practice-actions-main">
+          {drill && !submitted && (
+            <button className="vf-card-btn" onClick={() => submitAnswer(answer)} disabled={!answer.trim()}>
+              {t('practice.submit')}
+            </button>
+          )}
+          <button
+            className={drill && !submitted ? 'vf-card-btn-ghost' : 'vf-card-btn'}
+            onClick={() => void generate()}
+            disabled={generating}
+          >
+            {generating ? t('practice.generating') : drill ? t('practice.another') : t('practice.start')}
+          </button>
+        </div>
       </div>
     </div>
   );
