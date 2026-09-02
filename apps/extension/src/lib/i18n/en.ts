@@ -338,6 +338,11 @@ export const strings = {
   'demo.voiceDenied': 'Chrome only asks for the microphone from a real tab, not from this popup.',
   'demo.allowMic': 'Allow microphone',
 
+  // ── Mastery progress bar ─────────────────────────────────────
+  'mastery.label': 'Progress to mastered',
+  'mastery.tooltip': '{pct}% of the way to mastered - about {n} more reviews',
+  'mastery.tooltipMastered': 'Mastered - this word has earned a long gap between reviews',
+
   // ── Microphone permission page ───────────────────────────────
   'mic.title': 'Microphone access',
   'mic.body': 'BrowseVocab needs your microphone so you can answer by speaking. Chrome will only ask for it from a real tab - that is why this page opened instead of prompting in the popup.',

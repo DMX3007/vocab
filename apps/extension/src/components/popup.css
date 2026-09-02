@@ -3118,6 +3118,48 @@ img.ach-badge {
   text-transform: uppercase;
   color: var(--ink-5);
 }
+/* Mastery progress bar — Review rows and Library cards. Width is the only
+   channel carrying the value: colour is reserved for the status pills, which
+   use it semantically (due / mastered / shelved), so a colour ramp here would
+   read as a competing status. */
+.mastery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.mastery-track {
+  flex: 1;
+  height: 4px;
+  min-width: 40px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+
+.mastery-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink-4);
+  transition: width 0.3s ease;
+}
+
+/* Only the finished state earns colour — it's the one value worth spotting
+   while scanning, and it matches the green "Mastered" bucket dot. */
+.mastery-track.done .mastery-fill { background: var(--leaf); }
+
+.mastery-caption {
+  flex: none;
+  font-size: 10px;
+  color: var(--ink-5);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mastery-fill { transition: none; }
+}
+
 .demo-input-row { margin-top: 14px; }
 
 /* The demo pane borrows the review card's markup (.vf-card-input-row,

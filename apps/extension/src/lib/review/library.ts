@@ -14,8 +14,12 @@ export function wordStatus(word: Word, now: Date): WordStatus {
   if (word.shelvedAt) return 'shelved';
   if (word.srsState.dueAt.getTime() <= now.getTime()) return 'due';
   if (isMastered(word)) return 'mastered';
-  if (word.srsState.intervalDays > 0) return 'learning';
-  return 'fresh';
+  // Deliberately isFreshWord, NOT `intervalDays > 0`. intervalDays stays 0
+  // for a word's WHOLE learning ladder — only graduating sets it — so the
+  // old check badged a word as "fresh" after thirteen drills across six
+  // days, and the Library's fresh/learning counts said the same. "Fresh"
+  // means untouched; anything answered even once is learning.
+  return isFreshWord(word) ? 'fresh' : 'learning';
 }
 
 /** A word that has never actually been attempted — saved, but not answered

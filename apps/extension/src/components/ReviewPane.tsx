@@ -4,8 +4,8 @@ import type { Word, ReviewLog } from '../lib/storage/types';
 import { SUPPORTED_LANGUAGES } from '../lib/languages';
 import { algoChoiceOptions, algoChoiceOf, parseAlgoChoice, algoBadgeLabel, type AlgoChoice } from '../lib/review/algo';
 import { sortForReview, type AlgoFilter } from '../lib/review/library';
-import { isMastered } from '../lib/review/progress';
-import { computeWordStatsById, algoProgress, estimateReviewsToMastery, type LadderProgress } from '../lib/review/word-stats';
+import { computeWordStatsById, algoProgress, type LadderProgress } from '../lib/review/word-stats';
+import { MasteryBar } from './MasteryBar';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import { useI18n } from '../lib/i18n';
 import type { AlgoId, Pace } from '@vocably/core';
@@ -113,7 +113,6 @@ export function ReviewPane({
     const accuracyText = stats
       ? `${stats.successRate}% (${stats.passed}/${stats.total})`
       : t('review.noReviewsYet');
-    const repsText = isMastered(w) ? t('review.mastered') : t('review.repsToGo', { n: estimateReviewsToMastery(w) });
     const detail = stats
       ? `${t('review.rowDetail', { passed: stats.passed, total: stats.total, pct: stats.successRate! })}, ${tp('review.missCount', stats.failed)}`
       : t('review.rowDetailNone');
@@ -124,8 +123,11 @@ export function ReviewPane({
           <div className="word-tr">{w.translations[0]}</div>
           <div className="word-stats-row" title={detail}>
             <span className="lib-card-algo">{algoBadgeLabel(w.srsState.algo, w.srsState.pace ?? 'aggressive', t)}</span>
-            <span className="word-stat-text">{formatLadder(algoProgress(w), t)} · {accuracyText} · {repsText}</span>
+            <span className="word-stat-text">{formatLadder(algoProgress(w), t)} · {accuracyText}</span>
           </div>
+          {/* The "n reviews to go" figure moved out of the text line above and
+              onto the bar's caption — same number, now with a picture of it. */}
+          <MasteryBar word={w} showCaption />
         </div>
         <div className="row-meta">
           <span className={pillClassName}>{pill}</span>

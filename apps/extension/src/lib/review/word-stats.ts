@@ -99,4 +99,43 @@ export function estimateReviewsToMastery(word: Word): number {
   return stepsRemaining + reviewRepsFrom(config.graduatingIntervalDays, easeFactor);
 }
 
+/** How far along the road to "mastered" a word is, 0..1 — what the progress
+ *  bar in the Review and Library tabs fills to.
+ *
+ *  Measured in REVIEWS, not days: (journey - remaining) / journey, where both
+ *  halves come from estimateReviewsToMastery so the bar and the "n reviews to
+ *  go" text beside it can never disagree. Days would be the wrong unit — the
+ *  learning ladder is 14 of the 18 reviews on the default pace but only ~7 of
+ *  the ~88 days, so a day-based bar would sit near zero through all the work
+ *  the user actually does.
+ *
+ *  The baseline is the SAME word rewound to the start of its ladder, keeping
+ *  its current ease. So a word that has become hard (low ease) honestly shows
+ *  less progress than an easy one at the same step — there genuinely is more
+ *  work left — instead of being measured against a stranger's easier journey.
+ *
+ *  Can go DOWN: a lapse halves the interval and re-lengthens the road, which
+ *  is the same reversibility isMastered has (see progress.ts). */
+export function masteryProgress(word: Word): number {
+  if (isMastered(word)) return 1;
+  const remaining = estimateReviewsToMastery(word);
+  const wholeJourney = estimateReviewsToMastery({
+    ...word,
+    srsState: {
+      ...word.srsState,
+      phase: 'learning',
+      stepIndex: 0,
+      intervalDays: 0,
+      repetitions: 0,
+    },
+  });
+  if (wholeJourney <= 0) return 0;
+  return clamp01(1 - remaining / wholeJourney);
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
+}
+
 export { NO_HISTORY as EMPTY_WORD_STATS };

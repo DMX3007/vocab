@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Icon } from './icons';
 import {
   wordStatus,
+  isFreshWord,
   sortWords,
   filterWords,
   filterByAlgo,
@@ -9,6 +10,7 @@ import {
   type AlgoFilter,
 } from '../lib/review/library';
 import { isMastered } from '../lib/review/progress';
+import { MasteryBar } from './MasteryBar';
 import { algoChoiceOptions, algoChoiceOf, parseAlgoChoice, algoBadgeLabel, type AlgoChoice } from '../lib/review/algo';
 import { trackedWords, msUntilDue, formatCountdown, formatOverdue } from '../lib/review/live-queue';
 import { speak } from '../lib/tts';
@@ -120,8 +122,11 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
   // aside, not "fresh" or "learning" in the sense those labels imply.
   const active = words.filter((w) => !w.shelvedAt);
   const mastered = active.filter(isMastered).length;
-  const learning = active.filter((w) => w.srsState.intervalDays > 0 && !isMastered(w)).length;
-  const fresh = active.filter((w) => w.srsState.intervalDays === 0).length;
+  // Split on isFreshWord, matching wordStatus — see its comment. Keying these
+  // off intervalDays put every word still on the learning ladder in "fresh",
+  // so the two counts were mislabelled, not merely approximate.
+  const fresh = active.filter((w) => isFreshWord(w) && !isMastered(w)).length;
+  const learning = active.length - mastered - fresh;
 
   return (
     <div className="library-view">
@@ -244,6 +249,7 @@ export function LibraryPane({ words, sort, setSort, search, setSearch, onDelete,
                     )}
                   </div>
                   <div className="lib-card-tr">{w.translations.join(', ')}</div>
+                  <MasteryBar word={w} />
                   <div className="lib-card-foot">
                     <div className="lib-card-foot-main">
                       <span className="lib-card-source">{source}</span>

@@ -41,8 +41,30 @@ describe('wordStatus', () => {
   it('learning when interval has grown but not yet mastered', () => {
     expect(wordStatus(word({ srsState: { intervalDays: 5 } }), NOW)).toBe('learning');
   });
-  it('fresh for a brand-new word (interval still 0)', () => {
-    expect(wordStatus(word({ srsState: { intervalDays: 0 } }), NOW)).toBe('fresh');
+  it('REGRESSION: a word part-way up the learning ladder is "learning", not "fresh"', () => {
+    // intervalDays stays 0 for the WHOLE learning ladder — only graduating
+    // sets it — so splitting fresh/learning on it badged a word as untouched
+    // after thirteen drills across six days, and the Library's fresh and
+    // learning counts repeated that. Not due here, so the due branch can't
+    // mask it.
+    const midLadder = word({
+      srsState: { phase: 'learning', stepIndex: 13, intervalDays: 0, repetitions: 0, lapses: 0 },
+    });
+    expect(wordStatus(midLadder, NOW)).toBe('learning');
+  });
+
+  it('a word that failed its first attempt is "learning" too — it has been touched', () => {
+    const missedOnce = word({
+      srsState: { phase: 'learning', stepIndex: 0, intervalDays: 0, repetitions: 0, lapses: 1 },
+    });
+    expect(wordStatus(missedOnce, NOW)).toBe('learning');
+  });
+
+  it('fresh only for a word never answered at all', () => {
+    // Every counter at zero — not merely intervalDays, which a word keeps at
+    // 0 for its entire learning ladder.
+    const brandNew = word({ srsState: { phase: 'learning', stepIndex: 0, intervalDays: 0, repetitions: 0, lapses: 0 } });
+    expect(wordStatus(brandNew, NOW)).toBe('fresh');
   });
   it('Leitner is mastered by reaching the last box, not by a day count', () => {
     const w = word({ srsState: { algo: 'leitner', stepIndex: 5, intervalDays: 16 } });
