@@ -1,6 +1,6 @@
-// DEMO MODE — see prompt-api.ts's header. Safe to delete with the folder.
+// PRACTICE MODE — see prompt-api.ts's header. Safe to delete with the folder.
 //
-// The pure half of the demo drill: choosing which library words to build a
+// The pure half of the practice drill: choosing which library words to build a
 // phrase around, writing the prompt, and cleaning up whatever the model
 // returns. No browser APIs here, so it's all unit-testable.
 

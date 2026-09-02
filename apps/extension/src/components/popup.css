@@ -3039,234 +3039,27 @@ img.ach-badge {
   font-weight: 700;
 }
 /* ── DEMO MODE (experimental — see src/lib/demo/). Safe to delete. ── */
-.demo-enter {
+/* PRACTICE MODE entry (see src/lib/practice/). Deliberately quieter than
+   .btn-primary: reviewing is the main action on this tab, practice is the
+   alternative. Removable with the feature. */
+.practice-enter {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  width: calc(100% - 28px);
-  margin: 0 14px 12px;
-  padding: 9px 12px;
-  border: 1px dashed var(--rule);
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
   border-radius: 10px;
   background: transparent;
   color: var(--ink-3);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.demo-enter:hover:not(:disabled) { background: var(--paper-2); color: var(--ink); }
-.demo-enter:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.demo-pane { padding: 14px; }
-
-.demo-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.demo-badge {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--heat);
-}
-.demo-sub { font-size: 12px; color: var(--ink-4); margin-top: 3px; }
-.demo-exit { flex: none; padding: 5px 10px; font-size: 11.5px; }
-
-.demo-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.demo-difficulty { display: inline-flex; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
-.demo-diff-btn {
-  padding: 7px 12px;
-  border: none;
-  background: transparent;
-  color: var(--ink-4);
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.demo-diff-btn.active { background: var(--paper-3); color: var(--ink); }
-.demo-generate { flex: 1; }
-
-.demo-note {
-  margin: 8px 0;
-  padding: 8px 10px;
-  border-radius: 9px;
-  background: var(--paper-2);
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--ink-3);
-}
-
-.demo-drill { margin-top: 14px; }
-.demo-prompt-row { display: flex; align-items: flex-start; gap: 8px; }
-.demo-phrase {
-  flex: 1;
-  font-family: var(--serif);
-  font-size: 19px;
-  line-height: 1.35;
-  color: var(--ink);
-}
-.demo-terms {
-  margin-top: 8px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-5);
-}
-/* Mastery progress bar — Review rows and Library cards. Width is the only
-   channel carrying the value: colour is reserved for the status pills, which
-   use it semantically (due / mastered / shelved), so a colour ramp here would
-   read as a competing status. */
-.mastery {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.mastery-track {
-  flex: 1;
-  height: 4px;
-  min-width: 40px;
-  border-radius: 999px;
-  background: var(--paper-3);
-  overflow: hidden;
-}
-
-.mastery-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--ink-4);
-  transition: width 0.3s ease;
-}
-
-/* Only the finished state earns colour — it's the one value worth spotting
-   while scanning, and it matches the green "Mastered" bucket dot. */
-.mastery-track.done .mastery-fill { background: var(--leaf); }
-
-.mastery-caption {
-  flex: none;
-  font-size: 10px;
-  color: var(--ink-5);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mastery-fill { transition: none; }
-}
-
-.demo-input-row { margin-top: 14px; }
-
-/* The demo pane borrows the review card's markup (.vf-card-input-row,
-   .vf-mic-btn, .vf-speak-btn, .vf-card-btn-ghost, .vf-hint) but lives in the
-   POPUP, whose stylesheet never defined those — they're in tooltip.css, which
-   only the content script loads. Unstyled, the mic button dropped below the
-   input as a bare browser button with no listening state at all, which is
-   most of why voice here looked broken. Re-stated in the popup's own tokens
-   rather than @import-ing tooltip.css: that sheet is hardcoded to the light
-   paper palette and would ignore dark mode. Scoped to .demo-pane so it stays
-   as removable as the rest of demo mode. */
-.demo-pane .vf-card-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.demo-pane .vf-mic-btn {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--rule);
-  border-radius: 11px;
-  background: var(--paper-2);
-  color: var(--ink-3);
-  cursor: pointer;
-}
-.demo-pane .vf-mic-btn:hover { background: var(--paper-3); }
-
-/* Armed but not capturing right now (between phrases, or just switched on) —
-   a steady tint, deliberately not animated, so only real listening pulses. */
-.demo-pane .vf-mic-btn.enabled {
-  background: var(--heat-soft);
-  border-color: var(--heat);
-  color: var(--heat);
-}
-.demo-pane .vf-mic-btn.listening {
-  background: var(--heat);
-  border-color: var(--heat);
-  color: var(--paper);
-  animation: demo-mic-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes demo-mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 oklch(0.62 0.18 35 / 0.4); }
-  50% { box-shadow: 0 0 0 6px oklch(0.62 0.18 35 / 0); }
-}
-
-.demo-pane .vf-speak-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-.demo-pane .vf-speak-btn:hover { background: var(--paper-2); }
-
-.demo-pane .vf-card-btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  height: 38px;
-  border: 1px solid var(--rule);
-  border-radius: 11px;
-  background: transparent;
-  color: var(--ink);
   font-family: inherit;
   font-size: 12.5px;
-  font-weight: 600;
   cursor: pointer;
 }
-.demo-pane .vf-card-btn-ghost:hover:not(:disabled) { background: var(--paper-2); }
-.demo-pane .vf-card-btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.demo-pane .vf-hint { color: var(--heat); }
-
-/* The one actionable fix for a blocked mic — full width so it reads as the
-   next step, not as a footnote next to the error it follows. */
-.demo-mic-fix { width: 100%; justify-content: center; margin-top: 8px; }
-
-.demo-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.demo-actions .btn-primary { flex: 1; }
-.demo-reference {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-left: 2px solid var(--leaf);
-  background: var(--paper-2);
-  border-radius: 0 9px 9px 0;
-}
-.demo-reference-label {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--ink-4);
-  margin-bottom: 4px;
-}
-.demo-reference-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); }
+.practice-enter:hover:not(:disabled) { background: var(--paper-2); color: var(--ink); }
+.practice-enter:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Pause control shown in the same strip the "paused" bar occupies, so the
    row either offers a pause or offers a resume — never both. */

@@ -7,7 +7,10 @@ import { computeProgressStats, computeUnlockedAchievementIds } from '../src/lib/
 import { translateWord } from '../src/lib/translate/mymemory';
 import { fetchDictionaryInfo } from '../src/lib/dictionary/freeDictionary';
 import { validateLicense } from '../src/lib/licensing/license-client';
-import type { Message, AchievementUnlockedMessage, BackgroundCommand, RequestShowOverlayResponse } from '../src/lib/messaging/protocol';
+import { checkAvailability, createSession, modelCanWrite, type PracticeSession } from '../src/lib/practice/prompt-api';
+import { SYSTEM_PROMPT, buildDrillPrompt, parseGeneratedPhrase, pickDrillWords, type DrillDifficulty } from '../src/lib/practice/drill';
+import { SUPPORTED_LANGUAGES } from '../src/lib/languages';
+import type { Message, AchievementUnlockedMessage, BackgroundCommand, RequestShowOverlayResponse, PracticeDrill } from '../src/lib/messaging/protocol';
 
 // The service worker owns the database AND drives the review alarm.
 // On each alarm it asks the active tab for its page context, decides via
@@ -223,11 +226,70 @@ export default defineBackground(() => {
         return translateWord(message.payload.term, message.payload.langFrom, message.payload.langTo);
       case 'ACTIVATE_LICENSE':
         return validateLicense(message.payload.key);
+      case 'PRACTICE_AVAILABILITY': {
+        const settings = await settingsStore.load();
+        return { availability: await checkAvailability(), canTranslate: modelCanWrite(settings.targetLang) };
+      }
+      case 'PRACTICE_GENERATE':
+        return generatePracticeDrill(message.payload.langTo, message.payload.difficulty);
       default: {
         const exhaustive: never = message
         throw new Error(`Unknown message: ${String(exhaustive)}`);
       }
     }
+  }
+
+  // ── PRACTICE MODE (see src/lib/practice/prompt-api.ts) ───────
+  //
+  // Generation lives here because the Prompt API is exposed to extension
+  // contexts ONLY — the on-page Practice card is a content script, in the
+  // page's isolated world, where LanguageModel simply doesn't exist.
+  //
+  // The session is cached in a plain module-scope variable, which is
+  // normally forbidden in this worker (see the file header). It's allowed
+  // precisely because losing it is harmless: MV3 killing the worker just
+  // means the next drill pays to open a session again. Nothing is READ
+  // BACK from it, so there's no state to corrupt — it's a cache, not
+  // storage. Anything that had to survive would still go to
+  // browser.storage.
+  let practiceSession: PracticeSession | null = null;
+
+  async function getPracticeSession(langTo: string): Promise<PracticeSession> {
+    if (practiceSession) return practiceSession;
+    practiceSession = await createSession(SYSTEM_PROMPT, { outputLanguages: ['en', langTo] });
+    return practiceSession;
+  }
+
+  async function generatePracticeDrill(langTo: string, difficulty: DrillDifficulty): Promise<PracticeDrill> {
+    const words = await repo.getAllWords(langTo);
+    const picked = pickDrillWords(words, difficulty);
+    if (picked.length === 0) throw new Error('No usable words to build a phrase from');
+
+    const terms = picked.map((w) => w.term);
+    const canTranslate = modelCanWrite(langTo);
+    const targetLabel = canTranslate
+      ? SUPPORTED_LANGUAGES.find((l) => l.code === langTo)?.label ?? langTo
+      : null;
+
+    let raw: string;
+    try {
+      raw = await (await getPracticeSession(langTo)).prompt(buildDrillPrompt(terms, difficulty, targetLabel));
+    } catch (err) {
+      // A session can go stale on its own (the worker was killed mid-flight,
+      // the model was evicted). Drop it and retry once from scratch before
+      // giving up, so a recoverable blip doesn't surface as a dead feature.
+      practiceSession = null;
+      raw = await (await getPracticeSession(langTo)).prompt(buildDrillPrompt(terms, difficulty, targetLabel));
+    }
+
+    const parsed = parseGeneratedPhrase(raw);
+    if (!parsed.english) throw new Error('The model returned nothing usable');
+    return {
+      english: parsed.english,
+      translated: canTranslate ? parsed.translated : null,
+      terms,
+      cues: picked.map((w) => w.translations[0] ?? w.term),
+    };
   }
 
   type TickContext = {

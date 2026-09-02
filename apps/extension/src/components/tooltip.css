@@ -896,3 +896,81 @@ img.ach-badge {
   border-radius: 50%;
   background: currentColor;
 }
+/* ── PRACTICE MODE (see src/lib/practice/) ──────────────────────────
+   The Practice card reuses the review card's shell (.vf-card and friends)
+   so the two modes read as one app; only what's genuinely different gets
+   its own rules. Removable with the feature. */
+
+.vf-practice-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.vf-practice-toggle {
+  padding: 3px 8px;
+  border: 1px solid rgba(28, 26, 23, 0.14);
+  border-radius: 999px;
+  background: transparent;
+  color: #6b5c50;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vf-practice-toggle:hover { background: rgba(28, 26, 23, 0.05); }
+
+.vf-practice-toggle.active {
+  background: #1c1a17;
+  border-color: #1c1a17;
+  color: #faf7f2;
+}
+
+.vf-practice-intro { margin-top: 14px; }
+
+.vf-practice-phrase-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* The generated phrase is the thing to read, so it takes the prompt's own
+   type; the row only has to make room for the speak button beside it. */
+.vf-practice-phrase-row .vf-card-prompt { flex: 1; margin: 0; }
+
+.vf-practice-terms {
+  margin-top: 10px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a89c8c;
+}
+
+/* Shown only after answering — the English the phrase was composed in,
+   which is the reference the learner was producing toward. */
+.vf-practice-reference {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 2px solid rgba(28, 26, 23, 0.18);
+  background: rgba(28, 26, 23, 0.03);
+  border-radius: 0 10px 10px 0;
+}
+
+.vf-practice-reference-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #a89c8c;
+  margin-bottom: 4px;
+}
+
+.vf-practice-reference-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #1c1a17;
+}

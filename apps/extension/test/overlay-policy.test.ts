@@ -58,15 +58,6 @@ describe('pausing suppresses interruptions WITHOUT touching the schedule', () =>
 });
 
 describe('decideOverlay', () => {
-  it('DEMO MODE suppresses normal review entirely (experimental — see src/lib/demo/)', () => {
-    // The whole isolation contract: while the demo is on, the ambient
-    // overlay must never fire, no matter how overdue anything is.
-    const decision = decideOverlay(settings({ demoModeEnabled: true }), page, NOW);
-    // Narrowed rather than reaching for .reason directly — OverlayDecision's
-    // 'show' arm has no reason field.
-    expect(decision).toEqual({ action: 'wait', reason: 'paused' });
-  });
-
   it('shows the overlay when something is due and nothing objects', () => {
     expect(decideOverlay(settings(), page, NOW).action).toBe('show');
   });

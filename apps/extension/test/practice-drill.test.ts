@@ -6,7 +6,7 @@ import {
   cleanGeneratedPhrase,
   canDrill,
   SYSTEM_PROMPT,
-} from '../src/lib/demo/drill';
+} from '../src/lib/practice/drill';
 import type { Word } from '../src/lib/storage/types';
 
 const NOW = new Date('2026-06-13T12:00:00Z');

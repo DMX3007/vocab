@@ -24,8 +24,8 @@ interface Props {
    *  button on an open card flips the same stored value either way. */
   voiceReviewEnabled: boolean;
   onVoiceReviewEnabledChange: (enabled: boolean) => void;
-  /** DEMO MODE (experimental — see src/lib/demo/). Removable. */
-  onEnterDemoMode: () => void;
+  /** PRACTICE MODE (see src/lib/practice/). Removable. */
+  onStartPractice: () => void;
   onStartReview: (algoFilter: AlgoFilter) => void;
   /** Unshelves the single oldest-shelved word and starts a review on it —
    *  offered only once nothing else is due (see the empty state below). */
@@ -74,7 +74,7 @@ function formatLadder(p: LadderProgress, t: ReturnType<typeof useI18n>['t']): st
 
 export function ReviewPane({
   words, logs, dueCount, targetLang, onLangChange, algo, pace, onAlgoChange,
-  voiceReviewEnabled, onVoiceReviewEnabledChange, onEnterDemoMode, onStartReview, onReviveShelved, ready, onDueCountChange,
+  voiceReviewEnabled, onVoiceReviewEnabledChange, onStartPractice, onStartReview, onReviveShelved, ready, onDueCountChange,
 }: Props) {
   const { t, tp } = useI18n();
   const [reviewFilter, setReviewFilter] = useState<AlgoFilter>('all');
@@ -181,9 +181,9 @@ export function ReviewPane({
         </div>
       </div>
 
-      {/* DEMO MODE entry (experimental — see src/lib/demo/). Removable. */}
-      <button className="demo-enter" onClick={onEnterDemoMode} disabled={!ready} title={t('demo.enterHint')}>
-        <Icon name="sparkle" size={12} /> {t('demo.enter')}
+      {/* PRACTICE MODE entry (see src/lib/practice/). Removable. */}
+      <button className="practice-enter" onClick={onStartPractice} disabled={!ready} title={t('practice.enterHint')}>
+        <Icon name="sparkle" size={12} /> {t('practice.enter')}
       </button>
 
       {dueCount > 0 && (

@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { wordClient } from '../../src/lib/messaging/client';
 import { SettingsStore } from '../../src/lib/review/settings-store';
-// DEMO MODE (experimental — see src/lib/demo/). Removable with its block below.
-import { DemoPane } from '../../src/components/DemoPane';
 import { DraftStore } from '../../src/lib/storage/draft-store';
 import { OverlayLockStore } from '../../src/lib/review/overlay-lock';
 import { resume, pauseFor, addToBlacklist, removeFromBlacklist, isBlacklisted, type OverlaySettings, type PausePreset } from '../../src/lib/review/overlay-policy';
@@ -332,10 +330,21 @@ export function Popup() {
     await refresh();
   }
 
-  /** DEMO MODE (experimental — see src/lib/demo/). Removable. */
-  async function handleDemoModeChange(demoModeEnabled: boolean) {
-    await settingsStore.update((s) => ({ ...s, demoModeEnabled }));
-    await refresh();
+  /** PRACTICE MODE (see src/lib/practice/). Opens the Practice card on the
+   *  page, the same surface review uses. Deliberately does NOT claim the
+   *  overlay lock the way handleStartReview does: that lock arbitrates who
+   *  may show a DUE WORD, and practice shows none — content.ts keeps the two
+   *  from colliding by refusing to replace a mounted practice surface. */
+  async function handleStartPractice() {
+    const targetLang = settings?.targetLang ?? (await settingsStore.load()).targetLang;
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error('no active tab');
+      await browser.tabs.sendMessage(tab.id, { type: 'SHOW_PRACTICE', langTo: targetLang });
+      window.close();
+    } catch {
+      showToast(t('toast.openWebpageFirst'));
+    }
   }
 
   async function handleVoiceReviewEnabledChange(voiceReviewEnabled: boolean) {
@@ -592,18 +601,7 @@ export function Popup() {
       )}
 
       <div className="tab-body">
-        {/* DEMO MODE (experimental — see src/lib/demo/). Takes over the
-            Review tab entirely while on, which is also what makes it
-            obvious that normal review is paused. Remove this one block
-            plus the import to drop the feature. */}
-        {tab === 'review' && settings?.demoModeEnabled && (
-          <DemoPane
-            words={words}
-            targetLang={settings?.targetLang ?? DEFAULT_TARGET_LANG}
-            onExit={() => void handleDemoModeChange(false)}
-          />
-        )}
-        {tab === 'review' && !settings?.demoModeEnabled && (
+        {tab === 'review' && (
           <ReviewPane
             words={words}
             logs={logs}
@@ -615,7 +613,7 @@ export function Popup() {
             onAlgoChange={handleDefaultAlgoChange}
             voiceReviewEnabled={settings?.voiceReviewEnabled ?? false}
             onVoiceReviewEnabledChange={handleVoiceReviewEnabledChange}
-            onEnterDemoMode={() => void handleDemoModeChange(true)}
+            onStartPractice={handleStartPractice}
             onStartReview={handleStartReview}
             onReviveShelved={handleReviveShelved}
             ready={ready}

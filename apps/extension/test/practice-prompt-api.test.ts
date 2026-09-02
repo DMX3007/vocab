@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MODEL_OUTPUT_LANGUAGES, modelCanWrite } from '../src/lib/demo/prompt-api';
+import { MODEL_OUTPUT_LANGUAGES, modelCanWrite } from '../src/lib/practice/prompt-api';
 
 describe('modelCanWrite', () => {
   it('accepts every language the built-in model attests to', () => {

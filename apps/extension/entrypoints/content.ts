@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Tooltip } from '../src/components/Tooltip';
 import { ReviewOverlay } from '../src/components/ReviewOverlay';
+import { PracticeOverlay } from '../src/components/PracticeOverlay';
 import { StreakReminder } from '../src/components/StreakReminder';
 import { AchievementToast } from '../src/components/AchievementToast';
 import tooltipCss from '../src/components/tooltip.css?inline';
@@ -26,6 +27,10 @@ import { I18nProvider } from '../src/lib/i18n';
 type ComponentPlacements =
   | { kind: 'icon' | 'tooltip' | 'skipped'; x: number; y: number; }
   | { kind: 'overlay'; }
+  // PRACTICE MODE — same full-page placement as 'overlay', kept as its own
+  // kind so showOverlay can tell "a review is up" from "the user is mid-
+  // phrase in Practice" and decline to replace the latter.
+  | { kind: 'practice'; }
   | { kind: 'streak'; };
 
 type Surface = { host: HTMLDivElement; root: Root; component: ComponentPlacements };
@@ -47,7 +52,7 @@ export default defineContentScript({
       unmount();
       let host = document.createElement('div');
 
-      host.style.cssText = component.kind === 'overlay'
+      host.style.cssText = component.kind === 'overlay' || component.kind === 'practice'
         ? 'position:fixed;inset:0;z-index:2147483647;'
         : component.kind === 'streak'
           // Covers the viewport (so the card's own fixed corner position
@@ -187,6 +192,12 @@ export default defineContentScript({
 
     // ── review overlay ─────────────────────────────────────────
     async function showOverlay(langTo: string, algoFilter?: AlgoFilter) {
+      // PRACTICE MODE guard (removable — see lib/practice/prompt-api.ts).
+      // mount() is exclusive, so without this a due word arriving mid-phrase
+      // would silently replace the Practice card the user is mid-sentence in.
+      // Practice is always something the user opened deliberately; a review
+      // that can wait a minute waits.
+      if (currentSurface?.component.kind === 'practice') return;
       const session = new ReviewSession(wordClient, { mode: 'normal' });
       await session.start(langTo, new Date(), { algoFilter });
       if (session.total === 0) return; // nothing due after all
@@ -206,6 +217,17 @@ export default defineContentScript({
           onLookupDictionary: (wordId: string) => wordClient.lookupDictionary(wordId, new Date()),
         }),
         { kind: 'overlay' },
+      );
+    }
+
+    // ── practice overlay (PRACTICE MODE) ───────────────────────
+    // Opened only on request from the popup — never by the scheduler, never
+    // on a timer. It shares the review overlay's surface and placement, so
+    // the two can't be on screen at once.
+    function showPractice(langTo: string) {
+      mount(
+        React.createElement(PracticeOverlay, { targetLang: langTo, onClose: unmount }),
+        { kind: 'practice' },
       );
     }
 
@@ -277,7 +299,6 @@ export default defineContentScript({
       burstPollInFlight = true;
       try {
         const settings = await settingsStore.load();
-        if (settings.demoModeEnabled) return; // DEMO MODE guard (removable — see OverlaySettings)
         if (isPausedOrSnoozed(settings, new Date())) return;
         if (isBlacklisted(settings, location.hostname)) return;
 
@@ -334,6 +355,13 @@ export default defineContentScript({
         // Acknowledge immediately either way — showOverlay's own await(s)
         // shouldn't hold up the sender (the popup awaits this to know a
         // content script is here before closing itself).
+        sendResponse(true);
+      }
+      // PRACTICE MODE (removable — see lib/practice/prompt-api.ts).
+      // Unconditional, unlike SHOW_OVERLAY above: the user explicitly asked
+      // for this from the popup, so it should replace whatever's on screen.
+      if (message?.type === 'SHOW_PRACTICE') {
+        showPractice(message.langTo);
         sendResponse(true);
       }
       if (message?.type === 'SHOW_STREAK_REMINDER') {

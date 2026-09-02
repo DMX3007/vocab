@@ -1,6 +1,8 @@
 import type { SaveWordInput, ReviewMode, WireWord, WireReviewLog, WireSrsState } from '../storage/types';
 import type { AlgoId, Direction, Grade, Pace } from '@vocably/core';
 import type { AlgoFilter } from '../review/library';
+import type { DrillDifficulty as PracticeDifficulty } from '../practice/drill';
+import type { ModelAvailability } from '../practice/prompt-api';
 
 // Why this exists: in a Chrome extension the content script runs in the
 // WEB PAGE's origin and the popup runs in the EXTENSION's origin. They do
@@ -32,6 +34,13 @@ export type RequestMap = {
     now: string;
   };
   ACTIVATE_LICENSE: { key: string };
+  /** PRACTICE MODE (see lib/practice/prompt-api.ts). Generation lives in the
+   *  background service worker for one hard reason: the Prompt API is only
+   *  exposed to EXTENSION contexts, and the Practice card is drawn by a
+   *  content script, which runs in the page's isolated world with no
+   *  LanguageModel global at all. So the card asks, the worker generates. */
+  PRACTICE_AVAILABILITY: Record<string, never>;
+  PRACTICE_GENERATE: { langTo: string; difficulty: PracticeDifficulty };
 };
 
 export type ResponseMap = {
@@ -53,7 +62,24 @@ export type ResponseMap = {
   LOOKUP_DICTIONARY: WireWord;
   UPDATE_WORD: WireWord;
   ACTIVATE_LICENSE: { valid: boolean; plan?: 'free' | 'premium'; limits?: { maxWords: number | null } };
+  PRACTICE_AVAILABILITY: { availability: ModelAvailability; canTranslate: boolean };
+  PRACTICE_GENERATE: PracticeDrill;
 };
+
+/** One generated phrase, already parsed and cleaned by the worker so the
+ *  card renders data rather than raw model output. */
+export interface PracticeDrill {
+  english: string;
+  /** The target-language rendering, or null when the model can't write that
+   *  language (see MODEL_OUTPUT_LANGUAGES) or didn't return a usable line. */
+  translated: string | null;
+  /** The picked words' own saved translations — the cue used when the model
+   *  can't write the target language. Correct by construction: they come
+   *  from the user's own library. */
+  cues: string[];
+  /** Which library words the phrase was built from. */
+  terms: string[];
+}
 
 
 export type MessageType = keyof RequestMap;
@@ -74,6 +100,9 @@ export type AchievementUnlockedMessage = { type: 'ACHIEVEMENT_UNLOCKED'; ids: st
 
 export type ContentCommand =
   | { type: "SHOW_OVERLAY"; langTo: string; algoFilter?: AlgoFilter }
+  /** PRACTICE MODE: the popup asks the active tab to open the Practice card
+   *  on the page, the same surface the review overlay uses. */
+  | { type: "SHOW_PRACTICE"; langTo: string }
   | { type: "GET_PAGE_CONTEXT" }
   | { type: "SHOW_STREAK_REMINDER"; streak: number; todayCount: number; dailyGoal: number }
   | AchievementUnlockedMessage

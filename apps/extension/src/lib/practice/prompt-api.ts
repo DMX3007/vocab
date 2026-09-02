@@ -1,23 +1,27 @@
 // ─────────────────────────────────────────────────────────────────
-// DEMO MODE — experimental, self-contained, safe to delete.
+// PRACTICE MODE — self-contained, still removable.
 //
-// Everything under src/lib/demo/ plus components/DemoPane.tsx is an
-// isolated experiment. Removing the feature means: delete this folder,
-// delete DemoPane.tsx, drop `demoModeEnabled` from OverlaySettings, and
-// remove the two one-line guards that read it (overlay-policy.ts's
-// decideOverlay and content.ts's pollForBurstDrill), and drop the
-// `.demo-*` / `.demo-pane .vf-*` blocks from popup.css. Nothing else in the
-// extension imports from here.
+// Everything under src/lib/practice/ plus components/PracticeCard.tsx and
+// PracticeOverlay.tsx. Removing the feature means: delete this folder and
+// those two components, drop the PRACTICE_* entries from the messaging
+// protocol and their handlers in background.ts, drop showPractice() and the
+// SHOW_PRACTICE case in content.ts, and remove the Practice button from
+// ReviewPane. Nothing else imports from here.
 //
-// Two things demo mode ADDED but does not own, so leave them in place:
+// Two things this mode ADDED but does not own, so leave them in place:
 // lib/voice/mic-permission.ts and the entrypoints/mic-permission/ page.
-// They fix a real Chrome limitation for any extension-page voice input, not
-// just this experiment.
+// They fix a real Chrome limitation for any extension-page voice input.
 // ─────────────────────────────────────────────────────────────────
 //
 // Thin wrapper over Chrome's built-in on-device model (Gemini Nano) via
 // the Prompt API. Runs entirely on the user's machine: no API key, no
 // network call, no cost, and nothing typed here ever leaves the device.
+//
+// WHERE THIS RUNS: the background service worker, and only there. The
+// Prompt API is exposed to EXTENSION contexts (service worker, extension
+// pages) — a content script runs in the page's isolated world and has no
+// LanguageModel global at all, so the on-page Practice card can't call this
+// directly and goes through PRACTICE_GENERATE messaging instead.
 //
 // The API has moved around a lot (window.ai.assistant -> window.ai
 // .languageModel -> a global LanguageModel), and availability is gated on
@@ -35,7 +39,7 @@ export type ModelAvailability =
   | 'downloading'
   | 'available';
 
-export interface DemoSession {
+export interface PracticeSession {
   prompt(input: string): Promise<string>;
   destroy(): void;
 }
@@ -68,7 +72,7 @@ interface CreateOptions {
 interface LanguageModelLike {
   availability?: () => Promise<string>;
   capabilities?: () => Promise<{ available?: string }>;
-  create: (options?: Record<string, unknown>) => Promise<DemoSession>;
+  create: (options?: Record<string, unknown>) => Promise<PracticeSession>;
 }
 
 function getApi(): LanguageModelLike | null {
@@ -119,7 +123,7 @@ export async function checkAvailability(): Promise<ModelAvailability> {
 export async function createSession(
   systemPrompt: string,
   options: CreateOptions = {},
-): Promise<DemoSession> {
+): Promise<PracticeSession> {
   const api = getApi();
   if (!api) throw new Error('Chrome built-in AI is not available in this browser.');
 

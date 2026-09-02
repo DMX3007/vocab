@@ -1,6 +1,7 @@
 import type { SaveWordInput, Word, ReviewMode, ReviewLog } from '../storage/types';
 import type { AlgoId, Direction, Grade, Pace, SrsState } from '@vocably/core';
 import type { Message, ResponseMap, MessageType } from './protocol';
+import type { DrillDifficulty } from '../practice/drill';
 import { reviveWord, reviveWords, reviveReviewLogs } from './revive';
 
 // Client used by the popup and the content script. It hides the messaging
@@ -96,6 +97,15 @@ export const wordClient = {
    *  invalid/unknown key — { valid: false } is an everyday result. */
   async activateLicense(key: string) {
     return send({ type: 'ACTIVATE_LICENSE', payload: { key } });
+  },
+  /** PRACTICE MODE. Both of these run the on-device model in the background
+   *  worker — see PRACTICE_AVAILABILITY in the protocol for why they can't
+   *  just be called locally from the on-page card. */
+  async practiceAvailability() {
+    return send({ type: 'PRACTICE_AVAILABILITY', payload: {} });
+  },
+  async generatePracticeDrill(langTo: string, difficulty: DrillDifficulty) {
+    return send({ type: 'PRACTICE_GENERATE', payload: { langTo, difficulty } });
   },
 };
 
