@@ -6,6 +6,8 @@ import {
   cleanGeneratedPhrase,
   canDrill,
   resolveTranslation,
+  tokenizePhrase,
+  findLocalHint,
   SYSTEM_PROMPT,
 } from '../src/lib/practice/drill';
 import type { Word } from '../src/lib/storage/types';
@@ -224,5 +226,63 @@ describe('resolveTranslation', () => {
     const translate = ok('x');
     expect(await resolveTranslation(null, '   ', 'en', 'ru', translate)).toEqual({ text: null, source: 'none' });
     expect(translate).not.toHaveBeenCalled();
+  });
+});
+
+describe('tokenizePhrase', () => {
+  it('round-trips: joining the tokens reproduces the phrase exactly', () => {
+    const phrase = 'Он проявил стойкость, не так ли?';
+    expect(tokenizePhrase(phrase).map((t) => t.text).join('')).toBe(phrase);
+  });
+
+  it('marks Cyrillic as words, not punctuation', () => {
+    // /\w+/ is ASCII-only and would treat every Russian word as a gap —
+    // and the languages this feature exists for are exactly the non-Latin
+    // ones, since those are the ones the model can't write.
+    const words = tokenizePhrase('Он проявил стойкость.').filter((t) => t.isWord).map((t) => t.text);
+    expect(words).toEqual(['Он', 'проявил', 'стойкость']);
+  });
+
+  it('keeps hyphens and apostrophes inside a single word', () => {
+    const words = tokenizePhrase("a well-known man doesn't quit").filter((t) => t.isWord).map((t) => t.text);
+    expect(words).toEqual(['a', 'well-known', 'man', "doesn't", 'quit']);
+  });
+
+  it('handles an empty phrase without throwing', () => {
+    expect(tokenizePhrase('')).toEqual([]);
+  });
+});
+
+describe('findLocalHint', () => {
+  const pairs = [{ term: 'fortitude', cue: 'стойкость' }, { term: 'candor', cue: 'откровенность' }];
+
+  it('matches a cue exactly, in either direction', () => {
+    expect(findLocalHint('стойкость', pairs)).toBe('fortitude');
+    expect(findLocalHint('fortitude', pairs)).toBe('стойкость');
+  });
+
+  it('is case-insensitive', () => {
+    expect(findLocalHint('Стойкость', pairs)).toBe('fortitude');
+  });
+
+  it('matches an inflected form by its stem', () => {
+    // Russian inflects heavily; the saved cue is the dictionary form but the
+    // phrase contains whatever case the sentence needed.
+    expect(findLocalHint('стойкостью', pairs)).toBe('fortitude');
+  });
+
+  it('does not match on a stem too short to be meaningful', () => {
+    // Guards against "на" matching "например" and handing out nonsense.
+    expect(findLocalHint('от', pairs)).toBeNull();
+  });
+
+  it('returns null for a word that is not in the drill at all', () => {
+    // The caller falls back to the translation provider from here.
+    expect(findLocalHint('проявил', pairs)).toBeNull();
+  });
+
+  it('returns null for blank input and empty pairs', () => {
+    expect(findLocalHint('   ', pairs)).toBeNull();
+    expect(findLocalHint('стойкость', [])).toBeNull();
   });
 });

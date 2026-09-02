@@ -29,7 +29,7 @@ import { SUPPORTED_LANGUAGES } from '../lib/languages';
 import { wordClient } from '../lib/messaging/client';
 import type { PracticeDrill } from '../lib/messaging/protocol';
 import type { ModelAvailability } from '../lib/practice/prompt-api';
-import type { DrillDifficulty, DrillDirection } from '../lib/practice/drill';
+import { findLocalHint, tokenizePhrase, type DrillDifficulty, type DrillDirection } from '../lib/practice/drill';
 
 const settingsStore = new SettingsStore(browser.storage.local);
 
@@ -63,6 +63,10 @@ export function PracticeCard({ targetLang, onClose }: Props) {
   /** Shared with the review card (OverlaySettings.voiceReviewEnabled) — one
    *  hands-free preference, not two. */
   const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
+  /** Words the user tapped in the prompt, lowercased, mapped to what they
+   *  mean. A null value means "looked it up and found nothing" — kept as a
+   *  key so the word doesn't look unclicked and invite endless retries. */
+  const [hints, setHints] = useState<Record<string, string | null>>({});
 
   const answerLang = direction === 'english' ? LEARNING_LANG : targetLang;
   const promptLang = direction === 'english' ? targetLang : LEARNING_LANG;
@@ -116,6 +120,7 @@ export function PracticeCard({ targetLang, onClose }: Props) {
     voiceRef.current = null;
     setListening(false);
     setVoiceError(null);
+    setHints({}); // a new phrase starts with nothing revealed
     inputRef.current?.focus();
   }, [drill]);
 
@@ -186,6 +191,33 @@ export function PracticeCard({ targetLang, onClose }: Props) {
     setListening(false);
     setSubmitted(true);
     if (referenceText) speak(referenceText, answerLang);
+  }
+
+  /** Reveals what one word of the prompt means.
+   *
+   *  The drill's own word pairs are consulted first: they come from the
+   *  user's library, so they're free and correct by construction. Only a
+   *  word from outside that set costs a provider call. */
+  async function revealWord(word: string) {
+    const key = word.toLowerCase();
+    if (key in hints || !drill) return; // already shown, or nothing to look up
+
+    const pairs = drill.terms.map((term, i) => ({ term, cue: drill.cues[i] ?? term }));
+    const local = findLocalHint(word, pairs);
+    if (local) {
+      setHints((h) => ({ ...h, [key]: local }));
+      return;
+    }
+    // Optimistically mark it as being looked up so a second tap can't fire
+    // a duplicate request while this one is in flight.
+    setHints((h) => ({ ...h, [key]: null }));
+    try {
+      const translated = await wordClient.translate(word, promptLang, answerLang);
+      if (translated.trim()) setHints((h) => ({ ...h, [key]: translated.trim() }));
+    } catch {
+      // Leaves the null already set — shown as "no translation found",
+      // which is the honest outcome and stops it being retried forever.
+    }
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -279,7 +311,26 @@ export function PracticeCard({ targetLang, onClose }: Props) {
       {drill && (
         <>
           <div className="vf-practice-phrase-row">
-            <div className="vf-card-prompt">{promptText}</div>
+            {/* Every word is a button: this mode is ungraded, so a hint is
+                the point rather than a leak. Stuck on one word shouldn't
+                mean abandoning the whole phrase. */}
+            <div className="vf-card-prompt vf-practice-phrase">
+              {tokenizePhrase(promptText).map((token, i) => (
+                token.isWord ? (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`vf-practice-word ${hints[token.text.toLowerCase()] ? 'revealed' : ''}`}
+                    onClick={() => void revealWord(token.text)}
+                    title={t('practice.wordHintTitle')}
+                  >
+                    {token.text}
+                  </button>
+                ) : (
+                  <span key={i}>{token.text}</span>
+                )
+              ))}
+            </div>
             <button
               type="button"
               className="vf-speak-btn"
@@ -293,6 +344,18 @@ export function PracticeCard({ targetLang, onClose }: Props) {
           {direction === 'english' && !drill.translated && (
             <div className="vf-card-ctx">{t('practice.cueFallback')}</div>
           )}
+          {Object.keys(hints).length > 0 && (
+            <div className="vf-practice-hints">
+              {Object.entries(hints).map(([word, hint]) => (
+                <span key={word} className="vf-practice-hint">
+                  <span className="vf-practice-hint-src">{word}</span>
+                  {' → '}
+                  {hint ?? t('practice.wordHintNone')}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="vf-practice-terms">
             <span className="vf-practice-terms-label">{t('practice.builtFrom')}</span>
             {drill.terms.join(' · ')}

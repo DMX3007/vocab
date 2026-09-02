@@ -309,6 +309,8 @@ export const strings: Record<TranslationKey, string> = {
   'practice.lengthLabel': 'Длина',
   'practice.langEnglish': 'English',
   'practice.builtFrom': 'Из слов',
+  'practice.wordHintTitle': 'Нажмите на незнакомое слово, чтобы увидеть перевод',
+  'practice.wordHintNone': 'перевод не найден',
   'practice.taskHint': 'Теперь скажите или напишите это на языке: {lang}.',
   'practice.introHint': 'Фраза составляется из слов вашей библиотеки. Скажите или напишите её на другом языке — оценок нет, расписание слов не меняется.',
   'practice.exit': '\u0412\u044b\u0439\u0442\u0438',

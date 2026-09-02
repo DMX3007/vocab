@@ -163,6 +163,79 @@ export async function resolveTranslation(
   }
 }
 
+/** One piece of a phrase split for display: either a clickable word or the
+ *  punctuation/whitespace between words, which must be preserved verbatim so
+ *  re-joining the tokens reproduces the original phrase exactly. */
+export interface PhraseToken {
+  text: string;
+  isWord: boolean;
+}
+
+/** Splits a phrase into clickable words and the gaps between them.
+ *
+ *  Deliberately Unicode-aware (\p{L}\p{N}) rather than /\w+/, which is
+ *  ASCII-only and would treat every Cyrillic word as punctuation — this
+ *  feature exists mainly for the languages the model can't write, which are
+ *  exactly the non-Latin ones. Hyphens and apostrophes stay inside a word so
+ *  "don't" and "well-known" are one token, not three. */
+export function tokenizePhrase(phrase: string): PhraseToken[] {
+  const tokens: PhraseToken[] = [];
+  const pattern = /[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu;
+  let lastIndex = 0;
+  for (const match of phrase.matchAll(pattern)) {
+    if (match.index > lastIndex) tokens.push({ text: phrase.slice(lastIndex, match.index), isWord: false });
+    tokens.push({ text: match[0], isWord: true });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < phrase.length) tokens.push({ text: phrase.slice(lastIndex), isWord: false });
+  return tokens;
+}
+
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase().replace(/[’']/g, "'").trim();
+}
+
+/** The shortest prefix worth trusting as an inflection match. Below this,
+ *  short words collide constantly ("на" would match "например"). */
+const MIN_STEM_MATCH = 4;
+
+/** Looks a clicked word up against the drill's OWN word pairs before asking
+ *  anything external.
+ *
+ *  These pairs come from the user's library, so a hit here is correct by
+ *  construction and free — no network, no rate limit, no wrong answer. It
+ *  matters most for the phrase side the model didn't write: those come from
+ *  a machine translator, and the learner is likeliest to get stuck exactly
+ *  on the word they saved in the first place.
+ *
+ *  Prefix matching is a deliberately crude stand-in for stemming: Russian
+ *  inflects heavily ("стойкость" appears as "стойкостью"), and a real
+ *  stemmer per language is far more than this hint is worth. Returns null
+ *  rather than guessing when nothing matches convincingly — the caller then
+ *  falls back to the translation provider. */
+export function findLocalHint(
+  word: string,
+  pairs: { term: string; cue: string }[],
+): string | null {
+  const needle = normalizeForMatch(word);
+  if (!needle) return null;
+
+  for (const { term, cue } of pairs) {
+    // Both directions: the clicked word may be the cue (reading the
+    // translated phrase) or the term itself (reading the English one).
+    for (const [candidate, answer] of [[cue, term], [term, cue]] as const) {
+      const hay = normalizeForMatch(candidate);
+      if (!hay) continue;
+      if (hay === needle) return answer;
+      const shorter = Math.min(hay.length, needle.length);
+      if (shorter >= MIN_STEM_MATCH && (hay.startsWith(needle) || needle.startsWith(hay))) {
+        return answer;
+      }
+    }
+  }
+  return null;
+}
+
 /** Whether the library has enough usable words to drill at all. */
 export function canDrill(words: Word[]): boolean {
   return words.some((w) => !w.deletedAt && !w.shelvedAt && w.term.trim());

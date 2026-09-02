@@ -313,6 +313,8 @@ export const strings = {
   'practice.lengthLabel': 'Length',
   'practice.langEnglish': 'English',
   'practice.builtFrom': 'Built from',
+  'practice.wordHintTitle': "Tap a word you don't know to see what it means",
+  'practice.wordHintNone': 'no translation found',
   'practice.taskHint': 'Now say or type this in {lang}.',
   'practice.introHint': "A phrase is built from words in your library. Say it or type it in the other language - nothing is scored, and no word's schedule changes.",
   'practice.exit': 'Exit',
